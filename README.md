@@ -4,7 +4,17 @@ This is a sandbox full of stuff/garbage for the STM32.
 #Setup of development environment (Ubuntu 10.04/12.04)
 
 ## Grab gcc-based toolchain
-* TODO
+I'm using the 4.6-2012-q2-update revision from the official GCC ARM launchpad repository:  https://launchpad.net/gcc-arm-embedded
+
+```
+sudo apt-get install ia32-libs
+
+cd ~/bin
+wget https://launchpad.net/gcc-arm-embedded/4.6/4.6-2012-q2-update/+download/gcc-arm-none-eabi-4_6-2012q2-20120614.tar.bz2
+tar xvfj gcc-arm-none-eabi-4_6-2012q2-20120614.tar.bz2
+rm gcc-arm-none-eabi-4_6-2012q2-20120614.tar.bz2.tar.bz2
+echo 'export PATH=~/bin/gcc-arm-none-eabi-4_6-2012q2/bin:$PATH' >> ~/.bashrc
+```
 
 ## Build OpenOCD
 ```
