@@ -1,6 +1,10 @@
 #STM32 Sandbox
 This is a sandbox full of stuff/garbage for the STM32.
 
+This repository is currently using:
+ * CMSIS v2.10, although the directory structure has been modified to be more like CMSIS v3.00. 
+ * STM32F4xx_StdPeriph_driver, v1.0.1
+
 #Setup of development environment (12.04)
 
 ## Grab gcc-based toolchain
