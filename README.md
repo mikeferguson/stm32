@@ -35,8 +35,6 @@ echo 'export PATH=$PATH:~/bin/openocd/src' >> ~/.bashrc
 ## Build DSP_Lib (optional)
 In the CMSIS directory, you can build the DSP_Lib by running Make. You may need to change the target processor as it is currently M4lf (Cortex M4, little-endian, with floating point).
 
-## Set paths
-
 # Connecting to a Target
 So far I haven't sorted out why openocd hates me, but the following command
 works around issues with jimtcl paths:
