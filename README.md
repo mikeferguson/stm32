@@ -32,6 +32,9 @@ make
 echo 'export PATH=$PATH:~/bin/openocd/src' >> ~/.bashrc
 ```
 
+## Build DSP_Lib (optional)
+In the CMSIS directory, you can build the DSP_Lib by running Make. You may need to change the target processor as it is currently M4lf (Cortex M4, little-endian, with floating point).
+
 ## Set paths
 
 # Connecting to a Target
@@ -44,4 +47,13 @@ sudo ../src/openocd  -f interface/flyswatter2.cfg -f target/stm32f4x.cfg
 ```
 
 Sudo may or may not be neccessary depending on your group configurations.
+
+I tend to use gdb to upload code and interact with the JTAG/STM32. The example makefile has a ".gdbinit" target which exports a .gdbinit file that allows you to run arm-none-eabi-gdb from within the project directory, and exposes a "flash" command to upload firmware, and a "reset" command that works around some quirks in either OpenOCD/Flyswatter/Lack-Of-Moon-Alignment:
+
+```
+cd <project>
+arm-none-eabi-gdb
+> flash
+```
+
 
