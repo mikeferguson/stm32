@@ -35,6 +35,9 @@
 #include "stm32f4xx.h"
 #include "gpio.hpp"
 
+/* This brings in the DSP library */
+#include "arm_math.h"
+
 typedef Gpio<GPIOD_BASE,3> act;  // activity LED
 typedef Gpio<GPIOD_BASE,4> stat; // status LED
 
@@ -61,8 +64,13 @@ int main(void)
 
   __enable_irq();
 
+
+  float x[10];
+
   while(1)
   {
+    /* really stupid test, just to see that DSP_Lib is building/linking */
+    arm_abs_f32(x, x, 10);
   }
 
 }

@@ -3,6 +3,7 @@ PRG         := template_f4
 # Architecture
 MCU         := STM32F4XX
 MCU_FLAGS   := -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
+MCU_FLAGS   += -DARM_MATH_CM4 -D__FPU_PRESENT
 # Linker Script
 LD_SCRIPT   := ../../libraries/ST/ld/STM32F407VET6.ld
 
@@ -20,10 +21,14 @@ SIZE        := arm-none-eabi-size
 INCLUDES    := -I. -I../../libraries/CMSIS/Include -I../../libraries/ST/inc
 CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections
 CXXFLAGS    := $(CFLAGS) -fno-exceptions
-LDFLAGS     := -T$(LD_SCRIPT) -v
+LDFLAGS     := -T$(LD_SCRIPT) --gc-sections -v
 CPFLAGS     := -Obinary -v
 ODFLAGS     := -S -t
 ARFLAGS     := 
+
+# DSP library support -- to use this, need to run "make" in CMSIS folder
+LDFLAGS     += -L../../libraries/CMSIS/Lib/
+LIBS        = -larm_cortexM4lf_math
 
 BUILD_PATH  := build
 BUILDDIRS   := $(BUILD_PATH)
@@ -88,7 +93,7 @@ $(BUILD_PATH)/$(PRG).bin: $(BUILD_PATH)/$(PRG).elf
 	@$(SIZE) $<
 
 $(BUILD_PATH)/$(PRG).elf: $(BUILDDIRS) $(TGT_BIN) 
-	$(LD) $(LDFLAGS) -o $@ $(TGT_BIN)
+	$(LD) $(LDFLAGS) -o $@ $(TGT_BIN) $(LIBS)
 
 $(BUILDDIRS):
 	@mkdir -p $@
