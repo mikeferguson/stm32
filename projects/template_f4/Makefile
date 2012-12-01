@@ -40,12 +40,6 @@ all: $(BUILD_PATH)/$(PRG).bin
 clean:
 	rm -rf build
 
-$(BUILD_PATH)/%.o: %.c
-	$(CC) $(CFLAGS) -std=c99 $(INCLUDES) -o $@ $<
-
-$(BUILD_PATH)/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
-
 # Build STM32_CPP
 INCLUDES    += -I../../libraries/libcpp/inc
 BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
@@ -86,6 +80,12 @@ $(BUILD_PATH)/std_periph/%.o: ../../libraries/STM32F4xx_StdPeriph_Driver/src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $<
 
 # Primary build rules
+$(BUILD_PATH)/%.o: %.c
+	$(CC) $(CFLAGS) -std=c99 $(INCLUDES) -o $@ $<
+
+$(BUILD_PATH)/%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
+
 $(BUILD_PATH)/$(PRG).bin: $(BUILD_PATH)/$(PRG).elf
 	$(CP) $(CPFLAGS) $(BUILD_PATH)/$(PRG).elf $@
 	$(OD) $(ODFLAGS) -d $(BUILD_PATH)/$(PRG).elf > $(BUILD_PATH)/$(PRG).lst
