@@ -34,7 +34,9 @@
  */
 
 #include "stm32f4xx.h"
+
 #include "gpio.hpp"
+#include "usart.hpp"
 #include "encoder.hpp"
 #include "ncv7729.hpp"
 
@@ -80,6 +82,9 @@ Encoder<TIM3_BASE> right_enc;
 /* two NCV7729 motor drivers */
 Ncv7729<SPI2_BASE, left_CS, TIM1_BASE, motor_enable, left_fault, 1> left_motor;
 Ncv7729<SPI2_BASE, right_CS, TIM1_BASE, motor_enable, right_fault, 2> right_motor;
+
+/* debugging via FTDI */
+Usart<USART1_BASE, 32> usart1;
 
 /* system clock */
 uint32_t system_clock;
@@ -133,6 +138,12 @@ int main(void)
   left_motor.init();
   right_motor.init();
 
+  // setup usart
+  RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+  usart1.init(115200);
+  NVIC_SetPriority(USART1_IRQn, 1);
+  NVIC_EnableIRQ(USART1_IRQn);
+
   // setup systick
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
@@ -175,6 +186,11 @@ void SysTick_Handler(void)
       top_b_led::low(); 
     }
   }
+}
+
+void USART1_IRQHandler(void)
+{
+  usart1.irq();
 }
 
 } /* extern C */
