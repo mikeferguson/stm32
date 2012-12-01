@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_biquad_cascade_df1_q31.c
@@ -11,6 +11,9 @@
 *				Q31 Biquad cascade filter
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -72,19 +75,22 @@ void arm_biquad_cascade_df1_q31(
   q31_t * pDst,
   uint32_t blockSize)
 {
+  q63_t acc;                                     /*  accumulator                   */
+  uint32_t uShift = ((uint32_t) S->postShift + 1u);
+  uint32_t lShift = 32u - uShift;                /*  Shift to be applied to the output */
   q31_t *pIn = pSrc;                             /*  input pointer initialization  */
   q31_t *pOut = pDst;                            /*  output pointer initialization */
   q31_t *pState = S->pState;                     /*  pState pointer initialization */
   q31_t *pCoeffs = S->pCoeffs;                   /*  coeff pointer initialization  */
-  q63_t acc;                                     /*  accumulator                   */
   q31_t Xn1, Xn2, Yn1, Yn2;                      /*  Filter state variables        */
   q31_t b0, b1, b2, a1, a2;                      /*  Filter coefficients           */
   q31_t Xn;                                      /*  temporary input               */
-  uint32_t shift = 32u - ((uint32_t) S->postShift + 1u);        /*  Shift to be applied to the output */
   uint32_t sample, stage = S->numStages;         /*  loop counters                     */
 
 
 #ifndef ARM_MATH_CM0
+
+  q31_t acc_l, acc_h;                            /*  temporary output variables    */
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
@@ -132,7 +138,15 @@ void arm_biquad_cascade_df1_q31(
       acc += (q63_t) a2 *Yn2;
 
       /* The result is converted to 1.31 , Yn2 variable is reused */
-      Yn2 = (q31_t) (acc >> shift);
+
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      Yn2 = (uint32_t) acc_l >> lShift | acc_h << uShift;
 
       /* Store the output in the destination buffer. */
       *pOut++ = Yn2;
@@ -155,7 +169,16 @@ void arm_biquad_cascade_df1_q31(
 
 
       /* The result is converted to 1.31, Yn1 variable is reused  */
-      Yn1 = (q31_t) (acc >> shift);
+
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      Yn1 = (uint32_t) acc_l >> lShift | acc_h << uShift;
 
       /* Store the output in the destination buffer. */
       *pOut++ = Yn1;
@@ -177,7 +200,15 @@ void arm_biquad_cascade_df1_q31(
       acc += (q63_t) a2 *Yn2;
 
       /* The result is converted to 1.31, Yn2 variable is reused  */
-      Yn2 = (q31_t) (acc >> shift);
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      Yn2 = (uint32_t) acc_l >> lShift | acc_h << uShift;
 
       /* Store the output in the destination buffer. */
       *pOut++ = Yn2;
@@ -199,7 +230,14 @@ void arm_biquad_cascade_df1_q31(
       acc += (q63_t) a2 *Yn1;
 
       /* The result is converted to 1.31, Yn1 variable is reused  */
-      Yn1 = (q31_t) (acc >> shift);
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      Yn1 = (uint32_t) acc_l >> lShift | acc_h << uShift;
 
       /* Every time after the output is computed state should be updated. */
       /* The states should be updated as:  */
@@ -240,7 +278,7 @@ void arm_biquad_cascade_df1_q31(
       acc += (q63_t) a2 *Yn2;
 
       /* The result is converted to 1.31  */
-      acc = acc >> shift;
+      acc = acc >> lShift;
 
       /* Every time after the output is computed state should be updated. */
       /* The states should be updated as:  */
@@ -319,7 +357,7 @@ void arm_biquad_cascade_df1_q31(
       acc += (q63_t) a2 *Yn2;
 
       /* The result is converted to 1.31  */
-      acc = acc >> shift;
+      acc = acc >> lShift;
 
       /* Every time after the output is computed state should be updated. */
       /* The states should be updated as:  */

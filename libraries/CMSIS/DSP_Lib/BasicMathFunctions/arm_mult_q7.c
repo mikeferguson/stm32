@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mult_q7.c
@@ -10,6 +10,9 @@
 * Description:	Q7 vector multiplication.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -83,10 +86,10 @@ void arm_mult_q7(
   {
     /* C = A * B */
     /* Multiply the inputs and store the results in temporary variables */
-    out1 = (q7_t) (((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7);
-    out2 = (q7_t) (((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7);
-    out3 = (q7_t) (((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7);
-    out4 = (q7_t) (((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7);
+    out1 = (q7_t) __SSAT((((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7), 8);
+    out2 = (q7_t) __SSAT((((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7), 8);
+    out3 = (q7_t) __SSAT((((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7), 8);
+    out4 = (q7_t) __SSAT((((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7), 8);
 
     /* Store the results of 4 inputs in the destination buffer in single cycle by packing */
     *__SIMD32(pDst)++ = __PACKq7(out1, out2, out3, out4);
@@ -113,7 +116,7 @@ void arm_mult_q7(
   {
     /* C = A * B */
     /* Multiply the inputs and store the result in the destination buffer */
-    *pDst++ = (q7_t) (((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7);
+    *pDst++ = (q7_t) __SSAT((((q15_t) (*pSrcA++) * (*pSrcB++)) >> 7), 8);
 
     /* Decrement the blockSize loop counter */
     blkCnt--;

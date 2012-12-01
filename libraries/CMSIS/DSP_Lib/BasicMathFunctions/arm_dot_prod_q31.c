@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_dot_prod_q31.c
@@ -10,6 +10,9 @@
 * Description:	Q31 dot product.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -72,6 +75,8 @@ void arm_dot_prod_q31(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t inA1, inA2, inA3, inA4;
+  q31_t inB1, inB2, inB3, inB4;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -82,10 +87,19 @@ void arm_dot_prod_q31(
   {
     /* C = A[0]* B[0] + A[1]* B[1] + A[2]* B[2] + .....+ A[blockSize-1]* B[blockSize-1] */
     /* Calculate dot product and then store the result in a temporary buffer. */
-    sum += ((q63_t) * pSrcA++ * *pSrcB++) >> 14u;
-    sum += ((q63_t) * pSrcA++ * *pSrcB++) >> 14u;
-    sum += ((q63_t) * pSrcA++ * *pSrcB++) >> 14u;
-    sum += ((q63_t) * pSrcA++ * *pSrcB++) >> 14u;
+    inA1 = *pSrcA++;
+    inA2 = *pSrcA++;
+    inA3 = *pSrcA++;
+    inA4 = *pSrcA++;
+    inB1 = *pSrcB++;
+    inB2 = *pSrcB++;
+    inB3 = *pSrcB++;
+    inB4 = *pSrcB++;
+
+    sum += ((q63_t) inA1 * inB1) >> 14u;
+    sum += ((q63_t) inA2 * inB2) >> 14u;
+    sum += ((q63_t) inA3 * inB3) >> 14u;
+    sum += ((q63_t) inA4 * inB4) >> 14u;
 
     /* Decrement the loop counter */
     blkCnt--;

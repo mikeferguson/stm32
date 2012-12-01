@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_mult_fast_q15.c
@@ -10,6 +10,9 @@
 * Description:	 Q15 matrix multiplication (fast variant)
 *
 * Target Processor: Cortex-M4/Cortex-M3
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -78,11 +81,9 @@ arm_status arm_mat_mult_fast_q15(
   q15_t * pState)
 {
   q31_t sum;                                     /* accumulator */
-  q31_t in;                                      /* Temporary variable to hold the input value */
   q15_t *pSrcBT = pState;                        /* input data matrix pointer for transpose */
   q15_t *pInA = pSrcA->pData;                    /* input data matrix pointer A of Q15 type */
   q15_t *pInB = pSrcB->pData;                    /* input data matrix pointer B of Q15 type */
-//  q15_t *pDst = pDst->pData;                   /* output data matrix pointer */
   q15_t *px;                                     /* Temporary output data matrix pointer */
   uint16_t numRowsA = pSrcA->numRows;            /* number of rows of input matrix A    */
   uint16_t numColsB = pSrcB->numCols;            /* number of columns of input matrix B */
@@ -91,11 +92,20 @@ arm_status arm_mat_mult_fast_q15(
   uint16_t col, i = 0u, row = numRowsB, colCnt;  /* loop counters */
   arm_status status;                             /* status of matrix multiplication */
 
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
+  q31_t in;                                      /* Temporary variable to hold the input value */
+  q31_t inA1, inA2, inB1, inB2;
+
+#else
+
+  q15_t in;                                      /* Temporary variable to hold the input value */
+  q15_t inA1, inA2, inB1, inB2;
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE	*/
+
 #ifdef ARM_MATH_MATRIX_CHECK
-
-
   /* Check for matrix mismatch condition */
-
   if((pSrcA->numCols != pSrcB->numRows) ||
      (pSrcA->numRows != pDst->numRows) || (pSrcB->numCols != pDst->numCols))
   {
@@ -103,8 +113,7 @@ arm_status arm_mat_mult_fast_q15(
     status = ARM_MATH_SIZE_MISMATCH;
   }
   else
-#endif /*      #ifdef ARM_MATH_MATRIX_CHECK    */
-
+#endif
   {
     /* Matrix transpose */
     do
@@ -119,6 +128,7 @@ arm_status arm_mat_mult_fast_q15(
        ** a second loop below computes the remaining 1 to 3 samples. */
       while(col > 0u)
       {
+#ifndef UNALIGNED_SUPPORT_DISABLE
         /* Read two elements from the row */
         in = *__SIMD32(pInB)++;
 
@@ -147,7 +157,6 @@ arm_status arm_mat_mult_fast_q15(
 
 #endif /*    #ifndef ARM_MATH_BIG_ENDIAN    */
 
-
         /* Update the pointer px to point to the next row of the transposed matrix */
         px += numRowsB;
 
@@ -180,7 +189,44 @@ arm_status arm_mat_mult_fast_q15(
 
 #endif /*    #ifndef ARM_MATH_BIG_ENDIAN    */
 
+#else
+
+        /* Read one element from the row */
+        in = *pInB++;
+
+        /* Store one element in the destination */
+        *px = in;
+
         /* Update the pointer px to point to the next row of the transposed matrix */
+        px += numRowsB;
+
+        /* Read one element from the row */
+        in = *pInB++;
+
+        /* Store one element in the destination */
+        *px = in;
+
+        /* Update the pointer px to point to the next row of the transposed matrix */
+        px += numRowsB;
+
+        /* Read one element from the row */
+        in = *pInB++;
+
+        /* Store one element in the destination */
+        *px = in;
+
+        /* Update the pointer px to point to the next row of the transposed matrix */
+        px += numRowsB;
+
+        /* Read one element from the row */
+        in = *pInB++;
+
+        /* Store one element in the destination */
+        *px = in;
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE	*/
+
+		/* Update the pointer px to point to the next row of the transposed matrix */
         px += numRowsB;
 
         /* Decrement the column loop counter */
@@ -233,7 +279,7 @@ arm_status arm_mat_mult_fast_q15(
         sum = 0;
 
         /* Apply loop unrolling and compute 2 MACs simultaneously. */
-        colCnt = numColsA >> 1;
+        colCnt = numColsA >> 2;
 
         /* Initiate the pointer pIn1 to point to the starting address of the column being processed */
         pInA = pSrcA->pData + i;
@@ -242,17 +288,48 @@ arm_status arm_mat_mult_fast_q15(
         while(colCnt > 0u)
         {
           /* c(m,n) = a(1,1)*b(1,1) + a(1,2) * b(2,1) + .... + a(m,p)*b(p,n) */
-          sum = __SMLAD(*__SIMD32(pInA)++, *__SIMD32(pInB)++, sum);
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
+          inA1 = *__SIMD32(pInA)++;
+          inB1 = *__SIMD32(pInB)++;
+          inA2 = *__SIMD32(pInA)++;
+          inB2 = *__SIMD32(pInB)++;
+
+          sum = __SMLAD(inA1, inB1, sum);
+          sum = __SMLAD(inA2, inB2, sum);
+
+#else
+
+          inA1 = *pInA++;
+          inB1 = *pInB++;
+          inA2 = *pInA++;
+          sum += inA1 * inB1;
+          inB2 = *pInB++;
+
+          inA1 = *pInA++;
+          inB1 = *pInB++;
+          sum += inA2 * inB2;
+          inA2 = *pInA++;
+          inB2 = *pInB++;
+
+          sum += inA1 * inB1;
+          sum += inA2 * inB2;
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE	*/
 
           /* Decrement the loop counter */
           colCnt--;
         }
 
         /* process odd column samples */
-        if((numColsA & 0x1u) > 0u)
+        colCnt = numColsA % 0x4u;
+
+        while(colCnt > 0u)
         {
           /* c(m,n) = a(1,1)*b(1,1) + a(1,2) * b(2,1) + .... + a(m,p)*b(p,n) */
-          sum += ((q31_t) * pInA * (*pInB++));
+          sum += (q31_t) (*pInA++) * (*pInB++);
+
+          colCnt--;
         }
 
         /* Saturate and store the result in the destination buffer */

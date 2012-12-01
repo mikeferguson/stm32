@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_biquad_cascade_df1_32x64_q31.c
@@ -10,6 +10,9 @@
 * Description:	High precision Q31 Biquad cascade filter processing function
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -184,11 +187,15 @@ void arm_biquad_cas_df1_32x64_q31(
   q63_t *pState = S->pState;                     /*  state pointer initialization  */
   q31_t *pCoeffs = S->pCoeffs;                   /*  coeff pointer initialization  */
   q63_t acc;                                     /*  accumulator                   */
-  q63_t Xn1, Xn2, Yn1, Yn2;                      /*  Filter state variables        */
+  q31_t Xn1, Xn2;                                /*  Input Filter state variables        */
+  q63_t Yn1, Yn2;                                /*  Output Filter state variables        */
   q31_t b0, b1, b2, a1, a2;                      /*  Filter coefficients           */
-  q63_t Xn;                                      /*  temporary input               */
+  q31_t Xn;                                      /*  temporary input               */
   int32_t shift = (int32_t) S->postShift + 1;    /*  Shift to be applied to the output */
   uint32_t sample, stage = S->numStages;         /*  loop counters                     */
+  q31_t acc_l, acc_h;                            /*  temporary output               */
+  uint32_t uShift = ((uint32_t) S->postShift + 1u);
+  uint32_t lShift = 32u - uShift;                /*  Shift to be applied to the output */
 
 
 #ifndef ARM_MATH_CM0
@@ -205,8 +212,8 @@ void arm_biquad_cas_df1_32x64_q31(
     a2 = *pCoeffs++;
 
     /* Reading the state values */
-    Xn1 = pState[0];
-    Xn2 = pState[1];
+    Xn1 = (q31_t) (pState[0]);
+    Xn2 = (q31_t) (pState[1]);
     Yn1 = pState[2];
     Yn2 = pState[3];
 
@@ -225,98 +232,142 @@ void arm_biquad_cas_df1_32x64_q31(
       /* Read the input */
       Xn = *pIn++;
 
-      /* The value is shifted to the MSB to perform 32x64 multiplication */
-      Xn = Xn << 32;
-
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
 
       /* acc =  b0 * x[n] */
-      acc = mult32x64(Xn, b0);
+      acc = (q63_t) Xn *b0;
+
       /* acc +=  b1 * x[n-1] */
-      acc += mult32x64(Xn1, b1);
+      acc += (q63_t) Xn1 *b1;
+
       /* acc +=  b[2] * x[n-2] */
-      acc += mult32x64(Xn2, b2);
+      acc += (q63_t) Xn2 *b2;
+
       /* acc +=  a1 * y[n-1] */
       acc += mult32x64(Yn1, a1);
+
       /* acc +=  a2 * y[n-2] */
       acc += mult32x64(Yn2, a2);
 
       /* The result is converted to 1.63 , Yn2 variable is reused */
       Yn2 = acc << shift;
 
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      acc_h = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
       /* Store the output in the destination buffer in 1.31 format. */
-      *pOut++ = (q31_t) (acc >> (32 - shift));
+      *pOut = acc_h;
 
       /* Read the second input into Xn2, to reuse the value */
       Xn2 = *pIn++;
 
-      /* The value is shifted to the MSB to perform 32x64 multiplication */
-      Xn2 = Xn2 << 32;
-
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
 
-      /* acc =  b0 * x[n] */
-      acc = mult32x64(Xn2, b0);
       /* acc +=  b1 * x[n-1] */
-      acc += mult32x64(Xn, b1);
+      acc = (q63_t) Xn *b1;
+
+      /* acc =  b0 * x[n] */
+      acc += (q63_t) Xn2 *b0;
+
       /* acc +=  b[2] * x[n-2] */
-      acc += mult32x64(Xn1, b2);
+      acc += (q63_t) Xn1 *b2;
+
       /* acc +=  a1 * y[n-1] */
       acc += mult32x64(Yn2, a1);
+
       /* acc +=  a2 * y[n-2] */
       acc += mult32x64(Yn1, a2);
 
       /* The result is converted to 1.63, Yn1 variable is reused */
       Yn1 = acc << shift;
 
-      /* The result is converted to 1.31 */
-      /* Store the output in the destination buffer. */
-      *pOut++ = (q31_t) (acc >> (32 - shift));
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      acc_h = (uint32_t) acc_l >> lShift | acc_h << uShift;
 
       /* Read the third input into Xn1, to reuse the value */
       Xn1 = *pIn++;
 
-      /* The value is shifted to the MSB to perform 32x64 multiplication */
-      Xn1 = Xn1 << 32;
+      /* The result is converted to 1.31 */
+      /* Store the output in the destination buffer. */
+      *(pOut + 1u) = acc_h;
 
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
+
       /* acc =  b0 * x[n] */
-      acc = mult32x64(Xn1, b0);
+      acc = (q63_t) Xn1 *b0;
+
       /* acc +=  b1 * x[n-1] */
-      acc += mult32x64(Xn2, b1);
+      acc += (q63_t) Xn2 *b1;
+
       /* acc +=  b[2] * x[n-2] */
-      acc += mult32x64(Xn, b2);
+      acc += (q63_t) Xn *b2;
+
       /* acc +=  a1 * y[n-1] */
       acc += mult32x64(Yn1, a1);
+
       /* acc +=  a2 * y[n-2] */
       acc += mult32x64(Yn2, a2);
 
       /* The result is converted to 1.63, Yn2 variable is reused  */
       Yn2 = acc << shift;
 
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      acc_h = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
       /* Store the output in the destination buffer in 1.31 format. */
-      *pOut++ = (q31_t) (acc >> (32 - shift));
+      *(pOut + 2u) = acc_h;
 
       /* Read the fourth input into Xn, to reuse the value */
       Xn = *pIn++;
 
-      /* The value is shifted to the MSB to perform 32x64 multiplication */
-      Xn = Xn << 32;
-
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
       /* acc =  b0 * x[n] */
-      acc = mult32x64(Xn, b0);
+      acc = (q63_t) Xn *b0;
+
       /* acc +=  b1 * x[n-1] */
-      acc += mult32x64(Xn1, b1);
+      acc += (q63_t) Xn1 *b1;
+
       /* acc +=  b[2] * x[n-2] */
-      acc += mult32x64(Xn2, b2);
+      acc += (q63_t) Xn2 *b2;
+
       /* acc +=  a1 * y[n-1] */
       acc += mult32x64(Yn2, a1);
+
       /* acc +=  a2 * y[n-2] */
       acc += mult32x64(Yn1, a2);
 
       /* The result is converted to 1.63, Yn1 variable is reused  */
       Yn1 = acc << shift;
+
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      acc_h = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+      /* Store the output in the destination buffer in 1.31 format. */
+      *(pOut + 3u) = acc_h;
 
       /* Every time after the output is computed state should be updated. */
       /* The states should be updated as:  */
@@ -327,8 +378,8 @@ void arm_biquad_cas_df1_32x64_q31(
       Xn2 = Xn1;
       Xn1 = Xn;
 
-      /* Store the output in the destination buffer in 1.31 format. */
-      *pOut++ = (q31_t) (acc >> (32 - shift));
+      /* update output pointer */
+      pOut += 4u;
 
       /* decrement the loop counter */
       sample--;
@@ -343,16 +394,14 @@ void arm_biquad_cas_df1_32x64_q31(
       /* Read the input */
       Xn = *pIn++;
 
-      /* The value is shifted to the MSB to perform 32x64 multiplication */
-      Xn = Xn << 32;
-
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
+
       /* acc =  b0 * x[n] */
-      acc = mult32x64(Xn, b0);
+      acc = (q63_t) Xn *b0;
       /* acc +=  b1 * x[n-1] */
-      acc += mult32x64(Xn1, b1);
+      acc += (q63_t) Xn1 *b1;
       /* acc +=  b[2] * x[n-2] */
-      acc += mult32x64(Xn2, b2);
+      acc += (q63_t) Xn2 *b2;
       /* acc +=  a1 * y[n-1] */
       acc += mult32x64(Yn1, a1);
       /* acc +=  a2 * y[n-2] */
@@ -367,10 +416,24 @@ void arm_biquad_cas_df1_32x64_q31(
       Xn2 = Xn1;
       Xn1 = Xn;
       Yn2 = Yn1;
+      /* The result is converted to 1.63, Yn1 variable is reused  */
       Yn1 = acc << shift;
 
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      acc_h = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
       /* Store the output in the destination buffer in 1.31 format. */
-      *pOut++ = (q31_t) (acc >> (32 - shift));
+      *pOut++ = acc_h;
+      //Yn1 = acc << shift;
+
+      /* Store the output in the destination buffer in 1.31 format. */
+//      *pOut++ = (q31_t) (acc >> (32 - shift));
 
       /* decrement the loop counter */
       sample--;
@@ -383,8 +446,9 @@ void arm_biquad_cas_df1_32x64_q31(
     pOut = pDst;
 
     /*  Store the updated state variables back into the pState array */
-    *pState++ = Xn1;
-    *pState++ = Xn2;
+    /*  Store the updated state variables back into the pState array */
+    *pState++ = (q63_t) Xn1;
+    *pState++ = (q63_t) Xn2;
     *pState++ = Yn1;
     *pState++ = Yn2;
 
@@ -421,16 +485,13 @@ void arm_biquad_cas_df1_32x64_q31(
       /* Read the input */
       Xn = *pIn++;
 
-      /* The value is shifted to the MSB to perform 32x64 multiplication */
-      Xn = Xn << 32;
-
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
       /* acc =  b0 * x[n] */
-      acc = mult32x64(Xn, b0);
+      acc = (q63_t) Xn *b0;
       /* acc +=  b1 * x[n-1] */
-      acc += mult32x64(Xn1, b1);
+      acc += (q63_t) Xn1 *b1;
       /* acc +=  b[2] * x[n-2] */
-      acc += mult32x64(Xn2, b2);
+      acc += (q63_t) Xn2 *b2;
       /* acc +=  a1 * y[n-1] */
       acc += mult32x64(Yn1, a1);
       /* acc +=  a2 * y[n-2] */
@@ -445,10 +506,26 @@ void arm_biquad_cas_df1_32x64_q31(
       Xn2 = Xn1;
       Xn1 = Xn;
       Yn2 = Yn1;
+
+      /* The result is converted to 1.63, Yn1 variable is reused  */
       Yn1 = acc << shift;
 
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      acc_h = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
       /* Store the output in the destination buffer in 1.31 format. */
-      *pOut++ = (q31_t) (acc >> (32 - shift));
+      *pOut++ = acc_h;
+
+      //Yn1 = acc << shift;
+
+      /* Store the output in the destination buffer in 1.31 format. */
+      //*pOut++ = (q31_t) (acc >> (32 - shift));
 
       /* decrement the loop counter */
       sample--;
@@ -461,8 +538,8 @@ void arm_biquad_cas_df1_32x64_q31(
     pOut = pDst;
 
     /*  Store the updated state variables back into the pState array */
-    *pState++ = Xn1;
-    *pState++ = Xn2;
+    *pState++ = (q63_t) Xn1;
+    *pState++ = (q63_t) Xn2;
     *pState++ = Yn1;
     *pState++ = Yn2;
 

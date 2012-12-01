@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_q31_to_q7.c
@@ -10,6 +10,9 @@
 * Description:	Converts the elements of the Q31 vector to Q7 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -67,6 +70,8 @@ void arm_q31_to_q7(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t in1, in2, in3, in4;
+  q7_t out1, out2, out3, out4;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -77,10 +82,17 @@ void arm_q31_to_q7(
   {
     /* C = (q7_t) A >> 24 */
     /* convert from q31 to q7 and then store the results in the destination buffer */
-    *pDst++ = (q7_t) (*pIn++ >> 24);
-    *pDst++ = (q7_t) (*pIn++ >> 24);
-    *pDst++ = (q7_t) (*pIn++ >> 24);
-    *pDst++ = (q7_t) (*pIn++ >> 24);
+    in1 = *pIn++;
+    in2 = *pIn++;
+    in3 = *pIn++;
+    in4 = *pIn++;
+
+    out1 = (q7_t) (in1 >> 24);
+    out2 = (q7_t) (in2 >> 24);
+    out3 = (q7_t) (in3 >> 24);
+    out4 = (q7_t) (in4 >> 24);
+
+    *__SIMD32(pDst)++ = __PACKq7(out1, out2, out3, out4);
 
     /* Decrement the loop counter */
     blkCnt--;

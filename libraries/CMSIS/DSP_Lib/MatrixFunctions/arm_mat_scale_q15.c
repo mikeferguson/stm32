@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_scale_q15.c
@@ -10,6 +10,9 @@
 * Description:	Multiplies a Q15 matrix by a scalar.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,9 +76,15 @@ arm_status arm_mat_scale_q15(
   uint32_t blkCnt;                               /* loop counters */
   arm_status status;                             /* status of matrix scaling     */
 
+#ifndef ARM_MATH_CM0
+
+  q15_t in1, in2, in3, in4;
+  q31_t out1, out2, out3, out4;
+  q31_t inA1, inA2;
+
+#endif //     #ifndef ARM_MATH_CM0
+
 #ifdef ARM_MATH_MATRIX_CHECK
-
-
   /* Check for matrix mismatch */
   if((pSrc->numRows != pDst->numRows) || (pSrc->numCols != pDst->numCols))
   {
@@ -83,8 +92,7 @@ arm_status arm_mat_scale_q15(
     status = ARM_MATH_SIZE_MISMATCH;
   }
   else
-#endif /*    #ifdef ARM_MATH_MATRIX_CHECK    */
-
+#endif //    #ifdef ARM_MATH_MATRIX_CHECK
   {
     /* Total number of samples in the input matrix */
     numSamples = (uint32_t) pSrc->numRows * pSrc->numCols;
@@ -101,14 +109,37 @@ arm_status arm_mat_scale_q15(
     {
       /* C(m,n) = A(m,n) * k */
       /* Scale, saturate and then store the results in the destination buffer. */
-      *pOut++ =
-        (q15_t) (__SSAT(((q31_t) (*pIn++) * scaleFract) >> totShift, 16));
-      *pOut++ =
-        (q15_t) (__SSAT(((q31_t) (*pIn++) * scaleFract) >> totShift, 16));
-      *pOut++ =
-        (q15_t) (__SSAT(((q31_t) (*pIn++) * scaleFract) >> totShift, 16));
-      *pOut++ =
-        (q15_t) (__SSAT(((q31_t) (*pIn++) * scaleFract) >> totShift, 16));
+      /* Reading 2 inputs from memory */
+      inA1 = _SIMD32_OFFSET(pIn);
+      inA2 = _SIMD32_OFFSET(pIn + 2);
+
+      /* C = A * scale */
+      /* Scale the inputs and then store the 2 results in the destination buffer
+       * in single cycle by packing the outputs */
+      out1 = (q31_t) ((q15_t) (inA1 >> 16) * scaleFract);
+      out2 = (q31_t) ((q15_t) inA1 * scaleFract);
+      out3 = (q31_t) ((q15_t) (inA2 >> 16) * scaleFract);
+      out4 = (q31_t) ((q15_t) inA2 * scaleFract);
+
+      out1 = out1 >> totShift;
+      inA1 = _SIMD32_OFFSET(pIn + 4);
+      out2 = out2 >> totShift;
+      inA2 = _SIMD32_OFFSET(pIn + 6);
+      out3 = out3 >> totShift;
+      out4 = out4 >> totShift;
+
+      in1 = (q15_t) (__SSAT(out1, 16));
+      in2 = (q15_t) (__SSAT(out2, 16));
+      in3 = (q15_t) (__SSAT(out3, 16));
+      in4 = (q15_t) (__SSAT(out4, 16));
+
+      _SIMD32_OFFSET(pOut) = __PKHBT(in2, in1, 16);
+      _SIMD32_OFFSET(pOut + 2) = __PKHBT(in4, in3, 16);
+
+      /* update pointers to process next sampels */
+      pIn += 4u;
+      pOut += 4u;
+
 
       /* Decrement the numSamples loop counter */
       blkCnt--;

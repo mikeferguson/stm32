@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_cmplx_mag_squared_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 complex magnitude squared.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -55,13 +58,14 @@ void arm_cmplx_mag_squared_q15(
   q15_t * pDst,
   uint32_t numSamples)
 {
-  q15_t real, imag;                              /* Temporary variables to store real and imaginary values */
   q31_t acc0, acc1;                              /* Accumulators */
 
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
   uint32_t blkCnt;                               /* loop counter */
+  q31_t in1, in2, in3, in4;
+  q31_t acc2, acc3;
 
   /*loop Unrolling */
   blkCnt = numSamples >> 2u;
@@ -71,33 +75,21 @@ void arm_cmplx_mag_squared_q15(
   while(blkCnt > 0u)
   {
     /* C[0] = (A[0] * A[0] + A[1] * A[1]) */
-    real = *pSrc++;
-    imag = *pSrc++;
-    acc0 = __SMUAD(real, real);
-    acc1 = __SMUAD(imag, imag);
-    /* store the result in 3.13 format in the destination buffer. */
-    *pDst++ = (q15_t) (((q63_t) acc0 + acc1) >> 17);
+    in1 = *__SIMD32(pSrc)++;
+    in2 = *__SIMD32(pSrc)++;
+    in3 = *__SIMD32(pSrc)++;
+    in4 = *__SIMD32(pSrc)++;
 
-    real = *pSrc++;
-    imag = *pSrc++;
-    acc0 = __SMUAD(real, real);
-    acc1 = __SMUAD(imag, imag);
-    /* store the result in 3.13 format in the destination buffer. */
-    *pDst++ = (q15_t) (((q63_t) acc0 + acc1) >> 17);
+    acc0 = __SMUAD(in1, in1);
+    acc1 = __SMUAD(in2, in2);
+    acc2 = __SMUAD(in3, in3);
+    acc3 = __SMUAD(in4, in4);
 
-    real = *pSrc++;
-    imag = *pSrc++;
-    acc0 = __SMUAD(real, real);
-    acc1 = __SMUAD(imag, imag);
     /* store the result in 3.13 format in the destination buffer. */
-    *pDst++ = (q15_t) (((q63_t) acc0 + acc1) >> 17);
-
-    real = *pSrc++;
-    imag = *pSrc++;
-    acc0 = __SMUAD(real, real);
-    acc1 = __SMUAD(imag, imag);
-    /* store the result in 3.13 format in the destination buffer. */
-    *pDst++ = (q15_t) (((q63_t) acc0 + acc1) >> 17);
+    *pDst++ = (q15_t) (acc0 >> 17);
+    *pDst++ = (q15_t) (acc1 >> 17);
+    *pDst++ = (q15_t) (acc2 >> 17);
+    *pDst++ = (q15_t) (acc3 >> 17);
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -110,12 +102,11 @@ void arm_cmplx_mag_squared_q15(
   while(blkCnt > 0u)
   {
     /* C[0] = (A[0] * A[0] + A[1] * A[1]) */
-    real = *pSrc++;
-    imag = *pSrc++;
-    acc0 = __SMUAD(real, real);
-    acc1 = __SMUAD(imag, imag);
+    in1 = *__SIMD32(pSrc)++;
+    acc0 = __SMUAD(in1, in1);
+
     /* store the result in 3.13 format in the destination buffer. */
-    *pDst++ = (q15_t) (((q63_t) acc0 + acc1) >> 17);
+    *pDst++ = (q15_t) (acc0 >> 17);
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -124,6 +115,7 @@ void arm_cmplx_mag_squared_q15(
 #else
 
   /* Run the below code for Cortex-M0 */
+  q15_t real, imag;                              /* Temporary variables to store real and imaginary values */
 
   while(numSamples > 0u)
   {

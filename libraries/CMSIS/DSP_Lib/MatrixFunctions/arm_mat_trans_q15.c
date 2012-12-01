@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_trans_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 matrix transpose.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -66,9 +69,15 @@ arm_status arm_mat_trans_q15(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+#ifndef UNALIGNED_SUPPORT_DISABLE
 
   q31_t in;                                      /* variable to hold temporary output  */
 
+#else
+
+  q15_t in;
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE	*/
 
 #ifdef ARM_MATH_MATRIX_CHECK
 
@@ -87,6 +96,7 @@ arm_status arm_mat_trans_q15(
     /* row loop     */
     do
     {
+
       /* Apply loop unrolling and exchange the columns with row elements */
       col = nColumns >> 2u;
 
@@ -97,6 +107,8 @@ arm_status arm_mat_trans_q15(
        ** a second loop below computes the remaining 1 to 3 samples. */
       while(col > 0u)
       {
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
         /* Read two elements from the row */
         in = *__SIMD32(pSrcA)++;
 
@@ -164,6 +176,42 @@ arm_status arm_mat_trans_q15(
         *pOut = (q15_t) in;
 
 #endif /*    #ifndef ARM_MATH_BIG_ENDIAN    */
+
+#else
+        /* Read one element from the row */
+        in = *pSrcA++;
+
+        /* Store one element in the destination */
+        *pOut = in;
+
+        /* Update the pointer px to point to the next row of the transposed matrix */
+        pOut += nRows;
+
+        /* Read one element from the row */
+        in = *pSrcA++;
+
+        /* Store one element in the destination */
+        *pOut = in;
+
+        /* Update the pointer px to point to the next row of the transposed matrix */
+        pOut += nRows;
+
+        /* Read one element from the row */
+        in = *pSrcA++;
+
+        /* Store one element in the destination */
+        *pOut = in;
+
+        /* Update the pointer px to point to the next row of the transposed matrix */
+        pOut += nRows;
+
+        /* Read one element from the row */
+        in = *pSrcA++;
+
+        /* Store one element in the destination */
+        *pOut = in;
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE	*/
 
         /* Update the pointer pOut to point to the next row of the transposed matrix */
         pOut += nRows;

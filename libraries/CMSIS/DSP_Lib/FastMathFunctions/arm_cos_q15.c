@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_cos_q15.c
@@ -10,6 +10,9 @@
 * Description:	Fast cosine calculation for Q15 values.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -99,7 +102,7 @@ static const q15_t cosTableQ15[259] = {
  * @param[in] x Scaled input value in radians.
  * @return  cos(x).
  *
- * The Q15 input value is in the range [0 +1) and is mapped to a radian value in the range [0 2*pi).
+ * The Q15 input value is in the range [0 +0.9999] and is mapped to a radian value in the range [0 2*pi), Here range excludes 2*pi.
  */
 
 q15_t arm_cos_q15(
@@ -131,6 +134,16 @@ q15_t arm_cos_q15(
 
   /* fractCube = fract * fract * fract */
   fractCube = (q15_t) ((fractSquare * fract) >> 15);
+
+  /* Checking min and max index of table */
+  if(index < 0)
+  {
+    index = 0;
+  }
+  else if(index > 256)
+  {
+    index = 256;
+  }
 
   /* Initialise table pointer */
   tablePtr = (q15_t *) & cosTableQ15[index];
@@ -165,7 +178,7 @@ q15_t arm_cos_q15(
   /* Read third nearest value of output from the cos table */
   c = *tablePtr++;
 
-  /*      cosVal += c*wc */
+  /* cosVal += c*wc */
   cosVal += c * wc;
 
   /* Calculation of wd */
@@ -179,8 +192,11 @@ q15_t arm_cos_q15(
   /* cosVal += d*wd; */
   cosVal += d * wd;
 
+  /* Convert output value in 1.15(q15) format and saturate */
+  cosVal = __SSAT((cosVal >> 15), 16);
+
   /* Return the output value in 1.15(q15) format */
-  return ((q15_t) (cosVal >> 15u));
+  return ((q15_t) cosVal);
 
 }
 

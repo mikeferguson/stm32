@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_add_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 vector addition
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -66,7 +69,7 @@ void arm_add_q15(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
-
+  q31_t inA1, inA2, inB1, inB2;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -77,8 +80,13 @@ void arm_add_q15(
   {
     /* C = A + B */
     /* Add and then store the results in the destination buffer. */
-    *__SIMD32(pDst)++ = __QADD16(*__SIMD32(pSrcA)++, *__SIMD32(pSrcB)++);
-    *__SIMD32(pDst)++ = __QADD16(*__SIMD32(pSrcA)++, *__SIMD32(pSrcB)++);
+    inA1 = *__SIMD32(pSrcA)++;
+    inA2 = *__SIMD32(pSrcA)++;
+    inB1 = *__SIMD32(pSrcB)++;
+    inB2 = *__SIMD32(pSrcB)++;
+
+    *__SIMD32(pDst)++ = __QADD16(inA1, inB1);
+    *__SIMD32(pDst)++ = __QADD16(inA2, inB2);
 
     /* Decrement the loop counter */
     blkCnt--;

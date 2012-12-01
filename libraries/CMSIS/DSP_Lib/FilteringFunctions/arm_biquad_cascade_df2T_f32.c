@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_biquad_cascade_df2T_f32.c
@@ -11,6 +11,9 @@
 *               direct form II Biquad cascade filter.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -149,19 +152,22 @@ void arm_biquad_cascade_df2T_f32(
 
   float32_t *pIn = pSrc;                         /*  source pointer            */
   float32_t *pOut = pDst;                        /*  destination pointer       */
-  float32_t *pState = S->pState;                 /*  State pointer            */
+  float32_t *pState = S->pState;                 /*  State pointer             */
   float32_t *pCoeffs = S->pCoeffs;               /*  coefficient pointer       */
-  float32_t acc0;                                /*  Simulates the accumulator */
+  float32_t acc0;                                /*  accumulator               */
   float32_t b0, b1, b2, a1, a2;                  /*  Filter coefficients       */
   float32_t Xn;                                  /*  temporary input           */
-  float32_t d1, d2;                              /*  state variables          */
+  float32_t d1, d2;                              /*  state variables           */
   uint32_t sample, stage = S->numStages;         /*  loop counters             */
-
 
 #ifndef ARM_MATH_CM0
 
-  /* Run the below code for Cortex-M4 and Cortex-M3 */
+  float32_t Xn1, Xn2;                            /*  Input State variables     */
+  float32_t acc1;                                /*  accumulator               */
 
+
+
+  /* Run the below code for Cortex-M4 and Cortex-M3 */
   do
   {
     /* Reading the coefficients */
@@ -182,69 +188,81 @@ void arm_biquad_cascade_df2T_f32(
      ** a second loop below computes the remaining 1 to 3 samples. */
     while(sample > 0u)
     {
-      /* Read the first input */
-      Xn = *pIn++;
 
       /* y[n] = b0 * x[n] + d1 */
-      acc0 = (b0 * Xn) + d1;
-
-      /* Store the result in the accumulator in the destination buffer. */
-      *pOut++ = acc0;
-
-      /* Every time after the output is computed state should be updated. */
       /* d1 = b1 * x[n] + a1 * y[n] + d2 */
-      d1 = ((b1 * Xn) + (a1 * acc0)) + d2;
-
       /* d2 = b2 * x[n] + a2 * y[n] */
-      d2 = (b2 * Xn) + (a2 * acc0);
+
+      /* Read the first input */
+      Xn1 = *pIn++;
+
+      /* y[n] = b0 * x[n] + d1 */
+      acc0 = (b0 * Xn1) + d1;
+
+      /* d1 = b1 * x[n] + d2 */
+      d1 = (b1 * Xn1) + d2;
+
+      /* d2 = b2 * x[n] */
+      d2 = (b2 * Xn1);
 
       /* Read the second input */
-      Xn = *pIn++;
+      Xn2 = *pIn++;
 
-      /* y[n] = b0 * x[n] + d1 */
-      acc0 = (b0 * Xn) + d1;
+      /* d1 = b1 * x[n] + a1 * y[n] */
+      d1 = (a1 * acc0) + d1;
 
       /* Store the result in the accumulator in the destination buffer. */
       *pOut++ = acc0;
 
-      /* Every time after the output is computed state should be updated. */
-      /* d1 = b1 * x[n] + a1 * y[n] + d2 */
-      d1 = ((b1 * Xn) + (a1 * acc0)) + d2;
+      d2 = (a2 * acc0) + d2;
 
-      /* d2 = b2 * x[n] + a2 * y[n] */
-      d2 = (b2 * Xn) + (a2 * acc0);
+      /* y[n] = b0 * x[n] + d1 */
+      acc1 = (b0 * Xn2) + d1;
 
       /* Read the third input */
-      Xn = *pIn++;
+      Xn1 = *pIn++;
 
-      /* y[n] = b0 * x[n] + d1 */
-      acc0 = (b0 * Xn) + d1;
+      d1 = (b1 * Xn2) + d2;
+
+      d2 = (b2 * Xn2);
 
       /* Store the result in the accumulator in the destination buffer. */
-      *pOut++ = acc0;
+      *pOut++ = acc1;
 
-      /* Every time after the output is computed state should be updated. */
-      /* d1 = b1 * x[n] + a1 * y[n] + d2 */
-      d1 = ((b1 * Xn) + (a1 * acc0)) + d2;
+      d1 = (a1 * acc1) + d1;
 
-      /* d2 = b2 * x[n] + a2 * y[n] */
-      d2 = (b2 * Xn) + (a2 * acc0);
+      d2 = (a2 * acc1) + d2;
+
+      /* y[n] = b0 * x[n] + d1 */
+      acc0 = (b0 * Xn1) + d1;
+
+      d1 = (b1 * Xn1) + d2;
+
+      d2 = (b2 * Xn1);
 
       /* Read the fourth input */
-      Xn = *pIn++;
+      Xn2 = *pIn++;
 
-      /* y[n] = b0 * x[n] + d1 */
-      acc0 = (b0 * Xn) + d1;
+      d1 = (a1 * acc0) + d1;
 
       /* Store the result in the accumulator in the destination buffer. */
       *pOut++ = acc0;
 
-      /* Every time after the output is computed state should be updated. */
-      /* d1 = b1 * x[n] + a1 * y[n] + d2 */
-      d1 = (b1 * Xn) + (a1 * acc0) + d2;
+      d2 = (a2 * acc0) + d2;
 
-      /* d2 = b2 * x[n] + a2 * y[n] */
-      d2 = (b2 * Xn) + (a2 * acc0);
+      /* y[n] = b0 * x[n] + d1 */
+      acc1 = (b0 * Xn2) + d1;
+
+      d1 = (b1 * Xn2) + d2;
+
+      d2 = (b2 * Xn2);
+
+      /* Store the result in the accumulator in the destination buffer. */
+      *pOut++ = acc1;
+
+      d1 = (a1 * acc1) + d1;
+
+      d2 = (a2 * acc1) + d2;
 
       /* decrement the loop counter */
       sample--;

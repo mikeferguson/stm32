@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_cmplx_mult_real_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 complex by real multiplication
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -65,6 +68,10 @@ void arm_cmplx_mult_real_q15(
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
   uint32_t blkCnt;                               /* loop counters */
+  q31_t inA1, inA2;                              /* Temporary variables to hold input data */
+  q31_t inB1;                                    /* Temporary variables to hold input data */
+  q15_t out1, out2, out3, out4;                  /* Temporary variables to hold output data */
+  q31_t mul1, mul2, mul3, mul4;                  /* Temporary variables to hold intermediate data */
 
   /* loop Unrolling */
   blkCnt = numSamples >> 2u;
@@ -75,30 +82,67 @@ void arm_cmplx_mult_real_q15(
   {
     /* C[2 * i] = A[2 * i] * B[i].            */
     /* C[2 * i + 1] = A[2 * i + 1] * B[i].        */
-    in = *pSrcReal++;
-    /* store the result in the destination buffer. */
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
+    /* read complex number both real and imaginary from complex input buffer */
+    inA1 = *__SIMD32(pSrcCmplx)++;
+    /* read two real values at a time from real input buffer */
+    inB1 = *__SIMD32(pSrcReal)++;
+    /* read complex number both real and imaginary from complex input buffer */
+    inA2 = *__SIMD32(pSrcCmplx)++;
 
-    in = *pSrcReal++;
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
+    /* multiply complex number with real numbers */
+#ifndef ARM_MATH_BIG_ENDIAN
 
-    in = *pSrcReal++;
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
+    mul1 = (q31_t) ((q15_t) (inA1) * (q15_t) (inB1));
+    mul2 = (q31_t) ((q15_t) (inA1 >> 16) * (q15_t) (inB1));
+    mul3 = (q31_t) ((q15_t) (inA2) * (q15_t) (inB1 >> 16));
+    mul4 = (q31_t) ((q15_t) (inA2 >> 16) * (q15_t) (inB1 >> 16));
 
-    in = *pSrcReal++;
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
-    *pCmplxDst++ =
-      (q15_t) __SSAT((((q31_t) (*pSrcCmplx++) * (in)) >> 15), 16);
+#else
+
+    mul2 = (q31_t) ((q15_t) (inA1 >> 16) * (q15_t) (inB1 >> 16));
+    mul1 = (q31_t) ((q15_t) inA1 * (q15_t) (inB1 >> 16));
+    mul4 = (q31_t) ((q15_t) (inA2 >> 16) * (q15_t) inB1);
+    mul3 = (q31_t) ((q15_t) inA2 * (q15_t) inB1);
+
+#endif //      #ifndef ARM_MATH_BIG_ENDIAN
+
+    /* saturate the result */
+    out1 = (q15_t) __SSAT(mul1 >> 15u, 16);
+    out2 = (q15_t) __SSAT(mul2 >> 15u, 16);
+    out3 = (q15_t) __SSAT(mul3 >> 15u, 16);
+    out4 = (q15_t) __SSAT(mul4 >> 15u, 16);
+
+    /* pack real and imaginary outputs and store them to destination */
+    *__SIMD32(pCmplxDst)++ = __PKHBT(out1, out2, 16);
+    *__SIMD32(pCmplxDst)++ = __PKHBT(out3, out4, 16);
+
+    inA1 = *__SIMD32(pSrcCmplx)++;
+    inB1 = *__SIMD32(pSrcReal)++;
+    inA2 = *__SIMD32(pSrcCmplx)++;
+
+#ifndef ARM_MATH_BIG_ENDIAN
+
+    mul1 = (q31_t) ((q15_t) (inA1) * (q15_t) (inB1));
+    mul2 = (q31_t) ((q15_t) (inA1 >> 16) * (q15_t) (inB1));
+    mul3 = (q31_t) ((q15_t) (inA2) * (q15_t) (inB1 >> 16));
+    mul4 = (q31_t) ((q15_t) (inA2 >> 16) * (q15_t) (inB1 >> 16));
+
+#else
+
+    mul2 = (q31_t) ((q15_t) (inA1 >> 16) * (q15_t) (inB1 >> 16));
+    mul1 = (q31_t) ((q15_t) inA1 * (q15_t) (inB1 >> 16));
+    mul4 = (q31_t) ((q15_t) (inA2 >> 16) * (q15_t) inB1);
+    mul3 = (q31_t) ((q15_t) inA2 * (q15_t) inB1);
+
+#endif //      #ifndef ARM_MATH_BIG_ENDIAN
+
+    out1 = (q15_t) __SSAT(mul1 >> 15u, 16);
+    out2 = (q15_t) __SSAT(mul2 >> 15u, 16);
+    out3 = (q15_t) __SSAT(mul3 >> 15u, 16);
+    out4 = (q15_t) __SSAT(mul4 >> 15u, 16);
+
+    *__SIMD32(pCmplxDst)++ = __PKHBT(out1, out2, 16);
+    *__SIMD32(pCmplxDst)++ = __PKHBT(out3, out4, 16);
 
     /* Decrement the numSamples loop counter */
     blkCnt--;

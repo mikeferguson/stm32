@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_cmplx_conj_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point complex conjugate.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -26,7 +29,6 @@
 * Version 1.0.0 2010/09/20
 *    Production release and review comments incorporated.
 * ---------------------------------------------------------------------------- */
-
 #include "arm_math.h"
 
 /**
@@ -74,11 +76,13 @@ void arm_cmplx_conj_f32(
   float32_t * pDst,
   uint32_t numSamples)
 {
+  uint32_t blkCnt;                               /* loop counter */
 
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
-  uint32_t blkCnt;                               /* loop counter */
+  float32_t inR1, inR2, inR3, inR4;
+  float32_t inI1, inI2, inI3, inI4;
 
   /*loop Unrolling */
   blkCnt = numSamples >> 2u;
@@ -89,14 +93,54 @@ void arm_cmplx_conj_f32(
   {
     /* C[0]+jC[1] = A[0]+ j (-1) A[1] */
     /* Calculate Complex Conjugate and then store the results in the destination buffer. */
-    *pDst++ = *pSrc++;
-    *pDst++ = -*pSrc++;
-    *pDst++ = *pSrc++;
-    *pDst++ = -*pSrc++;
-    *pDst++ = *pSrc++;
-    *pDst++ = -*pSrc++;
-    *pDst++ = *pSrc++;
-    *pDst++ = -*pSrc++;
+    /* read real input samples */
+    inR1 = pSrc[0];
+    /* store real samples to destination */
+    pDst[0] = inR1;
+    inR2 = pSrc[2];
+    pDst[2] = inR2;
+    inR3 = pSrc[4];
+    pDst[4] = inR3;
+    inR4 = pSrc[6];
+    pDst[6] = inR4;
+
+    /* read imaginary input samples */
+    inI1 = pSrc[1];
+    inI2 = pSrc[3];
+
+    /* conjugate input */
+    inI1 = -inI1;
+
+    /* read imaginary input samples */
+    inI3 = pSrc[5];
+
+    /* conjugate input */
+    inI2 = -inI2;
+
+    /* read imaginary input samples */
+    inI4 = pSrc[7];
+
+    /* conjugate input */
+    inI3 = -inI3;
+
+    /* store imaginary samples to destination */
+    pDst[1] = inI1;
+    pDst[3] = inI2;
+
+    /* conjugate input */
+    inI4 = -inI4;
+
+    /* store imaginary samples to destination */
+    pDst[5] = inI3;
+
+    /* increment source pointer by 8 to process next sampels */
+    pSrc += 8u;
+
+    /* store imaginary sample to destination */
+    pDst[7] = inI4;
+
+    /* increment destination pointer by 8 to store next samples */
+    pDst += 8u;
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -106,22 +150,14 @@ void arm_cmplx_conj_f32(
    ** No loop unrolling is used. */
   blkCnt = numSamples % 0x4u;
 
-  while(blkCnt > 0u)
-  {
-    /* C[0]+jC[1] = A[0]+ j (-1) A[1] */
-    /* Calculate Complex Conjugate and then store the results in the destination buffer. */
-    *pDst++ = *pSrc++;
-    *pDst++ = -*pSrc++;
-
-    /* Decrement the loop counter */
-    blkCnt--;
-  }
-
 #else
 
   /* Run the below code for Cortex-M0 */
+  blkCnt = numSamples;
 
-  while(numSamples > 0u)
+#endif /* #ifndef ARM_MATH_CM0 */
+
+  while(blkCnt > 0u)
   {
     /* realOut + j (imagOut) = realIn + j (-1) imagIn */
     /* Calculate Complex Conjugate and then store the results in the destination buffer. */
@@ -129,11 +165,8 @@ void arm_cmplx_conj_f32(
     *pDst++ = -*pSrc++;
 
     /* Decrement the loop counter */
-    numSamples--;
+    blkCnt--;
   }
-
-#endif /* #ifndef ARM_MATH_CM0 */
-
 }
 
 /**

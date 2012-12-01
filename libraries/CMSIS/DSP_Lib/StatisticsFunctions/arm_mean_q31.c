@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_mean_q31.c
@@ -10,6 +10,9 @@
 * Description:	Mean value of a Q31 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -69,6 +72,7 @@ void arm_mean_q31(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t in1, in2, in3, in4;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -78,10 +82,15 @@ void arm_mean_q31(
   while(blkCnt > 0u)
   {
     /* C = (A[0] + A[1] + A[2] + ... + A[blockSize-1]) */
-    sum += *pSrc++;
-    sum += *pSrc++;
-    sum += *pSrc++;
-    sum += *pSrc++;
+    in1 = *pSrc++;
+    in2 = *pSrc++;
+    in3 = *pSrc++;
+    in4 = *pSrc++;
+
+    sum += in1;
+    sum += in2;
+    sum += in3;
+    sum += in4;
 
     /* Decrement the loop counter */
     blkCnt--;

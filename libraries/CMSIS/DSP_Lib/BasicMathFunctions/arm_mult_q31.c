@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mult_q31.c
@@ -10,6 +10,9 @@
 * Description:	Q31 vector multiplication.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -69,6 +72,10 @@ void arm_mult_q31(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t inA1, inA2, inA3, inA4;                  /* temporary input variables */
+  q31_t inB1, inB2, inB3, inB4;                  /* temporary input variables */
+  q31_t out1, out2, out3, out4;                  /* temporary output variables */
+
   /* loop Unrolling */
   blkCnt = blockSize >> 2u;
 
@@ -78,14 +85,29 @@ void arm_mult_q31(
   {
     /* C = A * B */
     /* Multiply the inputs and then store the results in the destination buffer. */
-    *pDst++ =
-      (q31_t) clip_q63_to_q31(((q63_t) (*pSrcA++) * (*pSrcB++)) >> 31);
-    *pDst++ =
-      (q31_t) clip_q63_to_q31(((q63_t) (*pSrcA++) * (*pSrcB++)) >> 31);
-    *pDst++ =
-      (q31_t) clip_q63_to_q31(((q63_t) (*pSrcA++) * (*pSrcB++)) >> 31);
-    *pDst++ =
-      (q31_t) clip_q63_to_q31(((q63_t) (*pSrcA++) * (*pSrcB++)) >> 31);
+    inA1 = *pSrcA++;
+    inA2 = *pSrcA++;
+    inA3 = *pSrcA++;
+    inA4 = *pSrcA++;
+    inB1 = *pSrcB++;
+    inB2 = *pSrcB++;
+    inB3 = *pSrcB++;
+    inB4 = *pSrcB++;
+
+    out1 = ((q63_t) inA1 * inB1) >> 32;
+    out2 = ((q63_t) inA2 * inB2) >> 32;
+    out3 = ((q63_t) inA3 * inB3) >> 32;
+    out4 = ((q63_t) inA4 * inB4) >> 32;
+
+    out1 = __SSAT(out1, 31);
+    out2 = __SSAT(out2, 31);
+    out3 = __SSAT(out3, 31);
+    out4 = __SSAT(out4, 31);
+
+    *pDst++ = out1 << 1u;
+    *pDst++ = out2 << 1u;
+    *pDst++ = out3 << 1u;
+    *pDst++ = out4 << 1u;
 
     /* Decrement the blockSize loop counter */
     blkCnt--;

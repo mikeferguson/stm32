@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_fir_decimate_f32.c
@@ -10,6 +10,9 @@
 * Description:	FIR decimation for floating-point sequences.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -146,6 +149,11 @@ void arm_fir_decimate_f32(
 
 #ifndef ARM_MATH_CM0
 
+  uint32_t blkCntN4;
+  float32_t *px0, *px1, *px2, *px3;
+  float32_t acc0, acc1, acc2, acc3;
+  float32_t x1, x2, x3;
+
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
   /* S->pState buffer contains previous frame (numTaps - 1) samples */
@@ -153,9 +161,149 @@ void arm_fir_decimate_f32(
   pStateCurnt = S->pState + (numTaps - 1u);
 
   /* Total number of output samples to be computed */
-  blkCnt = outBlockSize;
+  blkCnt = outBlockSize / 4;
+  blkCntN4 = outBlockSize - (4 * blkCnt);
 
   while(blkCnt > 0u)
+  {
+    /* Copy 4 * decimation factor number of new input samples into the state buffer */
+    i = 4 * S->M;
+
+    do
+    {
+      *pStateCurnt++ = *pSrc++;
+
+    } while(--i);
+
+    /* Set accumulators to zero */
+    acc0 = 0.0f;
+    acc1 = 0.0f;
+    acc2 = 0.0f;
+    acc3 = 0.0f;
+
+    /* Initialize state pointer for all the samples */
+    px0 = pState;
+    px1 = pState + S->M;
+    px2 = pState + 2 * S->M;
+    px3 = pState + 3 * S->M;
+
+    /* Initialize coeff pointer */
+    pb = pCoeffs;
+
+    /* Loop unrolling.  Process 4 taps at a time. */
+    tapCnt = numTaps >> 2;
+
+    /* Loop over the number of taps.  Unroll by a factor of 4.
+     ** Repeat until we've computed numTaps-4 coefficients. */
+
+    while(tapCnt > 0u)
+    {
+      /* Read the b[numTaps-1] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-1] sample for acc0 */
+      x0 = *(px0++);
+      /* Read x[n-numTaps-1] sample for acc1 */
+      x1 = *(px1++);
+      /* Read x[n-numTaps-1] sample for acc2 */
+      x2 = *(px2++);
+      /* Read x[n-numTaps-1] sample for acc3 */
+      x3 = *(px3++);
+
+      /* Perform the multiply-accumulate */
+      acc0 += x0 * c0;
+      acc1 += x1 * c0;
+      acc2 += x2 * c0;
+      acc3 += x3 * c0;
+
+      /* Read the b[numTaps-2] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-2] sample for acc0, acc1, acc2, acc3 */
+      x0 = *(px0++);
+      x1 = *(px1++);
+      x2 = *(px2++);
+      x3 = *(px3++);
+
+      /* Perform the multiply-accumulate */
+      acc0 += x0 * c0;
+      acc1 += x1 * c0;
+      acc2 += x2 * c0;
+      acc3 += x3 * c0;
+
+      /* Read the b[numTaps-3] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-3] sample acc0, acc1, acc2, acc3 */
+      x0 = *(px0++);
+      x1 = *(px1++);
+      x2 = *(px2++);
+      x3 = *(px3++);
+
+      /* Perform the multiply-accumulate */
+      acc0 += x0 * c0;
+      acc1 += x1 * c0;
+      acc2 += x2 * c0;
+      acc3 += x3 * c0;
+
+      /* Read the b[numTaps-4] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-4] sample acc0, acc1, acc2, acc3 */
+      x0 = *(px0++);
+      x1 = *(px1++);
+      x2 = *(px2++);
+      x3 = *(px3++);
+
+      /* Perform the multiply-accumulate */
+      acc0 += x0 * c0;
+      acc1 += x1 * c0;
+      acc2 += x2 * c0;
+      acc3 += x3 * c0;
+
+      /* Decrement the loop counter */
+      tapCnt--;
+    }
+
+    /* If the filter length is not a multiple of 4, compute the remaining filter taps */
+    tapCnt = numTaps % 0x4u;
+
+    while(tapCnt > 0u)
+    {
+      /* Read coefficients */
+      c0 = *(pb++);
+
+      /* Fetch  state variables for acc0, acc1, acc2, acc3 */
+      x0 = *(px0++);
+      x1 = *(px1++);
+      x2 = *(px2++);
+      x3 = *(px3++);
+
+      /* Perform the multiply-accumulate */
+      acc0 += x0 * c0;
+      acc1 += x1 * c0;
+      acc2 += x2 * c0;
+      acc3 += x3 * c0;
+
+      /* Decrement the loop counter */
+      tapCnt--;
+    }
+
+    /* Advance the state pointer by the decimation factor
+     * to process the next group of decimation factor number samples */
+    pState = pState + 4 * S->M;
+
+    /* The result is in the accumulator, store in the destination buffer. */
+    *pDst++ = acc0;
+    *pDst++ = acc1;
+    *pDst++ = acc2;
+    *pDst++ = acc3;
+
+    /* Decrement the loop counter */
+    blkCnt--;
+  }
+
+  while(blkCntN4 > 0u)
   {
     /* Copy decimation factor number of new input samples into the state buffer */
     i = S->M;
@@ -248,7 +396,7 @@ void arm_fir_decimate_f32(
     *pDst++ = sum0;
 
     /* Decrement the loop counter */
-    blkCnt--;
+    blkCntN4--;
   }
 
   /* Processing is complete.

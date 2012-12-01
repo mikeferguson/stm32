@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_negate_q7.c
@@ -10,6 +10,9 @@
 * Description:	Negates Q7 vectors.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -60,14 +63,13 @@ void arm_negate_q7(
   uint32_t blockSize)
 {
   uint32_t blkCnt;                               /* loop counter */
+  q7_t in;
 
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
-  q7_t in1;                                      /* Input value1 */
-  q7_t in2;                                      /* Input value2 */
-  q7_t in3;                                      /* Input value3 */
-  q7_t in4;                                      /* Input value4 */
+  q31_t input;                                   /* Input values1-4 */
+  q31_t zero = 0x00000000;
 
 
   /*loop Unrolling */
@@ -79,15 +81,10 @@ void arm_negate_q7(
   {
     /* C = -A */
     /* Read four inputs */
-    in1 = *pSrc++;
-    in2 = *pSrc++;
-    in3 = *pSrc++;
-    in4 = *pSrc++;
+    input = *__SIMD32(pSrc)++;
 
     /* Store the Negated results in the destination buffer in a single cycle by packing the results */
-    *__SIMD32(pDst)++ =
-      __PACKq7(__SSAT(-in1, 8), __SSAT(-in2, 8), __SSAT(-in3, 8),
-               __SSAT(-in4, 8));
+    *__SIMD32(pDst)++ = __QSUB8(zero, input);
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -109,8 +106,9 @@ void arm_negate_q7(
   while(blkCnt > 0u)
   {
     /* C = -A */
-    /* Negate and then store the results in the destination buffer. */
-    *pDst++ = __SSAT(-*pSrc++, 8);
+    /* Negate and then store the results in the destination buffer. */ \
+      in = *pSrc++;
+    *pDst++ = (in == (q7_t) 0x80) ? 0x7f : -in;
 
     /* Decrement the loop counter */
     blkCnt--;

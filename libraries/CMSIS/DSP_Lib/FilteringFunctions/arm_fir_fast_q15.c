@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:        arm_fir_fast_q15.c
@@ -10,6 +10,9 @@
 * Description:  Q15 Fast FIR filter processing function.
 *
 * Target Processor: Cortex-M4/Cortex-M3
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -71,15 +74,15 @@ void arm_fir_fast_q15(
   q15_t *pState = S->pState;                     /* State pointer */
   q15_t *pCoeffs = S->pCoeffs;                   /* Coefficient pointer */
   q15_t *pStateCurnt;                            /* Points to the current sample of the state */
-  q15_t *px1;                                    /* Temporary q15 pointer for state buffer */
-  q31_t *pb;                                     /* Temporary pointer for coefficient buffer */
-  q31_t *px2;                                    /* Temporary q31 pointer for SIMD state buffer accesses */
-  q31_t x0, x1, x2, x3, c0;                      /* Temporary variables to hold SIMD state and coefficient values */
   q31_t acc0, acc1, acc2, acc3;                  /* Accumulators */
+  q15_t *pb;                                     /* Temporary pointer for coefficient buffer */
+  q15_t *px;                                     /* Temporary q31 pointer for SIMD state buffer accesses */
+  q31_t x0, x1, x2, c0;                          /* Temporary variables to hold SIMD state and coefficient values */
   uint32_t numTaps = S->numTaps;                 /* Number of taps in the filter */
   uint32_t tapCnt, blkCnt;                       /* Loop counters */
 
-  /* S->pState points to buffer which contains previous frame (numTaps - 1) samples */
+
+  /* S->pState points to state array which contains previous frame (numTaps - 1) samples */
   /* pStateCurnt points to the location where the new input data should be written */
   pStateCurnt = &(S->pState[(numTaps - 1u)]);
 
@@ -91,6 +94,7 @@ void arm_fir_fast_q15(
    *    acc2 =  b[numTaps-1] * x[n-numTaps+1] + b[numTaps-2] * x[n-numTaps] +   b[numTaps-3] * x[n-numTaps-1] +...+ b[0] * x[2]
    *    acc3 =  b[numTaps-1] * x[n-numTaps+2] + b[numTaps-2] * x[n-numTaps+1] + b[numTaps-3] * x[n-numTaps]   +...+ b[0] * x[3]
    */
+
   blkCnt = blockSize >> 2;
 
   /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
@@ -99,8 +103,11 @@ void arm_fir_fast_q15(
   {
     /* Copy four new input samples into the state buffer.
      ** Use 32-bit SIMD to move the 16-bit data.  Only requires two copies. */
-    *__SIMD32(pStateCurnt)++ = *__SIMD32(pSrc)++;
-    *__SIMD32(pStateCurnt)++ = *__SIMD32(pSrc)++;
+    *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
+
 
     /* Set all accumulators to zero */
     acc0 = 0;
@@ -108,84 +115,123 @@ void arm_fir_fast_q15(
     acc2 = 0;
     acc3 = 0;
 
-    /* Initialize state pointer of type q15 */
-    px1 = pState;
+    /* Typecast q15_t pointer to q31_t pointer for state reading in q31_t */
+    px = pState;
 
-    /* Initialize coeff pointer of type q31 */
-    pb = (q31_t *) (pCoeffs);
+    /* Typecast q15_t pointer to q31_t pointer for coefficient reading in q31_t */
+    pb = pCoeffs;
 
     /* Read the first two samples from the state buffer:  x[n-N], x[n-N-1] */
-    x0 = *(q31_t *) (px1++);
+    x0 = *__SIMD32(px)++;
 
-    /* Read the third and forth samples from the state buffer: x[n-N-1], x[n-N-2] */
-    x1 = *(q31_t *) (px1++);
+    /* Read the third and forth samples from the state buffer: x[n-N-2], x[n-N-3] */
+    x2 = *__SIMD32(px)++;
 
     /* Loop over the number of taps.  Unroll by a factor of 4.
-     ** Repeat until we've computed numTaps-4 coefficients. */
+     ** Repeat until we've computed numTaps-(numTaps%4) coefficients. */
     tapCnt = numTaps >> 2;
-    do
+
+    while(tapCnt > 0)
     {
       /* Read the first two coefficients using SIMD:  b[N] and b[N-1] coefficients */
-      c0 = *(pb++);
+      c0 = *__SIMD32(pb)++;
 
       /* acc0 +=  b[N] * x[n-N] + b[N-1] * x[n-N-1] */
       acc0 = __SMLAD(x0, c0, acc0);
 
-      /* acc1 +=  b[N] * x[n-N-1] + b[N-1] * x[n-N-2] */
-      acc1 = __SMLAD(x1, c0, acc1);
-
-      /* Read state x[n-N-2], x[n-N-3] */
-      x2 = *(q31_t *) (px1++);
-
-      /* Read state x[n-N-3], x[n-N-4] */
-      x3 = *(q31_t *) (px1++);
-
       /* acc2 +=  b[N] * x[n-N-2] + b[N-1] * x[n-N-3] */
       acc2 = __SMLAD(x2, c0, acc2);
 
+      /* pack  x[n-N-1] and x[n-N-2] */
+#ifndef ARM_MATH_BIG_ENDIAN
+      x1 = __PKHBT(x2, x0, 0);
+#else
+      x1 = __PKHBT(x0, x2, 0);
+#endif
+
+      /* Read state x[n-N-4], x[n-N-5] */
+      x0 = _SIMD32_OFFSET(px);
+
+      /* acc1 +=  b[N] * x[n-N-1] + b[N-1] * x[n-N-2] */
+      acc1 = __SMLADX(x1, c0, acc1);
+
+      /* pack  x[n-N-3] and x[n-N-4] */
+#ifndef ARM_MATH_BIG_ENDIAN
+      x1 = __PKHBT(x0, x2, 0);
+#else
+      x1 = __PKHBT(x2, x0, 0);
+#endif
+
       /* acc3 +=  b[N] * x[n-N-3] + b[N-1] * x[n-N-4] */
-      acc3 = __SMLAD(x3, c0, acc3);
+      acc3 = __SMLADX(x1, c0, acc3);
 
       /* Read coefficients b[N-2], b[N-3] */
-      c0 = *(pb++);
+      c0 = *__SIMD32(pb)++;
 
       /* acc0 +=  b[N-2] * x[n-N-2] + b[N-3] * x[n-N-3] */
       acc0 = __SMLAD(x2, c0, acc0);
 
-      /* acc1 +=  b[N-2] * x[n-N-3] + b[N-3] * x[n-N-4] */
-      acc1 = __SMLAD(x3, c0, acc1);
-
-      /* Read state x[n-N-4], x[n-N-5] */
-      x0 = *(q31_t *) (px1++);
-
-      /* Read state x[n-N-5], x[n-N-6] */
-      x1 = *(q31_t *) (px1++);
+      /* Read state x[n-N-6], x[n-N-7] with offset */
+      x2 = _SIMD32_OFFSET(px + 2u);
 
       /* acc2 +=  b[N-2] * x[n-N-4] + b[N-3] * x[n-N-5] */
       acc2 = __SMLAD(x0, c0, acc2);
 
+      /* acc1 +=  b[N-2] * x[n-N-3] + b[N-3] * x[n-N-4] */
+      acc1 = __SMLADX(x1, c0, acc1);
+
+      /* pack  x[n-N-5] and x[n-N-6] */
+#ifndef ARM_MATH_BIG_ENDIAN
+      x1 = __PKHBT(x2, x0, 0);
+#else
+      x1 = __PKHBT(x0, x2, 0);
+#endif
+
       /* acc3 +=  b[N-2] * x[n-N-5] + b[N-3] * x[n-N-6] */
-      acc3 = __SMLAD(x1, c0, acc3);
+      acc3 = __SMLADX(x1, c0, acc3);
+
+      /* Update state pointer for next state reading */
+      px += 4u;
+
+      /* Decrement tap count */
       tapCnt--;
 
     }
-    while(tapCnt > 0u);
 
     /* If the filter length is not a multiple of 4, compute the remaining filter taps.
-     ** This is always 2 taps since the filter length is always even. */
+     ** This is always be 2 taps since the filter length is even. */
     if((numTaps & 0x3u) != 0u)
     {
-      /* Read 2 coefficients */
-      c0 = *(pb++);
-      /* Fetch 4 state variables */
-      x2 = *(q31_t *) (px1++);
-      x3 = *(q31_t *) (px1++);
+
+      /* Read last two coefficients */
+      c0 = *__SIMD32(pb)++;
 
       /* Perform the multiply-accumulates */
       acc0 = __SMLAD(x0, c0, acc0);
-      acc1 = __SMLAD(x1, c0, acc1);
       acc2 = __SMLAD(x2, c0, acc2);
-      acc3 = __SMLAD(x3, c0, acc3);
+
+      /* pack state variables */
+#ifndef ARM_MATH_BIG_ENDIAN
+      x1 = __PKHBT(x2, x0, 0);
+#else
+      x1 = __PKHBT(x0, x2, 0);
+#endif
+
+      /* Read last state variables */
+      x0 = *__SIMD32(px);
+
+      /* Perform the multiply-accumulates */
+      acc1 = __SMLADX(x1, c0, acc1);
+
+      /* pack state variables */
+#ifndef ARM_MATH_BIG_ENDIAN
+      x1 = __PKHBT(x0, x2, 0);
+#else
+      x1 = __PKHBT(x2, x0, 0);
+#endif
+
+      /* Perform the multiply-accumulates */
+      acc3 = __SMLADX(x1, c0, acc3);
     }
 
     /* The results in the 4 accumulators are in 2.30 format.  Convert to 1.15 with saturation.
@@ -193,18 +239,25 @@ void arm_fir_fast_q15(
 
 #ifndef ARM_MATH_BIG_ENDIAN
 
-    *__SIMD32(pDst)++ = __PKHBT((acc0 >> 15), (acc1 >> 15), 16u);
-    *__SIMD32(pDst)++ = __PKHBT((acc2 >> 15), (acc3 >> 15), 16u);
+    *__SIMD32(pDst)++ =
+      __PKHBT(__SSAT((acc0 >> 15), 16), __SSAT((acc1 >> 15), 16), 16);
+
+    *__SIMD32(pDst)++ =
+      __PKHBT(__SSAT((acc2 >> 15), 16), __SSAT((acc3 >> 15), 16), 16);
 
 #else
 
-    *__SIMD32(pDst)++ = __PKHBT((acc1 >> 15), (acc0 >> 15), 16u);
-    *__SIMD32(pDst)++ = __PKHBT((acc3 >> 15), (acc2 >> 15), 16u);
+    *__SIMD32(pDst)++ =
+      __PKHBT(__SSAT((acc1 >> 15), 16), __SSAT((acc0 >> 15), 16), 16);
 
-#endif /*      #ifndef ARM_MATH_BIG_ENDIAN     */
+    *__SIMD32(pDst)++ =
+      __PKHBT(__SSAT((acc3 >> 15), 16), __SSAT((acc2 >> 15), 16), 16);
+
+
+#endif /*      #ifndef ARM_MATH_BIG_ENDIAN       */
 
     /* Advance the state pointer by 4 to process the next group of 4 samples */
-    pState = pState + 4;
+    pState = pState + 4u;
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -222,23 +275,27 @@ void arm_fir_fast_q15(
     acc0 = 0;
 
     /* Use SIMD to hold states and coefficients */
-    px2 = (q31_t *) pState;
-    pb = (q31_t *) (pCoeffs);
-    tapCnt = numTaps >> 1;
+    px = pState;
+    pb = pCoeffs;
+
+    tapCnt = numTaps >> 1u;
 
     do
     {
-      acc0 = __SMLAD(*px2++, *(pb++), acc0);
+
+      acc0 += (q31_t) * px++ * *pb++;
+	  acc0 += (q31_t) * px++ * *pb++;
+
       tapCnt--;
     }
     while(tapCnt > 0u);
 
     /* The result is in 2.30 format.  Convert to 1.15 with saturation.
      ** Then store the output in the destination buffer. */
-    *pDst++ = (q15_t) ((acc0 >> 15));
+    *pDst++ = (q15_t) (__SSAT((acc0 >> 15), 16));
 
     /* Advance state pointer by 1 for the next sample */
-    pState = pState + 1;
+    pState = pState + 1u;
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -250,15 +307,19 @@ void arm_fir_fast_q15(
 
   /* Points to the start of the state buffer */
   pStateCurnt = S->pState;
+
   /* Calculation of count for copying integer writes */
   tapCnt = (numTaps - 1u) >> 2;
 
   while(tapCnt > 0u)
   {
-    *__SIMD32(pStateCurnt)++ = *__SIMD32(pState)++;
-    *__SIMD32(pStateCurnt)++ = *__SIMD32(pState)++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
 
     tapCnt--;
+
   }
 
   /* Calculation of count for remaining q15_t data */
@@ -272,6 +333,7 @@ void arm_fir_fast_q15(
     /* Decrement the loop counter */
     tapCnt--;
   }
+
 }
 
 /**

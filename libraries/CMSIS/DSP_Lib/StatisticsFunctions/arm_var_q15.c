@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_var_q15.c
@@ -10,6 +10,9 @@
 * Description:	Variance of an array of Q15 type.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -66,11 +69,12 @@ void arm_var_q15(
   uint32_t blockSize,
   q31_t * pResult)
 {
-  q63_t sum = 0;                                 /* Accumulator */
+  q31_t sum = 0;                                 /* Accumulator */
   q31_t meanOfSquares, squareOfMean;             /* Mean of square and square of mean */
   q15_t mean;                                    /* mean */
   uint32_t blkCnt;                               /* loop counter */
   q15_t t;                                       /* Temporary variable */
+  q63_t sumOfSquares = 0;                        /* Accumulator */
 
 #ifndef ARM_MATH_CM0
 
@@ -78,9 +82,6 @@ void arm_var_q15(
 
   q31_t in;                                      /* Input variable */
   q15_t in1;                                     /* Temporary variable */
-  q15_t *pIn;                                    /* Temporary pointer */
-
-  pIn = pSrc;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -93,9 +94,13 @@ void arm_var_q15(
     /* Compute Sum of squares of the input samples
      * and then store the result in a temporary variable, sum. */
     in = *__SIMD32(pSrc)++;
-    sum = __SMLALD(in, in, sum);
+    sum += ((in << 16) >> 16);
+    sum += (in >> 16);
+    sumOfSquares = __SMLALD(in, in, sumOfSquares);
     in = *__SIMD32(pSrc)++;
-    sum = __SMLALD(in, in, sum);
+    sum += ((in << 16) >> 16);
+    sum += (in >> 16);
+    sumOfSquares = __SMLALD(in, in, sumOfSquares);
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -111,7 +116,8 @@ void arm_var_q15(
     /* Compute Sum of squares of the input samples
      * and then store the result in a temporary variable, sum. */
     in1 = *pSrc++;
-    sum = __SMLALD(in1, in1, sum);
+    sum += in1;
+    sumOfSquares = __SMLALD(in1, in1, sumOfSquares);
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -120,53 +126,14 @@ void arm_var_q15(
   /* Compute Mean of squares of the input samples
    * and then store the result in a temporary variable, meanOfSquares. */
   t = (q15_t) ((1.0f / (float32_t) (blockSize - 1u)) * 16384);
-  sum = __SSAT((sum >> 15u), 16u);
+  sumOfSquares = __SSAT((sumOfSquares >> 15u), 16u);
 
-  meanOfSquares = (q31_t) ((sum * t) >> 14u);
-
-  /* Reset the accumulator */
-  sum = 0;
-
-  /*loop Unrolling */
-  blkCnt = blockSize >> 2u;
-
-  /* Reset the input working pointer */
-  pSrc = pIn;
-
-  /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
-   ** a second loop below computes the remaining 1 to 3 samples. */
-  while(blkCnt > 0u)
-  {
-    /* C = (A[0] + A[1] + A[2] + ... + A[blockSize-1]) */
-    /* Compute sum of all input values and then store the result in a temporary variable, sum. */
-    sum += *pSrc++;
-    sum += *pSrc++;
-    sum += *pSrc++;
-    sum += *pSrc++;
-
-    /* Decrement the loop counter */
-    blkCnt--;
-  }
-
-  /* If the blockSize is not a multiple of 4, compute any remaining output samples here.
-   ** No loop unrolling is used. */
-  blkCnt = blockSize % 0x4u;
-
-  while(blkCnt > 0u)
-  {
-    /* C = (A[0] + A[1] + A[2] + ... + A[blockSize-1]) */
-    /* Compute sum of all input values and then store the result in a temporary variable, sum. */
-    sum += *pSrc++;
-
-    /* Decrement the loop counter */
-    blkCnt--;
-  }
+  meanOfSquares = (q31_t) ((sumOfSquares * t) >> 14u);
 
 #else
 
   /* Run the below code for Cortex-M0 */
 
-  q63_t sumOfSquares = 0;                        /* Accumulator */
   q15_t in;                                      /* Temporary variable */
   /* Loop over blockSize number of values */
   blkCnt = blockSize;
@@ -192,7 +159,6 @@ void arm_var_q15(
   t = (q15_t) ((1.0f / (float32_t) (blockSize - 1u)) * 16384);
   sumOfSquares = __SSAT((sumOfSquares >> 15u), 16u);
   meanOfSquares = (q31_t) ((sumOfSquares * t) >> 14u);
-
 
 #endif /* #ifndef ARM_MATH_CM0 */
 

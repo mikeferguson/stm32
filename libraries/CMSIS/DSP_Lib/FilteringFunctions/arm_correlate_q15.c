@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_correlate_q15.c
@@ -10,6 +10,12 @@
 * Description:	Correlation of Q15 sequences.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
+*
+* Version 1.0.11 2011/10/18
+*    Bug Fix in conv, correlation, partial convolution.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -63,6 +69,10 @@
  *
  * \par
  * Refer to <code>arm_correlate_fast_q15()</code> for a faster but less precise version of this function for Cortex-M3 and Cortex-M4.
+ *
+ * \par
+ * Refer the function <code>arm_correlate_opt_q15()</code> for a faster implementation of this function using scratch buffers.
+ *
  */
 
 void arm_correlate_q15(
@@ -73,7 +83,7 @@ void arm_correlate_q15(
   q15_t * pDst)
 {
 
-#ifndef ARM_MATH_CM0
+#if (defined(ARM_MATH_CM4) || defined(ARM_MATH_CM3)) && !defined(UNALIGNED_SUPPORT_DISABLE)
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
@@ -87,7 +97,6 @@ void arm_correlate_q15(
   q31_t x0, x1, x2, x3, c0;                      /* temporary variables for holding input and coefficient values */
   uint32_t j, k = 0u, count, blkCnt, outBlockSize, blockSize1, blockSize2, blockSize3;  /* loop counter                 */
   int32_t inc = 1;                               /* Destination address modifier */
-  q31_t *pb;                                     /* 32 bit pointer for inputB buffer */
 
 
   /* The algorithm implementation is based on the lengths of the inputs. */
@@ -252,9 +261,6 @@ void arm_correlate_q15(
   /* Working pointer of inputB */
   py = pIn2;
 
-  /* Initialize inputB pointer of type q31 */
-  pb = (q31_t *) (py);
-
   /* count is index by which the pointer pIn1 to be incremented */
   count = 0u;
 
@@ -279,9 +285,10 @@ void arm_correlate_q15(
       acc3 = 0;
 
       /* read x[0], x[1] samples */
-      x0 = *(q31_t *) (px++);
+      x0 = *__SIMD32(px);
       /* read x[1], x[2] samples */
-      x1 = *(q31_t *) (px++);
+      x1 = _SIMD32_OFFSET(px + 1);
+	  px += 2u;
 
       /* Apply loop unrolling and compute 4 MACs simultaneously. */
       k = srcBLen >> 2u;
@@ -292,7 +299,7 @@ void arm_correlate_q15(
       {
         /* Read the first two inputB samples using SIMD:
          * y[0] and y[1] */
-        c0 = *(pb++);
+        c0 = *__SIMD32(py)++;
 
         /* acc0 +=  x[0] * y[0] + x[1] * y[1] */
         acc0 = __SMLALD(x0, c0, acc0);
@@ -301,10 +308,10 @@ void arm_correlate_q15(
         acc1 = __SMLALD(x1, c0, acc1);
 
         /* Read x[2], x[3] */
-        x2 = *(q31_t *) (px++);
+        x2 = *__SIMD32(px);
 
         /* Read x[3], x[4] */
-        x3 = *(q31_t *) (px++);
+        x3 = _SIMD32_OFFSET(px + 1);
 
         /* acc2 +=  x[2] * y[0] + x[3] * y[1] */
         acc2 = __SMLALD(x2, c0, acc2);
@@ -313,7 +320,7 @@ void arm_correlate_q15(
         acc3 = __SMLALD(x3, c0, acc3);
 
         /* Read y[2] and y[3] */
-        c0 = *(pb++);
+        c0 = *__SIMD32(py)++;
 
         /* acc0 +=  x[2] * y[2] + x[3] * y[3] */
         acc0 = __SMLALD(x2, c0, acc0);
@@ -322,10 +329,12 @@ void arm_correlate_q15(
         acc1 = __SMLALD(x3, c0, acc1);
 
         /* Read x[4], x[5] */
-        x0 = *(q31_t *) (px++);
+        x0 = _SIMD32_OFFSET(px + 2);
 
         /* Read x[5], x[6] */
-        x1 = *(q31_t *) (px++);
+        x1 = _SIMD32_OFFSET(px + 3);
+
+		px += 4u;
 
         /* acc2 +=  x[4] * y[2] + x[5] * y[3] */
         acc2 = __SMLALD(x0, c0, acc2);
@@ -334,10 +343,6 @@ void arm_correlate_q15(
         acc3 = __SMLALD(x1, c0, acc3);
 
       } while(--k);
-
-      /* For the next MAC operations, SIMD is not used
-       * So, the 16 bit pointer if inputB, py is updated */
-      py = (q15_t *) (pb);
 
       /* If the srcBLen is not a multiple of 4, compute any remaining MACs here.
        ** No loop unrolling is used. */
@@ -357,7 +362,8 @@ void arm_correlate_q15(
 
 #endif /*      #ifdef  ARM_MATH_BIG_ENDIAN     */
         /* Read x[7] */
-        x3 = *(q31_t *) px++;
+        x3 = *__SIMD32(px);
+		px++;
 
         /* Perform the multiply-accumulates */
         acc0 = __SMLALD(x0, c0, acc0);
@@ -369,13 +375,14 @@ void arm_correlate_q15(
       if(k == 2u)
       {
         /* Read y[4], y[5] */
-        c0 = *(pb);
+        c0 = *__SIMD32(py);
 
         /* Read x[7], x[8] */
-        x3 = *(q31_t *) px++;
+        x3 = *__SIMD32(px);
 
         /* Read x[9] */
-        x2 = *(q31_t *) px++;
+        x2 = _SIMD32_OFFSET(px + 1);
+		px += 2u;
 
         /* Perform the multiply-accumulates */
         acc0 = __SMLALD(x0, c0, acc0);
@@ -387,13 +394,13 @@ void arm_correlate_q15(
       if(k == 3u)
       {
         /* Read y[4], y[5] */
-        c0 = *pb++;
+        c0 = *__SIMD32(py)++;
 
         /* Read x[7], x[8] */
-        x3 = *(q31_t *) px++;
+        x3 = *__SIMD32(px);
 
         /* Read x[9] */
-        x2 = *(q31_t *) px++;
+        x2 = _SIMD32_OFFSET(px + 1);
 
         /* Perform the multiply-accumulates */
         acc0 = __SMLALD(x0, c0, acc0);
@@ -401,20 +408,19 @@ void arm_correlate_q15(
         acc2 = __SMLALD(x3, c0, acc2);
         acc3 = __SMLALD(x2, c0, acc3);
 
+        c0 = (*py);
+
         /* Read y[6] */
 #ifdef  ARM_MATH_BIG_ENDIAN
 
-        c0 = (*pb);
-        c0 = c0 & 0xFFFF0000;
-
+        c0 = c0 << 16u;
 #else
 
-        c0 = (q15_t) (*pb);
         c0 = c0 & 0x0000FFFF;
-
 #endif /*      #ifdef  ARM_MATH_BIG_ENDIAN     */
         /* Read x[10] */
-        x3 = *(q31_t *) px++;
+        x3 = _SIMD32_OFFSET(px + 2);
+		px += 3u;
 
         /* Perform the multiply-accumulates */
         acc0 = __SMLALDX(x1, c0, acc0);
@@ -443,8 +449,6 @@ void arm_correlate_q15(
       /* Update the inputA and inputB pointers for next MAC calculation */
       px = pIn1 + count;
       py = pIn2;
-      pb = (q31_t *) (py);
-
 
       /* Decrement the loop counter */
       blkCnt--;
@@ -705,7 +709,7 @@ void arm_correlate_q15(
       *pDst++ = (q15_t) __SSAT((sum >> 15u), 16u);
   }
 
-#endif /*   #ifndef ARM_MATH_CM0 */
+#endif /*#if (defined(ARM_MATH_CM4) || defined(ARM_MATH_CM3)) && !defined(UNALIGNED_SUPPORT_DISABLE) */
 
 }
 

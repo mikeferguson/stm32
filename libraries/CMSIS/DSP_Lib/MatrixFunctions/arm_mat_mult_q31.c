@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_mult_q31.c
@@ -10,6 +10,9 @@
 * Description:	 Q31 matrix multiplication.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -91,7 +94,7 @@ arm_status arm_mat_mult_q31(
 
   uint16_t col, i = 0u, j, row = numRowsA, colCnt;      /* loop counters */
   arm_status status;                             /* status of matrix multiplication */
-
+  q31_t a0, a1, a2, a3, b0, b1, b2, b3;
 
 #ifdef ARM_MATH_MATRIX_CHECK
 
@@ -141,17 +144,28 @@ arm_status arm_mat_mult_q31(
         {
           /* c(m,n) = a(1,1)*b(1,1) + a(1,2) * b(2,1) + .... + a(m,p)*b(p,n) */
           /* Perform the multiply-accumulates */
-          sum += (q63_t) * pIn1++ * *pIn2;
+          b0 = *pIn2;
           pIn2 += numColsB;
 
-          sum += (q63_t) * pIn1++ * *pIn2;
+          a0 = *pIn1++;
+          a1 = *pIn1++;
+
+          b1 = *pIn2;
+          pIn2 += numColsB;
+          b2 = *pIn2;
           pIn2 += numColsB;
 
-          sum += (q63_t) * pIn1++ * *pIn2;
+          sum += (q63_t) a0 *b0;
+          sum += (q63_t) a1 *b1;
+
+          a2 = *pIn1++;
+          a3 = *pIn1++;
+
+          b3 = *pIn2;
           pIn2 += numColsB;
 
-          sum += (q63_t) * pIn1++ * *pIn2;
-          pIn2 += numColsB;
+          sum += (q63_t) a2 *b2;
+          sum += (q63_t) a3 *b3;
 
           /* Decrement the loop counter */
           colCnt--;

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_fir_f32.c
@@ -11,11 +11,8 @@
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
 *
-* Version 1.0.10 2011/7/15
-*    Big Endian support added and Merged M0 and M3/M4 Source code.
-*
-* Version 1.0.3 2010/11/29
-*    Re-organized the CMSIS folders and updated documentation.
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.2 2010/11/11
 *    Documentation updated.
@@ -43,8 +40,7 @@
  * @defgroup FIR Finite Impulse Response (FIR) Filters
  *
  * This set of functions implements Finite Impulse Response (FIR) filters
- * for Q7, Q15, Q31, and floating-point data types.
- * Fast versions of Q15 and Q31 are also provided on Cortex-M4 and Cortex-M3.
+ * for Q7, Q15, Q31, and floating-point data types.  Fast versions of Q15 and Q31 are also provided.
  * The functions operate on blocks of input and output data and each call to the function processes
  * <code>blockSize</code> samples through the filter.  <code>pSrc</code> and
  * <code>pDst</code> points to input and output arrays containing <code>blockSize</code> values.
@@ -125,28 +121,24 @@
  *
  */
 
+#ifndef ARM_MATH_CM0
+
+  /* Run the below code for Cortex-M4 and Cortex-M3 */
+
 void arm_fir_f32(
   const arm_fir_instance_f32 * S,
   float32_t * pSrc,
   float32_t * pDst,
   uint32_t blockSize)
 {
-
   float32_t *pState = S->pState;                 /* State pointer */
   float32_t *pCoeffs = S->pCoeffs;               /* Coefficient pointer */
   float32_t *pStateCurnt;                        /* Points to the current sample of the state */
   float32_t *px, *pb;                            /* Temporary pointers for state and coefficient buffers */
+  float32_t acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;     /* Accumulators */
+  float32_t x0, x1, x2, x3, x4, x5, x6, x7, c0;  /* Temporary variables to hold state and coefficient values */
   uint32_t numTaps = S->numTaps;                 /* Number of filter coefficients in the filter */
   uint32_t i, tapCnt, blkCnt;                    /* Loop counters */
-
-
-#ifndef ARM_MATH_CM0
-
-  /* Run the below code for Cortex-M4 and Cortex-M3 */
-
-  float32_t acc0, acc1, acc2, acc3;              /* Accumulators */
-  float32_t x0, x1, x2, x3, c0;                  /* Temporary variables to hold state and coefficient values */
-
 
   /* S->pState points to state array which contains previous frame (numTaps - 1) samples */
   /* pStateCurnt points to the location where the new input data should be written */
@@ -160,7 +152,7 @@ void arm_fir_f32(
    *    acc2 =  b[numTaps-1] * x[n-numTaps+1] + b[numTaps-2] * x[n-numTaps] +   b[numTaps-3] * x[n-numTaps-1] +...+ b[0] * x[2]
    *    acc3 =  b[numTaps-1] * x[n-numTaps+2] + b[numTaps-2] * x[n-numTaps+1] + b[numTaps-3] * x[n-numTaps]   +...+ b[0] * x[3]
    */
-  blkCnt = blockSize >> 2;
+  blkCnt = blockSize >> 3;
 
   /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
    ** a second loop below computes the remaining 1 to 3 samples. */
@@ -171,12 +163,20 @@ void arm_fir_f32(
     *pStateCurnt++ = *pSrc++;
     *pStateCurnt++ = *pSrc++;
     *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
+    *pStateCurnt++ = *pSrc++;
 
     /* Set all accumulators to zero */
     acc0 = 0.0f;
     acc1 = 0.0f;
     acc2 = 0.0f;
     acc3 = 0.0f;
+    acc4 = 0.0f;
+    acc5 = 0.0f;
+    acc6 = 0.0f;
+    acc7 = 0.0f;
 
     /* Initialize state pointer */
     px = pState;
@@ -188,9 +188,13 @@ void arm_fir_f32(
     x0 = *px++;
     x1 = *px++;
     x2 = *px++;
+    x3 = *px++;
+    x4 = *px++;
+    x5 = *px++;
+    x6 = *px++;
 
     /* Loop unrolling.  Process 4 taps at a time. */
-    tapCnt = numTaps >> 2u;
+    tapCnt = numTaps >> 3u;
 
     /* Loop over the number of taps.  Unroll by a factor of 4.
      ** Repeat until we've computed numTaps-4 coefficients. */
@@ -200,7 +204,7 @@ void arm_fir_f32(
       c0 = *(pb++);
 
       /* Read x[n-numTaps-3] sample */
-      x3 = *(px++);
+      x7 = *(px++);
 
       /* acc0 +=  b[numTaps-1] * x[n-numTaps] */
       acc0 += x0 * c0;
@@ -214,6 +218,18 @@ void arm_fir_f32(
       /* acc3 +=  b[numTaps-1] * x[n-numTaps-3] */
       acc3 += x3 * c0;
 
+      /* acc4 +=  b[numTaps-1] * x[n-numTaps-4] */
+      acc4 += x4 * c0;
+
+      /* acc1 +=  b[numTaps-1] * x[n-numTaps-5] */
+      acc5 += x5 * c0;
+
+      /* acc2 +=  b[numTaps-1] * x[n-numTaps-6] */
+      acc6 += x6 * c0;
+
+      /* acc3 +=  b[numTaps-1] * x[n-numTaps-7] */
+      acc7 += x7 * c0;
+
       /* Read the b[numTaps-2] coefficient */
       c0 = *(pb++);
 
@@ -224,7 +240,11 @@ void arm_fir_f32(
       acc0 += x1 * c0;
       acc1 += x2 * c0;
       acc2 += x3 * c0;
-      acc3 += x0 * c0;
+      acc3 += x4 * c0;
+      acc4 += x5 * c0;
+      acc5 += x6 * c0;
+      acc6 += x7 * c0;
+      acc7 += x0 * c0;
 
       /* Read the b[numTaps-3] coefficient */
       c0 = *(pb++);
@@ -235,8 +255,12 @@ void arm_fir_f32(
       /* Perform the multiply-accumulates */
       acc0 += x2 * c0;
       acc1 += x3 * c0;
-      acc2 += x0 * c0;
-      acc3 += x1 * c0;
+      acc2 += x4 * c0;
+      acc3 += x5 * c0;
+      acc4 += x6 * c0;
+      acc5 += x7 * c0;
+      acc6 += x0 * c0;
+      acc7 += x1 * c0;
 
       /* Read the b[numTaps-4] coefficient */
       c0 = *(pb++);
@@ -246,15 +270,83 @@ void arm_fir_f32(
 
       /* Perform the multiply-accumulates */
       acc0 += x3 * c0;
+      acc1 += x4 * c0;
+      acc2 += x5 * c0;
+      acc3 += x6 * c0;
+      acc4 += x7 * c0;
+      acc5 += x0 * c0;
+      acc6 += x1 * c0;
+      acc7 += x2 * c0;
+
+      /* Read the b[numTaps-4] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-6] sample */
+      x3 = *(px++);
+
+      /* Perform the multiply-accumulates */
+      acc0 += x4 * c0;
+      acc1 += x5 * c0;
+      acc2 += x6 * c0;
+      acc3 += x7 * c0;
+      acc4 += x0 * c0;
+      acc5 += x1 * c0;
+      acc6 += x2 * c0;
+      acc7 += x3 * c0;
+
+      /* Read the b[numTaps-4] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-6] sample */
+      x4 = *(px++);
+
+      /* Perform the multiply-accumulates */
+      acc0 += x5 * c0;
+      acc1 += x6 * c0;
+      acc2 += x7 * c0;
+      acc3 += x0 * c0;
+      acc4 += x1 * c0;
+      acc5 += x2 * c0;
+      acc6 += x3 * c0;
+      acc7 += x4 * c0;
+
+      /* Read the b[numTaps-4] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-6] sample */
+      x5 = *(px++);
+
+      /* Perform the multiply-accumulates */
+      acc0 += x6 * c0;
+      acc1 += x7 * c0;
+      acc2 += x0 * c0;
+      acc3 += x1 * c0;
+      acc4 += x2 * c0;
+      acc5 += x3 * c0;
+      acc6 += x4 * c0;
+      acc7 += x5 * c0;
+
+      /* Read the b[numTaps-4] coefficient */
+      c0 = *(pb++);
+
+      /* Read x[n-numTaps-6] sample */
+      x6 = *(px++);
+
+      /* Perform the multiply-accumulates */
+      acc0 += x7 * c0;
       acc1 += x0 * c0;
       acc2 += x1 * c0;
       acc3 += x2 * c0;
+      acc4 += x3 * c0;
+      acc5 += x4 * c0;
+      acc6 += x5 * c0;
+      acc7 += x6 * c0;
 
       tapCnt--;
     }
 
     /* If the filter length is not a multiple of 4, compute the remaining filter taps */
-    tapCnt = numTaps % 0x4u;
+    tapCnt = numTaps % 0x8u;
 
     while(tapCnt > 0u)
     {
@@ -262,38 +354,50 @@ void arm_fir_f32(
       c0 = *(pb++);
 
       /* Fetch 1 state variable */
-      x3 = *(px++);
+      x7 = *(px++);
 
       /* Perform the multiply-accumulates */
       acc0 += x0 * c0;
       acc1 += x1 * c0;
       acc2 += x2 * c0;
       acc3 += x3 * c0;
+      acc4 += x4 * c0;
+      acc5 += x5 * c0;
+      acc6 += x6 * c0;
+      acc7 += x7 * c0;
 
       /* Reuse the present sample states for next sample */
       x0 = x1;
       x1 = x2;
       x2 = x3;
+      x3 = x4;
+      x4 = x5;
+      x5 = x6;
+      x6 = x7;
 
       /* Decrement the loop counter */
       tapCnt--;
     }
 
     /* Advance the state pointer by 4 to process the next group of 4 samples */
-    pState = pState + 4;
+    pState = pState + 8;
 
     /* The results in the 4 accumulators, store in the destination buffer. */
     *pDst++ = acc0;
     *pDst++ = acc1;
     *pDst++ = acc2;
     *pDst++ = acc3;
+    *pDst++ = acc4;
+    *pDst++ = acc5;
+    *pDst++ = acc6;
+    *pDst++ = acc7;
 
     blkCnt--;
   }
 
   /* If the blockSize is not a multiple of 4, compute any remaining output samples here.
    ** No loop unrolling is used. */
-  blkCnt = blockSize % 0x4u;
+  blkCnt = blockSize % 0x8u;
 
   while(blkCnt > 0u)
   {
@@ -360,8 +464,22 @@ void arm_fir_f32(
     /* Decrement the loop counter */
     tapCnt--;
   }
+}
 
 #else
+
+void arm_fir_f32(
+  const arm_fir_instance_f32 * S,
+  float32_t * pSrc,
+  float32_t * pDst,
+  uint32_t blockSize)
+{
+  float32_t *pState = S->pState;                 /* State pointer */
+  float32_t *pCoeffs = S->pCoeffs;               /* Coefficient pointer */
+  float32_t *pStateCurnt;                        /* Points to the current sample of the state */
+  float32_t *px, *pb;                            /* Temporary pointers for state and coefficient buffers */
+  uint32_t numTaps = S->numTaps;                 /* Number of filter coefficients in the filter */
+  uint32_t i, tapCnt, blkCnt;                    /* Loop counters */
 
   /* Run the below code for Cortex-M0 */
 
@@ -427,9 +545,9 @@ void arm_fir_f32(
     tapCnt--;
   }
 
-#endif /*   #ifndef ARM_MATH_CM0 */
-
 }
+
+#endif /*   #ifndef ARM_MATH_CM0 */
 
 /**
  * @} end of FIR group

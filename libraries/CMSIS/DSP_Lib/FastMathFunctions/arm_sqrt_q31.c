@@ -1,29 +1,26 @@
 /* ----------------------------------------------------------------------
-* Copyright (C) 2010 ARM Limited. All rights reserved.
+* Copyright (C) 2011 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
-* Project: 	    CMSIS DSP Library
+* Project:      CMSIS DSP Library
 * Title:		arm_sqrt_q31.c
 *
 * Description:	Q31 square root function.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
 *
-* Version 1.0.10 2011/7/15
-*    Big Endian support added and Merged M0 and M3/M4 Source code.
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
-* Version 1.0.2 2010/11/11
-*    Documentation updated.
+* Version 1.0.0 2011/03/08
+*     Alpha release.
 *
-* Version 1.0.1 2010/10/05
-*    Production release and review comments incorporated.
+* Version 1.0.1 2011/09/30
+*     Beta release.
 *
-* Version 1.0.0 2010/09/20
-*    Production release and review comments incorporated.
 * -------------------------------------------------------------------- */
-
 #include "arm_math.h"
 #include "arm_common_tables.h"
 
@@ -48,145 +45,78 @@ arm_status arm_sqrt_q31(
   q31_t in,
   q31_t * pOut)
 {
-  q63_t prevOut;
-  q31_t oneByOut;
-  uint32_t signBits;
+  q31_t number, temp1, bits_val1, var1, signBits1, half;
+  float32_t temp_float1;
 
-#ifndef ARM_MATH_CM0
+  number = in;
 
-  /* Run the below code for Cortex-M4 and Cortex-M3 */
-
-  q63_t out;
-
-  if(in > 0)
+  /* If the input is a positive number then compute the signBits. */
+  if(number > 0)
   {
+    signBits1 = __CLZ(number) - 1;
 
-    /* run for ten iterations */
-
-    /* Take initial guess as half of the input and first iteration */
-    out = (in >> 1) + 0x3FFFFFFF;
-
-    /* Calculation of reciprocal of out */
-    /* oneByOut contains reciprocal of out which is in 2.30 format
-       and oneByOut should be upscaled by signBits */
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-
-    /* 0.5 * (out) */
-    out = out >> 1u;
-
-    /* prevOut = 0.5 * out + (in * (oneByOut << signBits))) */
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    /* Third iteration */
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    /* Fifth iteration */
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    /* Seventh iteration */
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-    prevOut = prevOut >> 1u;
-    out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    /* tenth iteration */
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-    out = out >> 1u;
-    *pOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-    return (ARM_MATH_SUCCESS);
-  }
-
-#else
-
-  /* Run the below code for Cortex-M0 */
-
-  q63_t out, loopVar;                            /* Temporary variable for output, loop variable */
-  if(in > 0)
-  {
-
-    /* run for ten iterations */
-
-    /* Take initial guess as half of the input and first iteration */
-    out = (in >> 1) + 0x3FFFFFFF;
-
-    /* Calculation of reciprocal of out */
-    /* oneByOut contains reciprocal of out which is in 2.30 format
-       and oneByOut should be upscaled by sign bits */
-    signBits = arm_recip_q31((q31_t) out, &oneByOut, armRecipTableQ31);
-
-    /* 0.5 * (out) */
-    out = out >> 1u;
-
-    /* prevOut = 0.5 * out + (in * (oneByOut) << signbits) */
-    prevOut = out + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-
-
-    /* loop for third iteration to tength iteration */
-
-    for (loopVar = 1; loopVar <= 14; loopVar++)
+    /* Shift by the number of signBits1 */
+    if((signBits1 % 2) == 0)
     {
-
-      signBits = arm_recip_q31((q31_t) prevOut, &oneByOut, armRecipTableQ31);
-      /* 0.5 * (prevOut) */
-      prevOut = prevOut >> 1u;
-      /* out = 0.5 * prevOut + (in * oneByOut) << signbits))) */
-      out = prevOut + (((q31_t) (((q63_t) in * oneByOut) >> 32)) << signBits);
-      /* prevOut      = out */
-      prevOut = out;
-
+      number = number << signBits1;
     }
-    /* output is moved to pOut pointer */
-    *pOut = prevOut;
+    else
+    {
+      number = number << (signBits1 - 1);
+    }
+
+    /* Calculate half value of the number */
+    half = number >> 1;
+    /* Store the number for later use */
+    temp1 = number;
+
+    /*Convert to float */
+    temp_float1 = number * 4.6566128731e-010f;
+    /*Store as integer */
+    bits_val1 = *(int *) &temp_float1;
+    /* Subtract the shifted value from the magic number to give intial guess */
+    bits_val1 = 0x5f3759df - (bits_val1 >> 1);  // gives initial guess
+    /* Store as float */
+    temp_float1 = *(float *) &bits_val1;
+    /* Convert to integer format */
+    var1 = (q31_t) (temp_float1 * 1073741824);
+
+    /* 1st iteration */
+    var1 = ((q31_t) ((q63_t) var1 * (0x30000000 -
+                                     ((q31_t)
+                                      ((((q31_t)
+                                         (((q63_t) var1 * var1) >> 31)) *
+                                        (q63_t) half) >> 31))) >> 31)) << 2;
+    /* 2nd iteration */
+    var1 = ((q31_t) ((q63_t) var1 * (0x30000000 -
+                                     ((q31_t)
+                                      ((((q31_t)
+                                         (((q63_t) var1 * var1) >> 31)) *
+                                        (q63_t) half) >> 31))) >> 31)) << 2;
+    /* 3rd iteration */
+    var1 = ((q31_t) ((q63_t) var1 * (0x30000000 -
+                                     ((q31_t)
+                                      ((((q31_t)
+                                         (((q63_t) var1 * var1) >> 31)) *
+                                        (q63_t) half) >> 31))) >> 31)) << 2;
+
+    /* Multiply the inverse square root with the original value */
+    var1 = ((q31_t) (((q63_t) temp1 * var1) >> 31)) << 1;
+
+    /* Shift the output down accordingly */
+    if((signBits1 % 2) == 0)
+    {
+      var1 = var1 >> (signBits1 / 2);
+    }
+    else
+    {
+      var1 = var1 >> ((signBits1 - 1) / 2);
+    }
+    *pOut = var1;
 
     return (ARM_MATH_SUCCESS);
   }
-
-#endif /* #ifndef ARM_MATH_CM0 */
-
+  /* If the number is a negative number then store zero as its square root value */
   else
   {
     *pOut = 0;

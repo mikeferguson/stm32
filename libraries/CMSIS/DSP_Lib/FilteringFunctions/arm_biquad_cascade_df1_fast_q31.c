@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_biquad_cascade_df1_fast_q31.c
@@ -11,6 +11,9 @@
 *				Q31 Fast Biquad cascade DirectFormI(DF1) filter.
 *
 * Target Processor: Cortex-M4/Cortex-M3
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,13 +76,13 @@ void arm_biquad_cascade_df1_fast_q31(
   q31_t * pDst,
   uint32_t blockSize)
 {
+  q31_t acc;                                     /*  accumulator                   */
+  q31_t Xn1, Xn2, Yn1, Yn2;                      /*  Filter state variables        */
+  q31_t b0, b1, b2, a1, a2;                      /*  Filter coefficients           */
   q31_t *pIn = pSrc;                             /*  input pointer initialization  */
   q31_t *pOut = pDst;                            /*  output pointer initialization */
   q31_t *pState = S->pState;                     /*  pState pointer initialization */
   q31_t *pCoeffs = S->pCoeffs;                   /*  coeff pointer initialization  */
-  q31_t acc;                                     /*  accumulator                   */
-  q31_t Xn1, Xn2, Yn1, Yn2;                      /*  Filter state variables        */
-  q31_t b0, b1, b2, a1, a2;                      /*  Filter coefficients           */
   q31_t Xn;                                      /*  temporary input               */
   int32_t shift = (int32_t) S->postShift + 1;    /*  Shift to be applied to the output */
   uint32_t sample, stage = S->numStages;         /*  loop counters                     */
@@ -113,13 +116,13 @@ void arm_biquad_cascade_df1_fast_q31(
     while(sample > 0u)
     {
       /* Read the input */
-      Xn = *pIn++;
+      Xn = *pIn;
 
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
       /* acc =  b0 * x[n] */
-      acc = (q31_t) (((q63_t) b0 * Xn) >> 32);
+      acc = (q31_t) (((q63_t) b1 * Xn1) >> 32);
       /* acc +=  b1 * x[n-1] */
-      acc = (q31_t) ((((q63_t) acc << 32) + ((q63_t) b1 * (Xn1))) >> 32);
+      acc = (q31_t) ((((q63_t) acc << 32) + ((q63_t) b0 * (Xn))) >> 32);
       /* acc +=  b[2] * x[n-2] */
       acc = (q31_t) ((((q63_t) acc << 32) + ((q63_t) b2 * (Xn2))) >> 32);
       /* acc +=  a1 * y[n-1] */
@@ -130,11 +133,11 @@ void arm_biquad_cascade_df1_fast_q31(
       /* The result is converted to 1.31 , Yn2 variable is reused */
       Yn2 = acc << shift;
 
-      /* Store the output in the destination buffer. */
-      *pOut++ = Yn2;
-
       /* Read the second input */
-      Xn2 = *pIn++;
+      Xn2 = *(pIn + 1u);
+
+      /* Store the output in the destination buffer. */
+      *pOut = Yn2;
 
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
       /* acc =  b0 * x[n] */
@@ -151,11 +154,11 @@ void arm_biquad_cascade_df1_fast_q31(
       /* The result is converted to 1.31, Yn1 variable is reused  */
       Yn1 = acc << shift;
 
-      /* Store the output in the destination buffer. */
-      *pOut++ = Yn1;
-
       /* Read the third input  */
-      Xn1 = *pIn++;
+      Xn1 = *(pIn + 2u);
+
+      /* Store the output in the destination buffer. */
+      *(pOut + 1u) = Yn1;
 
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
       /* acc =  b0 * x[n] */
@@ -172,11 +175,12 @@ void arm_biquad_cascade_df1_fast_q31(
       /* The result is converted to 1.31, Yn2 variable is reused  */
       Yn2 = acc << shift;
 
-      /* Store the output in the destination buffer. */
-      *pOut++ = Yn2;
-
       /* Read the forth input */
-      Xn = *pIn++;
+      Xn = *(pIn + 3u);
+
+      /* Store the output in the destination buffer. */
+      *(pOut + 2u) = Yn2;
+      pIn += 4u;
 
       /* acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2] */
       /* acc =  b0 * x[n] */
@@ -190,20 +194,20 @@ void arm_biquad_cascade_df1_fast_q31(
       /* acc +=  a2 * y[n-2] */
       acc = (q31_t) ((((q63_t) acc << 32) + ((q63_t) a2 * (Yn1))) >> 32);
 
-      /* The result is converted to 1.31, Yn1 variable is reused  */
-      Yn1 = acc << shift;
-
       /* Every time after the output is computed state should be updated. */
       /* The states should be updated as:  */
       /* Xn2 = Xn1    */
-      /* Xn1 = Xn     */
-      /* Yn2 = Yn1    */
-      /* Yn1 = acc    */
       Xn2 = Xn1;
+
+      /* The result is converted to 1.31, Yn1 variable is reused  */
+      Yn1 = acc << shift;
+
+      /* Xn1 = Xn     */
       Xn1 = Xn;
 
       /* Store the output in the destination buffer. */
-      *pOut++ = Yn1;
+      *(pOut + 3u) = Yn1;
+      pOut += 4u;
 
       /* decrement the loop counter */
       sample--;

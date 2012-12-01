@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:        arm_mat_add_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point matrix addition
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,13 +76,18 @@ arm_status arm_mat_add_f32(
   float32_t *pIn1 = pSrcA->pData;                /* input data matrix pointer A  */
   float32_t *pIn2 = pSrcB->pData;                /* input data matrix pointer B  */
   float32_t *pOut = pDst->pData;                 /* output data matrix pointer   */
+
+#ifndef ARM_MATH_CM0
+
+  float32_t inA1, inA2, inB1, inB2, out1, out2;  /* temporary variables */
+
+#endif //      #ifndef ARM_MATH_CM0
+
   uint32_t numSamples;                           /* total number of elements in the matrix  */
   uint32_t blkCnt;                               /* loop counters */
   arm_status status;                             /* status of matrix addition */
 
 #ifdef ARM_MATH_MATRIX_CHECK
-
-
   /* Check for matrix mismatch condition */
   if((pSrcA->numRows != pSrcB->numRows) ||
      (pSrcA->numCols != pSrcB->numCols) ||
@@ -89,16 +97,13 @@ arm_status arm_mat_add_f32(
     status = ARM_MATH_SIZE_MISMATCH;
   }
   else
-#endif /*    #ifdef ARM_MATH_MATRIX_CHECK    */
-
+#endif
   {
 
     /* Total number of samples in the input matrix */
     numSamples = (uint32_t) pSrcA->numRows * pSrcA->numCols;
 
 #ifndef ARM_MATH_CM0
-
-    /* Run the below code for Cortex-M4 and Cortex-M3 */
 
     /* Loop unrolling */
     blkCnt = numSamples >> 2u;
@@ -109,11 +114,57 @@ arm_status arm_mat_add_f32(
     {
       /* C(m,n) = A(m,n) + B(m,n) */
       /* Add and then store the results in the destination buffer. */
-      *pOut++ = (*pIn1++) + (*pIn2++);
-      *pOut++ = (*pIn1++) + (*pIn2++);
-      *pOut++ = (*pIn1++) + (*pIn2++);
-      *pOut++ = (*pIn1++) + (*pIn2++);
+      /* Read values from source A */
+      inA1 = pIn1[0];
 
+      /* Read values from source B */
+      inB1 = pIn2[0];
+
+      /* Read values from source A */
+      inA2 = pIn1[1];
+
+      /* out = sourceA + sourceB */
+      out1 = inA1 + inB1;
+
+      /* Read values from source B */
+      inB2 = pIn2[1];
+
+      /* Read values from source A */
+      inA1 = pIn1[2];
+
+      /* out = sourceA + sourceB */
+      out2 = inA2 + inB2;
+
+      /* Read values from source B */
+      inB1 = pIn2[2];
+
+      /* Store result in destination */
+      pOut[0] = out1;
+      pOut[1] = out2;
+
+      /* Read values from source A */
+      inA2 = pIn1[3];
+
+      /* Read values from source B */
+      inB2 = pIn2[3];
+
+      /* out = sourceA + sourceB */
+      out1 = inA1 + inB1;
+
+      /* out = sourceA + sourceB */
+      out2 = inA2 + inB2;
+
+      /* Store result in destination */
+      pOut[2] = out1;
+
+      /* Store result in destination */
+      pOut[3] = out2;
+
+
+      /* update pointers to process next sampels */
+      pIn1 += 4u;
+      pIn2 += 4u;
+      pOut += 4u;
       /* Decrement the loop counter */
       blkCnt--;
     }
@@ -140,6 +191,7 @@ arm_status arm_mat_add_f32(
       /* Decrement the loop counter */
       blkCnt--;
     }
+
     /* set status as ARM_MATH_SUCCESS */
     status = ARM_MATH_SUCCESS;
 

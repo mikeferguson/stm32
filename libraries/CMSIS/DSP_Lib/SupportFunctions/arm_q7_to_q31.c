@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_q7_to_q31.c
@@ -10,6 +10,9 @@
 * Description:	Converts the elements of the Q7 vector to Q31 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -66,6 +69,8 @@ void arm_q7_to_q31(
 
 #ifndef ARM_MATH_CM0
 
+  q31_t in;
+
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
   /*loop Unrolling */
@@ -77,10 +82,23 @@ void arm_q7_to_q31(
   {
     /* C = (q31_t) A << 24 */
     /* convert from q7 to q31 and then store the results in the destination buffer */
-    *pDst++ = (q31_t) * pIn++ << 24;
-    *pDst++ = (q31_t) * pIn++ << 24;
-    *pDst++ = (q31_t) * pIn++ << 24;
-    *pDst++ = (q31_t) * pIn++ << 24;
+    in = *__SIMD32(pIn)++;
+
+#ifndef ARM_MATH_BIG_ENDIAN
+
+    *pDst++ = (__ROR(in, 8)) & 0xFF000000;
+    *pDst++ = (__ROR(in, 16)) & 0xFF000000;
+    *pDst++ = (__ROR(in, 24)) & 0xFF000000;
+    *pDst++ = (in & 0xFF000000);
+
+#else
+
+    *pDst++ = (in & 0xFF000000);
+    *pDst++ = (__ROR(in, 24)) & 0xFF000000;
+    *pDst++ = (__ROR(in, 16)) & 0xFF000000;
+    *pDst++ = (__ROR(in, 8)) & 0xFF000000;
+
+#endif //              #ifndef ARM_MATH_BIG_ENDIAN
 
     /* Decrement the loop counter */
     blkCnt--;

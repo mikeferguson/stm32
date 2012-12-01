@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_conv_partial_fast_q31.c
@@ -10,6 +10,12 @@
 * Description:	Fast Q31 Partial convolution.
 *
 * Target Processor: Cortex-M4/Cortex-M3
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
+*
+* Version 1.0.11 2011/10/18
+*    Bug Fix in conv, correlation, partial convolution.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -240,7 +246,7 @@ arm_status arm_conv_partial_fast_q31(
     py = pSrc2;
 
     /* count is index by which the pointer pIn1 to be incremented */
-    count = 1u;
+    count = 0u;
 
     /* -------------------
      * Stage2 process
@@ -381,12 +387,12 @@ arm_status arm_conv_partial_fast_q31(
         *pOut++ = (q31_t) (acc2 << 1);
         *pOut++ = (q31_t) (acc3 << 1);
 
-        /* Update the inputA and inputB pointers for next MAC calculation */
-        px = pIn1 + (count * 4u);
-        py = pSrc2;
+        /* Increment the pointer pIn1 index, count by 4 */
+        count += 4u;
 
-        /* Increment the pointer pIn1 index, count by 1 */
-        count++;
+        /* Update the inputA and inputB pointers for next MAC calculation */
+        px = pIn1 + count;
+        py = pSrc2;
 
         /* Decrement the loop counter */
         blkCnt--;
@@ -439,12 +445,12 @@ arm_status arm_conv_partial_fast_q31(
         /* Store the result in the accumulator in the destination buffer. */
         *pOut++ = sum << 1;
 
+        /* Increment the MAC count */
+        count++;
+
         /* Update the inputA and inputB pointers for next MAC calculation */
         px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the MAC count */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;
@@ -477,12 +483,12 @@ arm_status arm_conv_partial_fast_q31(
         /* Store the result in the accumulator in the destination buffer. */
         *pOut++ = sum << 1;
 
+        /* Increment the MAC count */
+        count++;
+
         /* Update the inputA and inputB pointers for next MAC calculation */
         px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the MAC count */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;

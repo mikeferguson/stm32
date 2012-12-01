@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_correlate_f32.c
@@ -10,6 +10,12 @@
 * Description:	 Correlation of floating-point sequences.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
+*
+* Version 1.0.11 2011/10/18
+*    Bug Fix in conv, correlation, partial convolution.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -76,6 +82,20 @@
  * Correlation requires summing up a large number of intermediate products.
  * As such, the Q7, Q15, and Q31 functions run a risk of overflow and saturation.
  * Refer to the function specific documentation below for further details of the particular algorithm used.
+ *
+ *
+ * <b>Fast Versions</b>
+ *
+ * \par
+ * Fast versions are supported for Q31 and Q15.  Cycles for Fast versions are less compared to Q31 and Q15 of correlate and the design requires
+ * the input signals should be scaled down to avoid intermediate overflows.
+ *
+ *
+ * <b>Opt Versions</b>
+ *
+ * \par
+ * Opt versions are supported for Q15 and Q7.  Design uses internal scratch buffer for getting good optimisation.
+ * These versions are optimised in cycles and consumes more memory(Scratch memory) compared to Q15 and Q7 versions of correlate
  */
 
 /**
@@ -293,7 +313,7 @@ void arm_correlate_f32(
   py = pIn2;
 
   /* count is index by which the pointer pIn1 to be incremented */
-  count = 1u;
+  count = 0u;
 
   /* -------------------
    * Stage2 process
@@ -439,12 +459,12 @@ void arm_correlate_f32(
       *pOut = acc3;
       pOut += inc;
 
-      /* Update the inputA and inputB pointers for next MAC calculation */
-      px = pIn1 + (count * 4u);
-      py = pIn2;
+      /* Increment the pointer pIn1 index, count by 4 */
+      count += 4u;
 
-      /* Increment the pointer pIn1 index, count by 1 */
-      count++;
+      /* Update the inputA and inputB pointers for next MAC calculation */
+      px = pIn1 + count;
+      py = pIn2;
 
       /* Decrement the loop counter */
       blkCnt--;
@@ -494,12 +514,12 @@ void arm_correlate_f32(
       /* Destination pointer is updated according to the address modifier, inc */
       pOut += inc;
 
+      /* Increment the pointer pIn1 index, count by 1 */
+      count++;
+
       /* Update the inputA and inputB pointers for next MAC calculation */
       px = pIn1 + count;
       py = pIn2;
-
-      /* Increment the pointer pIn1 index, count by 1 */
-      count++;
 
       /* Decrement the loop counter */
       blkCnt--;
@@ -533,12 +553,12 @@ void arm_correlate_f32(
       /* Destination pointer is updated according to the address modifier, inc */
       pOut += inc;
 
+      /* Increment the pointer pIn1 index, count by 1 */
+      count++;
+
       /* Update the inputA and inputB pointers for next MAC calculation */
       px = pIn1 + count;
       py = pIn2;
-
-      /* Increment the pointer pIn1 index, count by 1 */
-      count++;
 
       /* Decrement the loop counter */
       blkCnt--;

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_mult_fast_q31.c
@@ -10,6 +10,9 @@
 * Description:	 Q31 matrix multiplication (fast variant).
 *
 * Target Processor: Cortex-M4/Cortex-M3
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -86,7 +89,7 @@ arm_status arm_mat_mult_fast_q31(
   uint16_t numColsA = pSrcA->numCols;            /* number of columns of input matrix A */
   uint16_t col, i = 0u, j, row = numRowsA, colCnt;      /* loop counters */
   arm_status status;                             /* status of matrix multiplication */
-
+  q31_t inA1, inA2, inA3, inA4, inB1, inB2, inB3, inB4;
 
 #ifdef ARM_MATH_MATRIX_CHECK
 
@@ -136,18 +139,31 @@ arm_status arm_mat_mult_fast_q31(
         {
           /* c(m,n) = a(1,1)*b(1,1) + a(1,2) * b(2,1) + .... + a(m,p)*b(p,n) */
           /* Perform the multiply-accumulates */
-          sum = (q31_t) ((((q63_t) sum << 32) +
-                          ((q63_t) * pIn1++ * (*pIn2))) >> 32);
+          inB1 = *pIn2;
           pIn2 += numColsB;
-          sum = (q31_t) ((((q63_t) sum << 32) +
-                          ((q63_t) * pIn1++ * (*pIn2))) >> 32);
+
+          inA1 = pIn1[0];
+          inA2 = pIn1[1];
+
+          inB2 = *pIn2;
           pIn2 += numColsB;
-          sum = (q31_t) ((((q63_t) sum << 32) +
-                          ((q63_t) * pIn1++ * (*pIn2))) >> 32);
+
+          inB3 = *pIn2;
           pIn2 += numColsB;
-          sum = (q31_t) ((((q63_t) sum << 32) +
-                          ((q63_t) * pIn1++ * (*pIn2))) >> 32);
+
+          sum = (q31_t) ((((q63_t) sum << 32) + ((q63_t) inA1 * inB1)) >> 32);
+          sum = (q31_t) ((((q63_t) sum << 32) + ((q63_t) inA2 * inB2)) >> 32);
+
+          inA3 = pIn1[2];
+          inA4 = pIn1[3];
+
+          inB4 = *pIn2;
           pIn2 += numColsB;
+
+          sum = (q31_t) ((((q63_t) sum << 32) + ((q63_t) inA3 * inB3)) >> 32);
+          sum = (q31_t) ((((q63_t) sum << 32) + ((q63_t) inA4 * inB4)) >> 32);
+
+          pIn1 += 4u;
 
           /* Decrement the loop counter */
           colCnt--;

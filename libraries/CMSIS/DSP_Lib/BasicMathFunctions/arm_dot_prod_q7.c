@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_dot_prod_q7.c
@@ -10,6 +10,9 @@
 * Description:	Q7 dot product.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,7 +76,7 @@ void arm_dot_prod_q7(
 /* Run the below code for Cortex-M4 and Cortex-M3 */
 
   q31_t input1, input2;                          /* Temporary variables to store input */
-  q15_t in1, in2;                                /* Temporary variables to store input */
+  q31_t inA1, inA2, inB1, inB2;                  /* Temporary variables to store input */
 
 
 
@@ -84,35 +87,23 @@ void arm_dot_prod_q7(
    ** a second loop below computes the remaining 1 to 3 samples. */
   while(blkCnt > 0u)
   {
-    /* Reading two inputs of SrcA buffer and packing */
-    in1 = (q15_t) * pSrcA++;
-    in2 = (q15_t) * pSrcA++;
-    input1 = ((q31_t) in1 & 0x0000FFFF) | ((q31_t) in2 << 16);
+    /* read 4 samples at a time from sourceA */
+    input1 = *__SIMD32(pSrcA)++;
+    /* read 4 samples at a time from sourceB */
+    input2 = *__SIMD32(pSrcB)++;
 
-    /* Reading two inputs of SrcB buffer and packing */
-    in1 = (q15_t) * pSrcB++;
-    in2 = (q15_t) * pSrcB++;
-    input2 = ((q31_t) in1 & 0x0000FFFF) | ((q31_t) in2 << 16);
+    /* extract two q7_t samples to q15_t samples */
+    inA1 = __SXTB16(__ROR(input1, 8));
+    /* extract reminaing two samples */
+    inA2 = __SXTB16(input1);
+    /* extract two q7_t samples to q15_t samples */
+    inB1 = __SXTB16(__ROR(input2, 8));
+    /* extract reminaing two samples */
+    inB2 = __SXTB16(input2);
 
-    /* C = A[0]* B[0] + A[1]* B[1] + A[2]* B[2] + .....+ A[blockSize-1]* B[blockSize-1] */
-    /* Perform Dot product of 2 packed inputs using SMLALD and store the result in a temporary variable. */
-    sum = __SMLAD(input1, input2, sum);
-
-    /* Reading two inputs of SrcA buffer and packing */
-    in1 = (q15_t) * pSrcA++;
-    in2 = (q15_t) * pSrcA++;
-    input1 = ((q31_t) in1 & 0x0000FFFF) | ((q31_t) in2 << 16);
-
-    /* Reading two inputs of SrcB buffer and packing */
-    in1 = (q15_t) * pSrcB++;
-    in2 = (q15_t) * pSrcB++;
-    input2 = ((q31_t) in1 & 0x0000FFFF) | ((q31_t) in2 << 16);
-
-    /* C = A[0]* B[0] + A[1]* B[1] + A[2]* B[2] + .....+ A[blockSize-1]* B[blockSize-1] */
-    /* Perform Dot product of 2 packed inputs using SMLALD and store the result in a temporary variable. */
-    sum = __SMLAD(input1, input2, sum);
-
-
+    /* multiply and accumulate two samples at a time */
+    sum = __SMLAD(inA1, inB1, sum);
+    sum = __SMLAD(inA2, inB2, sum);
 
     /* Decrement the loop counter */
     blkCnt--;

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_q15_to_q7.c
@@ -10,6 +10,9 @@
 * Description:	Converts the elements of the Q15 vector to Q7 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -68,6 +71,8 @@ void arm_q15_to_q7(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t in1, in2;
+  q31_t out1, out2;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -78,10 +83,34 @@ void arm_q15_to_q7(
   {
     /* C = (q7_t) A >> 8 */
     /* convert from q15 to q7 and then store the results in the destination buffer */
-    *pDst++ = (q7_t) (*pIn++ >> 8);
-    *pDst++ = (q7_t) (*pIn++ >> 8);
-    *pDst++ = (q7_t) (*pIn++ >> 8);
-    *pDst++ = (q7_t) (*pIn++ >> 8);
+    in1 = *__SIMD32(pIn)++;
+    in2 = *__SIMD32(pIn)++;
+
+#ifndef ARM_MATH_BIG_ENDIAN
+
+    out1 = __PKHTB(in2, in1, 16);
+    out2 = __PKHBT(in2, in1, 16);
+
+#else
+
+    out1 = __PKHTB(in1, in2, 16);
+    out2 = __PKHBT(in1, in2, 16);
+
+#endif //      #ifndef ARM_MATH_BIG_ENDIAN
+
+    /* rotate packed value by 24 */
+    out2 = ((uint32_t) out2 << 8) | ((uint32_t) out2 >> 24);
+
+    /* anding with 0xff00ff00 to get two 8 bit values */
+    out1 = out1 & 0xFF00FF00;
+    /* anding with 0x00ff00ff to get two 8 bit values */
+    out2 = out2 & 0x00FF00FF;
+
+    /* oring two values(contains two 8 bit values) to get four packed 8 bit values */
+    out1 = out1 | out2;
+
+    /* store 4 samples at a time to destiantion buffer */
+    *__SIMD32(pDst)++ = out1;
 
     /* Decrement the loop counter */
     blkCnt--;

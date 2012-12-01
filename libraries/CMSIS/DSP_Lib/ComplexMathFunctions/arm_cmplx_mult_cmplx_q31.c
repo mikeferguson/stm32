@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_cmplx_mult_cmplx_q31.c
@@ -10,6 +10,9 @@
 * Description:	Q31 complex-by-complex multiplication
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -61,6 +64,8 @@ void arm_cmplx_mult_cmplx_q31(
 {
   q31_t a, b, c, d;                              /* Temporary variables to store real and imaginary values */
   uint32_t blkCnt;                               /* loop counters */
+  q31_t mul1, mul2, mul3, mul4;
+  q31_t out1, out2;
 
 #ifndef ARM_MATH_CM0
 
@@ -80,40 +85,92 @@ void arm_cmplx_mult_cmplx_q31(
     c = *pSrcB++;
     d = *pSrcB++;
 
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
     /* store the real result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
+    *pDst++ = out1;
     /* store the imag result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    *pDst++ = out2;
 
     a = *pSrcA++;
     b = *pSrcA++;
     c = *pSrcB++;
     d = *pSrcB++;
 
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
+    /* store the real result in 3.29 format in the destination buffer. */
+    *pDst++ = out1;
+    /* store the imag result in 3.29 format in the destination buffer. */
+    *pDst++ = out2;
 
     a = *pSrcA++;
     b = *pSrcA++;
     c = *pSrcB++;
     d = *pSrcB++;
 
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
+    /* store the real result in 3.29 format in the destination buffer. */
+    *pDst++ = out1;
+    /* store the imag result in 3.29 format in the destination buffer. */
+    *pDst++ = out2;
 
     a = *pSrcA++;
     b = *pSrcA++;
     c = *pSrcB++;
     d = *pSrcB++;
 
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
+    /* store the real result in 3.29 format in the destination buffer. */
+    *pDst++ = out1;
+    /* store the imag result in 3.29 format in the destination buffer. */
+    *pDst++ = out2;
 
     /* Decrement the blockSize loop counter */
     blkCnt--;
@@ -132,10 +189,23 @@ void arm_cmplx_mult_cmplx_q31(
     c = *pSrcB++;
     d = *pSrcB++;
 
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
+    /* store the real result in 3.29 format in the destination buffer. */
+    *pDst++ = out1;
+    /* store the imag result in 3.29 format in the destination buffer. */
+    *pDst++ = out2;
 
     /* Decrement the blockSize loop counter */
     blkCnt--;
@@ -159,20 +229,46 @@ void arm_cmplx_mult_cmplx_q31(
     c = *pSrcB++;
     d = *pSrcB++;
 
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
     /* store the real result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
+    *pDst++ = out1;
     /* store the imag result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    *pDst++ = out2;
 
     a = *pSrcA++;
     b = *pSrcA++;
     c = *pSrcB++;
     d = *pSrcB++;
 
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
+    /* store the real result in 3.29 format in the destination buffer. */
+    *pDst++ = out1;
+    /* store the imag result in 3.29 format in the destination buffer. */
+    *pDst++ = out2;
 
     /* Decrement the blockSize loop counter */
     blkCnt--;
@@ -191,10 +287,23 @@ void arm_cmplx_mult_cmplx_q31(
     c = *pSrcB++;
     d = *pSrcB++;
 
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * c) >> 33) - (((q63_t) b * d) >> 33));
-    /* store the result in 3.29 format in the destination buffer. */
-    *pDst++ = (q31_t) ((((q63_t) a * d) >> 33) + (((q63_t) b * c) >> 33));
+    mul1 = (q31_t) (((q63_t) a * c) >> 32);
+    mul2 = (q31_t) (((q63_t) b * d) >> 32);
+    mul3 = (q31_t) (((q63_t) a * d) >> 32);
+    mul4 = (q31_t) (((q63_t) b * c) >> 32);
+
+    mul1 = (mul1 >> 1);
+    mul2 = (mul2 >> 1);
+    mul3 = (mul3 >> 1);
+    mul4 = (mul4 >> 1);
+
+    out1 = mul1 - mul2;
+    out2 = mul3 + mul4;
+
+    /* store the real result in 3.29 format in the destination buffer. */
+    *pDst++ = out1;
+    /* store the imag result in 3.29 format in the destination buffer. */
+    *pDst++ = out2;
 
     /* Decrement the blockSize loop counter */
     blkCnt--;

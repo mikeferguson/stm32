@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_lms_q31.c
@@ -10,6 +10,9 @@
 * Description:	Processing function for the Q31 LMS filter.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -85,8 +88,10 @@ void arm_lms_q31(
   q63_t acc;                                     /* Accumulator */
   q31_t e = 0;                                   /* error of data sample */
   q31_t alpha;                                   /* Intermediate constant for taps update */
-  uint8_t shift = (uint8_t) (32u - (S->postShift + 1u));        /* Shift to be applied to the output */
   q31_t coef;                                    /* Temporary variable for coef */
+  q31_t acc_l, acc_h;                            /*  temporary input */
+  uint32_t uShift = ((uint32_t) S->postShift + 1u);
+  uint32_t lShift = 32u - uShift;                /*  Shift to be applied to the output */
 
   /* S->pState points to buffer which contains previous frame (numTaps - 1) samples */
   /* pStateCurnt points to the location where the new input data should be written */
@@ -149,9 +154,15 @@ void arm_lms_q31(
     }
 
     /* Converting the result to 1.31 format */
-    /* Store the result from accumulator into the destination buffer. */
-    acc = (q31_t) (acc >> shift);
+    /* Calc lower part of acc */
+    acc_l = acc & 0xffffffff;
 
+    /* Calc upper part of acc */
+    acc_h = (acc >> 32) & 0xffffffff;
+
+    acc = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+    /* Store the result from accumulator into the destination buffer. */
     *pOut++ = (q31_t) acc;
 
     /* Compute and store error */
@@ -282,7 +293,13 @@ void arm_lms_q31(
 
     /* Converting the result to 1.31 format */
     /* Store the result from accumulator into the destination buffer. */
-    acc = (q31_t) (acc >> shift);
+    /* Calc lower part of acc */
+    acc_l = acc & 0xffffffff;
+
+    /* Calc upper part of acc */
+    acc_h = (acc >> 32) & 0xffffffff;
+
+    acc = (uint32_t) acc_l >> lShift | acc_h << uShift;
 
     *pOut++ = (q31_t) acc;
 

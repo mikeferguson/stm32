@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_correlate_q31.c
@@ -10,6 +10,12 @@
 * Description:	Correlation of Q31 sequences.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
+*
+* Version 1.0.11 2011/10/18
+*    Bug Fix in conv, correlation, partial convolution.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -86,8 +92,8 @@ void arm_correlate_q31(
   q31_t *px;                                     /* Intermediate inputA pointer  */
   q31_t *py;                                     /* Intermediate inputB pointer  */
   q31_t *pSrc1;                                  /* Intermediate pointers        */
-  q63_t sum, acc0, acc1, acc2, acc3;             /* Accumulators                  */
-  q31_t x0, x1, x2, x3, c0;                      /* temporary variables for holding input and coefficient values */
+  q63_t sum, acc0, acc1, acc2;                   /* Accumulators                  */
+  q31_t x0, x1, x2, c0;                          /* temporary variables for holding input and coefficient values */
   uint32_t j, k = 0u, count, blkCnt, outBlockSize, blockSize1, blockSize2, blockSize3;  /* loop counter                 */
   int32_t inc = 1;                               /* Destination address modifier */
 
@@ -259,7 +265,7 @@ void arm_correlate_q31(
   py = pIn2;
 
   /* count is index by which the pointer pIn1 to be incremented */
-  count = 1u;
+  count = 0u;
 
   /* -------------------
    * Stage2 process
@@ -270,8 +276,8 @@ void arm_correlate_q31(
    * srcBLen should be greater than or equal to 4 */
   if(srcBLen >= 4u)
   {
-    /* Loop unroll over blockSize2, by 4 */
-    blkCnt = blockSize2 >> 2u;
+    /* Loop unroll by 3 */
+    blkCnt = blockSize2 / 3;
 
     while(blkCnt > 0u)
     {
@@ -279,25 +285,23 @@ void arm_correlate_q31(
       acc0 = 0;
       acc1 = 0;
       acc2 = 0;
-      acc3 = 0;
 
-      /* read x[0], x[1], x[2] samples */
+      /* read x[0], x[1] samples */
       x0 = *(px++);
       x1 = *(px++);
-      x2 = *(px++);
 
-      /* Apply loop unrolling and compute 4 MACs simultaneously. */
-      k = srcBLen >> 2u;
+      /* Apply loop unrolling and compute 3 MACs simultaneously. */
+      k = srcBLen / 3;
 
-      /* First part of the processing with loop unrolling.  Compute 4 MACs at a time.
-       ** a second loop below computes MACs for the remaining 1 to 3 samples. */
+      /* First part of the processing with loop unrolling.  Compute 3 MACs at a time.
+       ** a second loop below computes MACs for the remaining 1 to 2 samples. */
       do
       {
         /* Read y[0] sample */
-        c0 = *(py++);
+        c0 = *(py);
 
-        /* Read x[3] sample */
-        x3 = *(px++);
+        /* Read x[2] sample */
+        x2 = *(px);
 
         /* Perform the multiply-accumulate */
         /* acc0 +=  x[0] * y[0] */
@@ -306,14 +310,12 @@ void arm_correlate_q31(
         acc1 += ((q63_t) x1 * c0);
         /* acc2 +=  x[2] * y[0] */
         acc2 += ((q63_t) x2 * c0);
-        /* acc3 +=  x[3] * y[0] */
-        acc3 += ((q63_t) x3 * c0);
 
         /* Read y[1] sample */
-        c0 = *(py++);
+        c0 = *(py + 1u);
 
-        /* Read x[4] sample */
-        x0 = *(px++);
+        /* Read x[3] sample */
+        x0 = *(px + 1u);
 
         /* Perform the multiply-accumulates */
         /* acc0 +=  x[1] * y[1] */
@@ -321,47 +323,31 @@ void arm_correlate_q31(
         /* acc1 +=  x[2] * y[1] */
         acc1 += ((q63_t) x2 * c0);
         /* acc2 +=  x[3] * y[1] */
-        acc2 += ((q63_t) x3 * c0);
-        /* acc3 +=  x[4] * y[1] */
-        acc3 += ((q63_t) x0 * c0);
-        /* Read y[2] sample */
-        c0 = *(py++);
+        acc2 += ((q63_t) x0 * c0);
 
-        /* Read x[5] sample */
-        x1 = *(px++);
+        /* Read y[2] sample */
+        c0 = *(py + 2u);
+
+        /* Read x[4] sample */
+        x1 = *(px + 2u);
 
         /* Perform the multiply-accumulates */
         /* acc0 +=  x[2] * y[2] */
         acc0 += ((q63_t) x2 * c0);
         /* acc1 +=  x[3] * y[2] */
-        acc1 += ((q63_t) x3 * c0);
-        /* acc2 +=  x[4] * y[2] */
-        acc2 += ((q63_t) x0 * c0);
-        /* acc3 +=  x[5] * y[2] */
-        acc3 += ((q63_t) x1 * c0);
-
-        /* Read y[3] sample */
-        c0 = *(py++);
-
-        /* Read x[6] sample */
-        x2 = *(px++);
-
-        /* Perform the multiply-accumulates */
-        /* acc0 +=  x[3] * y[3] */
-        acc0 += ((q63_t) x3 * c0);
-        /* acc1 +=  x[4] * y[3] */
         acc1 += ((q63_t) x0 * c0);
-        /* acc2 +=  x[5] * y[3] */
+        /* acc2 +=  x[4] * y[2] */
         acc2 += ((q63_t) x1 * c0);
-        /* acc3 +=  x[6] * y[3] */
-        acc3 += ((q63_t) x2 * c0);
 
+        /* update scratch pointers */
+        px += 3u;
+        py += 3u;
 
       } while(--k);
 
-      /* If the srcBLen is not a multiple of 4, compute any remaining MACs here.
+      /* If the srcBLen is not a multiple of 3, compute any remaining MACs here.
        ** No loop unrolling is used. */
-      k = srcBLen % 0x4u;
+      k = srcBLen - (3 * (srcBLen / 3));
 
       while(k > 0u)
       {
@@ -369,7 +355,7 @@ void arm_correlate_q31(
         c0 = *(py++);
 
         /* Read x[7] sample */
-        x3 = *(px++);
+        x2 = *(px++);
 
         /* Perform the multiply-accumulates */
         /* acc0 +=  x[4] * y[4] */
@@ -378,13 +364,10 @@ void arm_correlate_q31(
         acc1 += ((q63_t) x1 * c0);
         /* acc2 +=  x[6] * y[4] */
         acc2 += ((q63_t) x2 * c0);
-        /* acc3 +=  x[7] * y[4] */
-        acc3 += ((q63_t) x3 * c0);
 
         /* Reuse the present samples for the next MAC */
         x0 = x1;
         x1 = x2;
-        x2 = x3;
 
         /* Decrement the loop counter */
         k--;
@@ -401,23 +384,21 @@ void arm_correlate_q31(
       *pOut = (q31_t) (acc2 >> 31);
       pOut += inc;
 
-      *pOut = (q31_t) (acc3 >> 31);
-      pOut += inc;
+      /* Increment the pointer pIn1 index, count by 3 */
+      count += 3u;
 
       /* Update the inputA and inputB pointers for next MAC calculation */
-      px = pIn1 + (count * 4u);
+      px = pIn1 + count;
       py = pIn2;
 
-      /* Increment the pointer pIn1 index, count by 1 */
-      count++;
 
       /* Decrement the loop counter */
       blkCnt--;
     }
 
-    /* If the blockSize2 is not a multiple of 4, compute any remaining output samples here.
+    /* If the blockSize2 is not a multiple of 3, compute any remaining output samples here.
      ** No loop unrolling is used. */
-    blkCnt = blockSize2 % 0x4u;
+    blkCnt = blockSize2 - 3 * (blockSize2 / 3);
 
     while(blkCnt > 0u)
     {
@@ -459,12 +440,12 @@ void arm_correlate_q31(
       /* Destination pointer is updated according to the address modifier, inc */
       pOut += inc;
 
+      /* Increment the MAC count */
+      count++;
+
       /* Update the inputA and inputB pointers for next MAC calculation */
       px = pIn1 + count;
       py = pIn2;
-
-      /* Increment the MAC count */
-      count++;
 
       /* Decrement the loop counter */
       blkCnt--;
@@ -498,12 +479,12 @@ void arm_correlate_q31(
       /* Destination pointer is updated according to the address modifier, inc */
       pOut += inc;
 
+      /* Increment the MAC count */
+      count++;
+
       /* Update the inputA and inputB pointers for next MAC calculation */
       px = pIn1 + count;
       py = pIn2;
-
-      /* Increment the MAC count */
-      count++;
 
       /* Decrement the loop counter */
       blkCnt--;
@@ -616,7 +597,7 @@ void arm_correlate_q31(
   /* If srcALen < srcBLen, (srcALen - srcBLen) zeroes has to included in the
    * ending of the output buffer */
   /* Once the zero padding is done the remaining of the output is calcualted
-   * using convolution but with the shorter signal time shifted. */
+   * using correlation but with the shorter signal time shifted. */
 
   /* Calculate the length of the remaining sequence */
   tot = ((srcALen + srcBLen) - 2u);
@@ -651,13 +632,13 @@ void arm_correlate_q31(
 
   }
 
-  /* Loop to calculate convolution for output length number of times */
+  /* Loop to calculate correlation for output length number of times */
   for (i = 0u; i <= tot; i++)
   {
     /* Initialize sum with zero to carry on MAC operations */
     sum = 0;
 
-    /* Loop to perform MAC operations according to convolution equation */
+    /* Loop to perform MAC operations according to correlation equation */
     for (j = 0u; j <= i; j++)
     {
       /* Check the array limitations */

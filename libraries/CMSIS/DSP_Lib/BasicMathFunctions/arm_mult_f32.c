@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mult_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point vector multiplication.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -72,10 +75,12 @@ void arm_mult_f32(
   uint32_t blockSize)
 {
   uint32_t blkCnt;                               /* loop counters */
-
 #ifndef ARM_MATH_CM0
 
-/* Run the below code for Cortex-M4 and Cortex-M3 */
+  /* Run the below code for Cortex-M4 and Cortex-M3 */
+  float32_t inA1, inA2, inA3, inA4;              /* temporary input variables */
+  float32_t inB1, inB2, inB3, inB4;              /* temporary input variables */
+  float32_t out1, out2, out3, out4;              /* temporary output variables */
 
   /* loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -86,10 +91,53 @@ void arm_mult_f32(
   {
     /* C = A * B */
     /* Multiply the inputs and store the results in output buffer */
-    *pDst++ = (*pSrcA++) * (*pSrcB++);
-    *pDst++ = (*pSrcA++) * (*pSrcB++);
-    *pDst++ = (*pSrcA++) * (*pSrcB++);
-    *pDst++ = (*pSrcA++) * (*pSrcB++);
+    /* read sample from sourceA */
+    inA1 = *pSrcA;
+    /* read sample from sourceB */
+    inB1 = *pSrcB;
+    /* read sample from sourceA */
+    inA2 = *(pSrcA + 1);
+    /* read sample from sourceB */
+    inB2 = *(pSrcB + 1);
+
+    /* out = sourceA * sourceB */
+    out1 = inA1 * inB1;
+
+    /* read sample from sourceA */
+    inA3 = *(pSrcA + 2);
+    /* read sample from sourceB */
+    inB3 = *(pSrcB + 2);
+
+    /* out = sourceA * sourceB */
+    out2 = inA2 * inB2;
+
+    /* read sample from sourceA */
+    inA4 = *(pSrcA + 3);
+
+    /* store result to destination buffer */
+    *pDst = out1;
+
+    /* read sample from sourceB */
+    inB4 = *(pSrcB + 3);
+
+    /* out = sourceA * sourceB */
+    out3 = inA3 * inB3;
+
+    /* store result to destination buffer */
+    *(pDst + 1) = out2;
+
+    /* out = sourceA * sourceB */
+    out4 = inA4 * inB4;
+    /* store result to destination buffer */
+    *(pDst + 2) = out3;
+    /* store result to destination buffer */
+    *(pDst + 3) = out4;
+
+
+    /* update pointers to process next samples */
+    pSrcA += 4u;
+    pSrcB += 4u;
+    pDst += 4u;
 
     /* Decrement the blockSize loop counter */
     blkCnt--;
@@ -108,7 +156,6 @@ void arm_mult_f32(
 
 #endif /* #ifndef ARM_MATH_CM0 */
 
-
   while(blkCnt > 0u)
   {
     /* C = A * B */
@@ -118,7 +165,6 @@ void arm_mult_f32(
     /* Decrement the blockSize loop counter */
     blkCnt--;
   }
-
 }
 
 /**

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_sin_cos_f32.c
@@ -10,6 +10,9 @@
 * Description:	Sine and Cosine calculation for floating-point values.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -41,7 +44,7 @@
  * There are separate functions for Q31 and floating-point data types.
  * The input to the floating-point version is in degrees while the
  * fixed-point Q31 have a scaled input with the range
- * [-1 1) mapping to [-180 180) degrees.
+ * [-1 0.9999] mapping to [-180 179] degrees.
  *
  * The implementation is based on table lookup using 360 values together with linear interpolation.
  * The steps used are:
@@ -369,9 +372,10 @@ void arm_sin_cos_f32(
   float32_t * pSinVal,
   float32_t * pCosVal)
 {
-  uint32_t i;                                    /* Index for reading nearwst output values */
+  int32_t i;                                     /* Index for reading nearwst output values */
   float32_t x1 = -179.0f;                        /* Initial input value */
   float32_t y0, y1;                              /* nearest output values */
+  float32_t y2, y3;
   float32_t fract;                               /* fractional part of input */
 
   /* Calculation of fractional part */
@@ -387,19 +391,35 @@ void arm_sin_cos_f32(
   /* index calculation for reading nearest output values */
   i = (uint32_t) (theta - x1);
 
+  /* Checking min and max index of table */
+  if(i < 0)
+  {
+    i = 0;
+  }
+  else if(i >= 359)
+  {
+    i = 358;
+  }
+
   /* reading nearest sine output values */
   y0 = sinTable[i];
   y1 = sinTable[i + 1u];
 
-  /* Calculation of sine value */
-  *pSinVal = y0 + (fract * (y1 - y0));
-
   /* reading nearest cosine output values */
-  y0 = cosTable[i];
-  y1 = cosTable[i + 1u];
+  y2 = cosTable[i];
+  y3 = cosTable[i + 1u];
+
+  y1 = y1 - y0;
+  y3 = y3 - y2;
+
+  y1 = fract * y1;
+  y3 = fract * y3;
+
+  /* Calculation of sine value */
+  *pSinVal = y0 + y1;
 
   /* Calculation of cosine value */
-  *pCosVal = y0 + (fract * (y1 - y0));
+  *pCosVal = y2 + y3;
 
 }
 

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_fir_fast_q31.c
@@ -10,6 +10,9 @@
 * Description:	Processing function for the Q31 Fast FIR filter.
 *
 * Target Processor: Cortex-M4/Cortex-M3
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -76,7 +79,7 @@ void arm_fir_fast_q31(
   q31_t c0;                                      /* Temporary variable to hold coefficient value */
   q31_t *px;                                     /* Temporary pointer for state */
   q31_t *pb;                                     /* Temporary pointer for coefficient buffer */
-  q63_t acc0, acc1, acc2, acc3;                  /* Accumulators */
+  q31_t acc0, acc1, acc2, acc3;                  /* Accumulators */
   uint32_t numTaps = S->numTaps;                 /* Number of filter coefficients in the filter */
   uint32_t i, tapCnt, blkCnt;                    /* Loop counters */
 
@@ -135,16 +138,16 @@ void arm_fir_fast_q31(
       x3 = *(px++);
 
       /* acc0 +=  b[numTaps] * x[n-numTaps] */
-      acc0 = (q31_t) ((((q63_t) x0 * c0) + (acc0 << 32)) >> 32);
+      acc0 = (q31_t) ((((q63_t) acc0 << 32) + ((q63_t) x0 * c0)) >> 32);
 
       /* acc1 +=  b[numTaps] * x[n-numTaps-1] */
-      acc1 = (q31_t) ((((q63_t) x1 * c0) + (acc1 << 32)) >> 32);
+      acc1 = (q31_t) ((((q63_t) acc1 << 32) + ((q63_t) x1 * c0)) >> 32);
 
       /* acc2 +=  b[numTaps] * x[n-numTaps-2] */
-      acc2 = (q31_t) ((((q63_t) x2 * c0) + (acc2 << 32)) >> 32);
+      acc2 = (q31_t) ((((q63_t) acc2 << 32) + ((q63_t) x2 * c0)) >> 32);
 
       /* acc3 +=  b[numTaps] * x[n-numTaps-3] */
-      acc3 = (q31_t) ((((q63_t) x3 * c0) + (acc3 << 32)) >> 32);
+      acc3 = (q31_t) ((((q63_t) acc3 << 32) + ((q63_t) x3 * c0)) >> 32);
 
       /* Read the b[numTaps-1] coefficient */
       c0 = *(pb++);
@@ -153,10 +156,10 @@ void arm_fir_fast_q31(
       x0 = *(px++);
 
       /* Perform the multiply-accumulates */
-      acc0 = (q31_t) ((((q63_t) x1 * c0) + (acc0 << 32)) >> 32);
-      acc1 = (q31_t) ((((q63_t) x2 * c0) + (acc1 << 32)) >> 32);
-      acc2 = (q31_t) ((((q63_t) x3 * c0) + (acc2 << 32)) >> 32);
-      acc3 = (q31_t) ((((q63_t) x0 * c0) + (acc3 << 32)) >> 32);
+      acc0 = (q31_t) ((((q63_t) acc0 << 32) + ((q63_t) x1 * c0)) >> 32);
+      acc1 = (q31_t) ((((q63_t) acc1 << 32) + ((q63_t) x2 * c0)) >> 32);
+      acc2 = (q31_t) ((((q63_t) acc2 << 32) + ((q63_t) x3 * c0)) >> 32);
+      acc3 = (q31_t) ((((q63_t) acc3 << 32) + ((q63_t) x0 * c0)) >> 32);
 
       /* Read the b[numTaps-2] coefficient */
       c0 = *(pb++);
@@ -165,10 +168,10 @@ void arm_fir_fast_q31(
       x1 = *(px++);
 
       /* Perform the multiply-accumulates */
-      acc0 = (q31_t) ((((q63_t) x2 * c0) + (acc0 << 32)) >> 32);
-      acc1 = (q31_t) ((((q63_t) x3 * c0) + (acc1 << 32)) >> 32);
-      acc2 = (q31_t) ((((q63_t) x0 * c0) + (acc2 << 32)) >> 32);
-      acc3 = (q31_t) ((((q63_t) x1 * c0) + (acc3 << 32)) >> 32);
+      acc0 = (q31_t) ((((q63_t) acc0 << 32) + ((q63_t) x2 * c0)) >> 32);
+      acc1 = (q31_t) ((((q63_t) acc1 << 32) + ((q63_t) x3 * c0)) >> 32);
+      acc2 = (q31_t) ((((q63_t) acc2 << 32) + ((q63_t) x0 * c0)) >> 32);
+      acc3 = (q31_t) ((((q63_t) acc3 << 32) + ((q63_t) x1 * c0)) >> 32);
 
       /* Read the b[numTaps-3] coefficients */
       c0 = *(pb++);
@@ -177,10 +180,10 @@ void arm_fir_fast_q31(
       x2 = *(px++);
 
       /* Perform the multiply-accumulates */
-      acc0 = (q31_t) ((((q63_t) x3 * c0) + (acc0 << 32)) >> 32);
-      acc1 = (q31_t) ((((q63_t) x0 * c0) + (acc1 << 32)) >> 32);
-      acc2 = (q31_t) ((((q63_t) x1 * c0) + (acc2 << 32)) >> 32);
-      acc3 = (q31_t) ((((q63_t) x2 * c0) + (acc3 << 32)) >> 32);
+      acc0 = (q31_t) ((((q63_t) acc0 << 32) + ((q63_t) x3 * c0)) >> 32);
+      acc1 = (q31_t) ((((q63_t) acc1 << 32) + ((q63_t) x0 * c0)) >> 32);
+      acc2 = (q31_t) ((((q63_t) acc2 << 32) + ((q63_t) x1 * c0)) >> 32);
+      acc3 = (q31_t) ((((q63_t) acc3 << 32) + ((q63_t) x2 * c0)) >> 32);
       i--;
     }
 
@@ -196,10 +199,10 @@ void arm_fir_fast_q31(
       x3 = *(px++);
 
       /* Perform the multiply-accumulates */
-      acc0 = (q31_t) ((((q63_t) x0 * c0) + (acc0 << 32)) >> 32);
-      acc1 = (q31_t) ((((q63_t) x1 * c0) + (acc1 << 32)) >> 32);
-      acc2 = (q31_t) ((((q63_t) x2 * c0) + (acc2 << 32)) >> 32);
-      acc3 = (q31_t) ((((q63_t) x3 * c0) + (acc3 << 32)) >> 32);
+      acc0 = (q31_t) ((((q63_t) acc0 << 32) + ((q63_t) x0 * c0)) >> 32);
+      acc1 = (q31_t) ((((q63_t) acc1 << 32) + ((q63_t) x1 * c0)) >> 32);
+      acc2 = (q31_t) ((((q63_t) acc2 << 32) + ((q63_t) x2 * c0)) >> 32);
+      acc3 = (q31_t) ((((q63_t) acc3 << 32) + ((q63_t) x3 * c0)) >> 32);
 
       /* Reuse the present sample states for next sample */
       x0 = x1;
@@ -248,7 +251,9 @@ void arm_fir_fast_q31(
     /* Perform the multiply-accumulates */
     do
     {
-      acc0 = (q31_t) ((((q63_t) * (px++) * (*(pb++))) + (acc0 << 32)) >> 32);
+      acc0 =
+        (q31_t) ((((q63_t) acc0 << 32) +
+                  ((q63_t) (*px++) * (*(pb++)))) >> 32);
       i--;
     } while(i > 0u);
 
@@ -295,6 +300,7 @@ void arm_fir_fast_q31(
     /* Decrement the loop counter */
     tapCnt--;
   }
+
 
 }
 

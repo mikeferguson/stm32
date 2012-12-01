@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_copy_q31.c
@@ -10,6 +10,9 @@
 * Description:	Copies the elements of a Q31 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -61,6 +64,7 @@ void arm_copy_q31(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t in1, in2, in3, in4;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -71,10 +75,15 @@ void arm_copy_q31(
   {
     /* C = A */
     /* Copy and then store the values in the destination buffer */
-    *pDst++ = *pSrc++;
-    *pDst++ = *pSrc++;
-    *pDst++ = *pSrc++;
-    *pDst++ = *pSrc++;
+    in1 = *pSrc++;
+    in2 = *pSrc++;
+    in3 = *pSrc++;
+    in4 = *pSrc++;
+
+    *pDst++ = in1;
+    *pDst++ = in2;
+    *pDst++ = in3;
+    *pDst++ = in4;
 
     /* Decrement the loop counter */
     blkCnt--;

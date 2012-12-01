@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_add_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point vector addition.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,6 +76,8 @@ void arm_add_f32(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
+  float32_t inA1, inA2, inA3, inA4;              /* temporary input variabels */
+  float32_t inB1, inB2, inB3, inB4;              /* temporary input variables */
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -83,10 +88,29 @@ void arm_add_f32(
   {
     /* C = A + B */
     /* Add and then store the results in the destination buffer. */
-    *pDst++ = (*pSrcA++) + (*pSrcB++);
-    *pDst++ = (*pSrcA++) + (*pSrcB++);
-    *pDst++ = (*pSrcA++) + (*pSrcB++);
-    *pDst++ = (*pSrcA++) + (*pSrcB++);
+
+    /* read four inputs from sourceA and four inputs from sourceB */
+    inA1 = *pSrcA;
+    inB1 = *pSrcB;
+    inA2 = *(pSrcA + 1);
+    inB2 = *(pSrcB + 1);
+    inA3 = *(pSrcA + 2);
+    inB3 = *(pSrcB + 2);
+    inA4 = *(pSrcA + 3);
+    inB4 = *(pSrcB + 3);
+
+    /* C = A + B */
+    /* add and store result to destination */
+    *pDst = inA1 + inB1;
+    *(pDst + 1) = inA2 + inB2;
+    *(pDst + 2) = inA3 + inB3;
+    *(pDst + 3) = inA4 + inB4;
+
+    /* update pointers to process next samples */
+    pSrcA += 4u;
+    pSrcB += 4u;
+    pDst += 4u;
+
 
     /* Decrement the loop counter */
     blkCnt--;

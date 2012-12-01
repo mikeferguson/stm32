@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_offset_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point vector offset.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -29,7 +32,6 @@
 * Version 0.0.7  2010/06/10
 *    Misra-C changes done
 * ---------------------------------------------------------------------------- */
-
 #include "arm_math.h"
 
 /**
@@ -74,6 +76,7 @@ void arm_offset_f32(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
+  float32_t in1, in2, in3, in4;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -84,10 +87,43 @@ void arm_offset_f32(
   {
     /* C = A + offset */
     /* Add offset and then store the results in the destination buffer. */
-    *pDst++ = (*pSrc++) + offset;
-    *pDst++ = (*pSrc++) + offset;
-    *pDst++ = (*pSrc++) + offset;
-    *pDst++ = (*pSrc++) + offset;
+    /* read samples from source */
+    in1 = *pSrc;
+    in2 = *(pSrc + 1);
+
+    /* add offset to input */
+    in1 = in1 + offset;
+
+    /* read samples from source */
+    in3 = *(pSrc + 2);
+
+    /* add offset to input */
+    in2 = in2 + offset;
+
+    /* read samples from source */
+    in4 = *(pSrc + 3);
+
+    /* add offset to input */
+    in3 = in3 + offset;
+
+    /* store result to destination */
+    *pDst = in1;
+
+    /* add offset to input */
+    in4 = in4 + offset;
+
+    /* store result to destination */
+    *(pDst + 1) = in2;
+
+    /* store result to destination */
+    *(pDst + 2) = in3;
+
+    /* store result to destination */
+    *(pDst + 3) = in4;
+
+    /* update pointers to process next samples */
+    pSrc += 4u;
+    pDst += 4u;
 
     /* Decrement the loop counter */
     blkCnt--;

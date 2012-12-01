@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:        arm_fir_init_q15.c
@@ -10,6 +10,9 @@
 * Description:  Q15 FIR filter initialization function.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -79,7 +82,7 @@
  * </pre>
  * \par
  * <code>pState</code> points to the array of state variables.
- * <code>pState</code> is of length <code>numTaps+blockSize-1</code>, where <code>blockSize</code> is the number of input samples processed by each call to <code>arm_fir_q15()</code>.
+ * <code>pState</code> is of length <code>numTaps+blockSize</code>, when running on Cortex-M4 and Cortex-M3  and is of length <code>numTaps+blockSize-1</code>, when running on Cortex-M0 where <code>blockSize</code> is the number of input samples processed by each call to <code>arm_fir_q15()</code>.
  */
 
 arm_status arm_fir_init_q15(
@@ -97,7 +100,7 @@ arm_status arm_fir_init_q15(
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
   /* The Number of filter coefficients in the filter must be even and at least 4 */
-  if((numTaps < 4u) || (numTaps & 0x1u))
+  if(numTaps & 0x1u)
   {
     status = ARM_MATH_ARGUMENT_ERROR;
   }
@@ -109,8 +112,8 @@ arm_status arm_fir_init_q15(
     /* Assign coefficient pointer */
     S->pCoeffs = pCoeffs;
 
-    /* Clear the state buffer.  The size is always (blockSize + numTaps - 1) */
-    memset(pState, 0, (numTaps + (blockSize - 1u)) * sizeof(q15_t));
+    /* Clear the state buffer.  The size is always (blockSize + numTaps ) */
+    memset(pState, 0, (numTaps + (blockSize)) * sizeof(q15_t));
 
     /* Assign state pointer */
     S->pState = pState;

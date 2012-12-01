@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_fir_q31.c
@@ -10,6 +10,9 @@
 * Description:	Q31 FIR filter processing function.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -79,13 +82,13 @@ void arm_fir_q31(
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
-  q31_t x0, x1, x2, x3;                          /* Temporary variables to hold state */
+  q31_t x0, x1, x2;                              /* Temporary variables to hold state */
   q31_t c0;                                      /* Temporary variable to hold coefficient value */
   q31_t *px;                                     /* Temporary pointer for state */
   q31_t *pb;                                     /* Temporary pointer for coefficient buffer */
-  q63_t acc0, acc1, acc2, acc3;                  /* Accumulators */
+  q63_t acc0, acc1, acc2;                        /* Accumulators */
   uint32_t numTaps = S->numTaps;                 /* Number of filter coefficients in the filter */
-  uint32_t i, tapCnt, blkCnt;                    /* Loop counters */
+  uint32_t i, tapCnt, blkCnt, tapCntN3;          /* Loop counters */
 
   /* S->pState points to state array which contains previous frame (numTaps - 1) samples */
   /* pStateCurnt points to the location where the new input data should be written */
@@ -99,14 +102,17 @@ void arm_fir_q31(
    *    acc2 =  b[numTaps-1] * x[n-numTaps+1] + b[numTaps-2] * x[n-numTaps] +   b[numTaps-3] * x[n-numTaps-1] +...+ b[0] * x[2]
    *    acc3 =  b[numTaps-1] * x[n-numTaps+2] + b[numTaps-2] * x[n-numTaps+1] + b[numTaps-3] * x[n-numTaps]   +...+ b[0] * x[3]
    */
-  blkCnt = blockSize >> 2;
+  blkCnt = blockSize / 3;
+  blockSize = blockSize - (3 * blkCnt);
+
+  tapCnt = numTaps / 3;
+  tapCntN3 = numTaps - (3 * tapCnt);
 
   /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
    ** a second loop below computes the remaining 1 to 3 samples. */
   while(blkCnt > 0u)
   {
-    /* Copy four new input samples into the state buffer */
-    *pStateCurnt++ = *pSrc++;
+    /* Copy three new input samples into the state buffer */
     *pStateCurnt++ = *pSrc++;
     *pStateCurnt++ = *pSrc++;
     *pStateCurnt++ = *pSrc++;
@@ -115,7 +121,6 @@ void arm_fir_q31(
     acc0 = 0;
     acc1 = 0;
     acc2 = 0;
-    acc3 = 0;
 
     /* Initialize state pointer */
     px = pState;
@@ -123,119 +128,94 @@ void arm_fir_q31(
     /* Initialize coefficient pointer */
     pb = pCoeffs;
 
-    /* Read the first three samples from the state buffer:
-     *  x[n-numTaps], x[n-numTaps-1], x[n-numTaps-2] */
+    /* Read the first two samples from the state buffer:
+     *  x[n-numTaps], x[n-numTaps-1] */
     x0 = *(px++);
     x1 = *(px++);
-    x2 = *(px++);
 
-    /* Loop unrolling.  Process 4 taps at a time. */
-    tapCnt = numTaps >> 2;
+    /* Loop unrolling.  Process 3 taps at a time. */
     i = tapCnt;
 
     while(i > 0u)
     {
       /* Read the b[numTaps] coefficient */
-      c0 = *(pb++);
+      c0 = *pb;
 
-      /* Read x[n-numTaps-3] sample */
-      x3 = *(px++);
+      /* Read x[n-numTaps-2] sample */
+      x2 = *(px++);
 
-      /* acc0 +=  b[numTaps] * x[n-numTaps] */
+      /* Perform the multiply-accumulates */
       acc0 += ((q63_t) x0 * c0);
-
-      /* acc1 +=  b[numTaps] * x[n-numTaps-1] */
       acc1 += ((q63_t) x1 * c0);
-
-      /* acc2 +=  b[numTaps] * x[n-numTaps-2] */
       acc2 += ((q63_t) x2 * c0);
 
-      /* acc3 +=  b[numTaps] * x[n-numTaps-3] */
-      acc3 += ((q63_t) x3 * c0);
-
-      /* Read the b[numTaps-1] coefficient */
-      c0 = *(pb++);
-
-      /* Read x[n-numTaps-4] sample */
+      /* Read the coefficient and state */
+      c0 = *(pb + 1u);
       x0 = *(px++);
 
       /* Perform the multiply-accumulates */
       acc0 += ((q63_t) x1 * c0);
       acc1 += ((q63_t) x2 * c0);
-      acc2 += ((q63_t) x3 * c0);
-      acc3 += ((q63_t) x0 * c0);
+      acc2 += ((q63_t) x0 * c0);
 
-      /* Read the b[numTaps-2] coefficient */
-      c0 = *(pb++);
-
-      /* Read x[n-numTaps-5] sample */
+      /* Read the coefficient and state */
+      c0 = *(pb + 2u);
       x1 = *(px++);
+
+      /* update coefficient pointer */
+      pb += 3u;
 
       /* Perform the multiply-accumulates */
       acc0 += ((q63_t) x2 * c0);
-      acc1 += ((q63_t) x3 * c0);
-      acc2 += ((q63_t) x0 * c0);
-      acc3 += ((q63_t) x1 * c0);
-      /* Read the b[numTaps-3] coefficients */
-      c0 = *(pb++);
-
-      /* Read x[n-numTaps-6] sample */
-      x2 = *(px++);
-
-      /* Perform the multiply-accumulates */
-      acc0 += ((q63_t) x3 * c0);
       acc1 += ((q63_t) x0 * c0);
       acc2 += ((q63_t) x1 * c0);
-      acc3 += ((q63_t) x2 * c0);
+
+      /* Decrement the loop counter */
       i--;
     }
 
-    /* If the filter length is not a multiple of 4, compute the remaining filter taps */
+    /* If the filter length is not a multiple of 3, compute the remaining filter taps */
 
-    i = numTaps - (tapCnt * 4u);
+    i = tapCntN3;
+
     while(i > 0u)
     {
       /* Read coefficients */
       c0 = *(pb++);
 
       /* Fetch 1 state variable */
-      x3 = *(px++);
+      x2 = *(px++);
 
       /* Perform the multiply-accumulates */
       acc0 += ((q63_t) x0 * c0);
       acc1 += ((q63_t) x1 * c0);
       acc2 += ((q63_t) x2 * c0);
-      acc3 += ((q63_t) x3 * c0);
 
       /* Reuse the present sample states for next sample */
       x0 = x1;
       x1 = x2;
-      x2 = x3;
 
       /* Decrement the loop counter */
       i--;
     }
 
-    /* Advance the state pointer by 4 to process the next group of 4 samples */
-    pState = pState + 4;
+    /* Advance the state pointer by 3 to process the next group of 3 samples */
+    pState = pState + 3;
 
-    /* The results in the 4 accumulators are in 2.62 format.  Convert to 1.31
-     ** Then store the 4 outputs in the destination buffer. */
+    /* The results in the 3 accumulators are in 2.30 format.  Convert to 1.31
+     ** Then store the 3 outputs in the destination buffer. */
     *pDst++ = (q31_t) (acc0 >> 31u);
     *pDst++ = (q31_t) (acc1 >> 31u);
     *pDst++ = (q31_t) (acc2 >> 31u);
-    *pDst++ = (q31_t) (acc3 >> 31u);
 
     /* Decrement the samples loop counter */
     blkCnt--;
   }
 
-
-  /* If the blockSize is not a multiple of 4, compute any remaining output samples here.
+  /* If the blockSize is not a multiple of 3, compute any remaining output samples here.
    ** No loop unrolling is used. */
-  blkCnt = blockSize % 4u;
 
-  while(blkCnt > 0u)
+  while(blockSize > 0u)
   {
     /* Copy one sample at a time into state buffer */
     *pStateCurnt++ = *pSrc++;
@@ -266,7 +246,7 @@ void arm_fir_q31(
     pState = pState + 1;
 
     /* Decrement the samples loop counter */
-    blkCnt--;
+    blockSize--;
   }
 
   /* Processing is complete.

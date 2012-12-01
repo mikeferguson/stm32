@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_lms_norm_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 NLMS filter.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -88,10 +91,13 @@ void arm_lms_norm_q15(
   q15_t e = 0, d = 0;                            /* error, reference data sample */
   q15_t w = 0, in;                               /* weight factor and state */
   q15_t x0;                                      /* temporary variable to hold input sample */
-  uint32_t shift = (uint32_t) S->postShift + 1u; /* Shift to be applied to the output */
+  //uint32_t shift = (uint32_t) S->postShift + 1u; /* Shift to be applied to the output */
   q15_t errorXmu, oneByEnergy;                   /* Temporary variables to store error and mu product and reciprocal of energy */
   q15_t postShift;                               /* Post shift to be applied to weight after reciprocal calculation */
   q31_t coef;                                    /* Teporary variable for coefficient */
+  q31_t acc_l, acc_h;
+  int32_t lShift = (15 - (int32_t) S->postShift);       /*  Post shift  */
+  int32_t uShift = (32 - lShift);
 
   energy = S->energy;
   x0 = S->x0;
@@ -136,8 +142,19 @@ void arm_lms_norm_q15(
     {
 
       /* Perform the multiply-accumulate */
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
       acc = __SMLALD(*__SIMD32(px)++, (*__SIMD32(pb)++), acc);
       acc = __SMLALD(*__SIMD32(px)++, (*__SIMD32(pb)++), acc);
+
+#else
+
+      acc += (((q31_t) * px++ * (*pb++)));
+      acc += (((q31_t) * px++ * (*pb++)));
+      acc += (((q31_t) * px++ * (*pb++)));
+      acc += (((q31_t) * px++ * (*pb++)));
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE	*/
 
       /* Decrement the loop counter */
       tapCnt--;
@@ -155,8 +172,17 @@ void arm_lms_norm_q15(
       tapCnt--;
     }
 
-    /* Converting the result to 1.15 format */
-    acc = __SSAT((acc >> (16u - shift)), 16u);
+    /* Calc lower part of acc */
+    acc_l = acc & 0xffffffff;
+
+    /* Calc upper part of acc */
+    acc_h = (acc >> 32) & 0xffffffff;
+
+    /* Apply shift for lower part of acc and upper part of acc */
+    acc = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+    /* Converting the result to 1.15 format and saturate the output */
+    acc = __SSAT(acc, 16u);
 
     /* Store the result from accumulator into the destination buffer. */
     *pOut++ = (q15_t) acc;
@@ -244,8 +270,19 @@ void arm_lms_norm_q15(
   while(tapCnt > 0u)
   {
 
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
     *__SIMD32(pStateCurnt)++ = *__SIMD32(pState)++;
     *__SIMD32(pStateCurnt)++ = *__SIMD32(pState)++;
+
+#else
+
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+
+#endif
 
     tapCnt--;
 
@@ -300,8 +337,20 @@ void arm_lms_norm_q15(
       tapCnt--;
     }
 
+    /* Calc lower part of acc */
+    acc_l = acc & 0xffffffff;
+
+    /* Calc upper part of acc */
+    acc_h = (acc >> 32) & 0xffffffff;
+
+    /* Apply shift for lower part of acc and upper part of acc */
+    acc = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+    /* Converting the result to 1.15 format and saturate the output */
+    acc = __SSAT(acc, 16u);
+
     /* Converting the result to 1.15 format */
-    acc = __SSAT((acc >> (16u - shift)), 16u);
+    //acc = __SSAT((acc >> (16u - shift)), 16u);
 
     /* Store the result from accumulator into the destination buffer. */
     *pOut++ = (q15_t) acc;

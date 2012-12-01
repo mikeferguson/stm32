@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_abs_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 vector absolute value.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -87,15 +90,15 @@ void arm_abs_q15(
 #ifndef  ARM_MATH_BIG_ENDIAN
 
     *__SIMD32(pDst)++ =
-      __PKHBT(((in1 > 0) ? in1 : __SSAT(-in1, 16)),
-              ((in2 > 0) ? in2 : __SSAT(-in2, 16)), 16);
+      __PKHBT(((in1 > 0) ? in1 : __QSUB16(0, in1)),
+              ((in2 > 0) ? in2 : __QSUB16(0, in2)), 16);
 
 #else
 
 
     *__SIMD32(pDst)++ =
-      __PKHBT(((in2 > 0) ? in2 : __SSAT(-in2, 16)),
-              ((in1 > 0) ? in1 : __SSAT(-in1, 16)), 16);
+      __PKHBT(((in2 > 0) ? in2 : __QSUB16(0, in2)),
+              ((in1 > 0) ? in1 : __QSUB16(0, in1)), 16);
 
 #endif /* #ifndef  ARM_MATH_BIG_ENDIAN    */
 
@@ -106,15 +109,15 @@ void arm_abs_q15(
 #ifndef  ARM_MATH_BIG_ENDIAN
 
     *__SIMD32(pDst)++ =
-      __PKHBT(((in1 > 0) ? in1 : __SSAT(-in1, 16)),
-              ((in2 > 0) ? in2 : __SSAT(-in2, 16)), 16);
-
+      __PKHBT(((in1 > 0) ? in1 : __QSUB16(0, in1)),
+              ((in2 > 0) ? in2 : __QSUB16(0, in2)), 16);
 
 #else
 
+
     *__SIMD32(pDst)++ =
-      __PKHBT(((in2 > 0) ? in2 : __SSAT(-in2, 16)),
-              ((in1 > 0) ? in1 : __SSAT(-in1, 16)), 16);
+      __PKHBT(((in2 > 0) ? in2 : __QSUB16(0, in2)),
+              ((in1 > 0) ? in1 : __QSUB16(0, in1)), 16);
 
 #endif /* #ifndef  ARM_MATH_BIG_ENDIAN    */
 
@@ -133,7 +136,7 @@ void arm_abs_q15(
     in1 = *pSrc++;
 
     /* Calculate absolute value of input and then store the result in the destination buffer. */
-    *pDst++ = (in1 > 0) ? in1 : __SSAT(-in1, 16);
+    *pDst++ = (in1 > 0) ? in1 : __QSUB16(0, in1);
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -155,7 +158,7 @@ void arm_abs_q15(
     in = *pSrc++;
 
     /* Calculate absolute value of input and then store the result in the destination buffer. */
-    *pDst++ = (in > 0) ? in : __SSAT(-in, 16);
+    *pDst++ = (in > 0) ? in : ((in == (q15_t) 0x8000) ? 0x7fff : -in);
 
     /* Decrement the loop counter */
     blkCnt--;

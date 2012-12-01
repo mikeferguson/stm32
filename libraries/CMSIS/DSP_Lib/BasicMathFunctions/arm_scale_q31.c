@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_scale_q31.c
@@ -10,6 +10,9 @@
 * Description:	Multiplies a Q31 vector by a scalar.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -63,31 +66,118 @@ void arm_scale_q31(
   q31_t * pDst,
   uint32_t blockSize)
 {
-  int8_t kShift = 31 - shift;                    /* Shift to apply after scaling */
+  int8_t kShift = shift + 1;                     /* Shift to apply after scaling */
+  int8_t sign = (kShift & 0x80);
   uint32_t blkCnt;                               /* loop counter */
+  q31_t in, out;
 
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
 
+  q31_t in1, in2, in3, in4;                      /* temporary input variables */
+  q31_t out1, out2, out3, out4;                  /* temporary output variabels */
+
+
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
 
-  /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
-   ** a second loop below computes the remaining 1 to 3 samples. */
-  while(blkCnt > 0u)
+  if(sign == 0u)
   {
-    /* C = A * scale */
-    /* Scale the input and then store the results in the destination buffer. */
-    *pDst++ = clip_q63_to_q31(((q63_t) * pSrc++ * scaleFract) >> kShift);
-    *pDst++ = clip_q63_to_q31(((q63_t) * pSrc++ * scaleFract) >> kShift);
-    *pDst++ = clip_q63_to_q31(((q63_t) * pSrc++ * scaleFract) >> kShift);
-    *pDst++ = clip_q63_to_q31(((q63_t) * pSrc++ * scaleFract) >> kShift);
+    /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
+     ** a second loop below computes the remaining 1 to 3 samples. */
+    while(blkCnt > 0u)
+    {
+      /* read four inputs from source */
+      in1 = *pSrc;
+      in2 = *(pSrc + 1);
+      in3 = *(pSrc + 2);
+      in4 = *(pSrc + 3);
 
-    /* Decrement the loop counter */
-    blkCnt--;
+      /* multiply input with scaler value */
+      in1 = ((q63_t) in1 * scaleFract) >> 32;
+      in2 = ((q63_t) in2 * scaleFract) >> 32;
+      in3 = ((q63_t) in3 * scaleFract) >> 32;
+      in4 = ((q63_t) in4 * scaleFract) >> 32;
+
+      /* apply shifting */
+      out1 = in1 << kShift;
+      out2 = in2 << kShift;
+
+      /* saturate the results. */
+      if(in1 != (out1 >> kShift))
+        out1 = 0x7FFFFFFF ^ (in1 >> 31);
+
+      if(in2 != (out2 >> kShift))
+        out2 = 0x7FFFFFFF ^ (in2 >> 31);
+
+      out3 = in3 << kShift;
+      out4 = in4 << kShift;
+
+      *pDst = out1;
+      *(pDst + 1) = out2;
+
+      if(in3 != (out3 >> kShift))
+        out3 = 0x7FFFFFFF ^ (in3 >> 31);
+
+      if(in4 != (out4 >> kShift))
+        out4 = 0x7FFFFFFF ^ (in4 >> 31);
+
+      /* Store result destination */
+      *(pDst + 2) = out3;
+      *(pDst + 3) = out4;
+
+      /* Update pointers to process next sampels */
+      pSrc += 4u;
+      pDst += 4u;
+
+      /* Decrement the loop counter */
+      blkCnt--;
+    }
+
   }
+  else
+  {
+    kShift = -kShift;
 
+    /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
+     ** a second loop below computes the remaining 1 to 3 samples. */
+    while(blkCnt > 0u)
+    {
+      /* read four inputs from source */
+      in1 = *pSrc;
+      in2 = *(pSrc + 1);
+      in3 = *(pSrc + 2);
+      in4 = *(pSrc + 3);
+
+      /* multiply input with scaler value */
+      in1 = ((q63_t) in1 * scaleFract) >> 32;
+      in2 = ((q63_t) in2 * scaleFract) >> 32;
+      in3 = ((q63_t) in3 * scaleFract) >> 32;
+      in4 = ((q63_t) in4 * scaleFract) >> 32;
+
+      /* apply shifting */
+      out1 = in1 >> kShift;
+      out2 = in2 >> kShift;
+
+      out3 = in3 >> kShift;
+      out4 = in4 >> kShift;
+
+      /* Store result destination */
+      *pDst = out1;
+      *(pDst + 1) = out2;
+
+      *(pDst + 2) = out3;
+      *(pDst + 3) = out4;
+
+      /* Update pointers to process next sampels */
+      pSrc += 4u;
+      pDst += 4u;
+
+      /* Decrement the loop counter */
+      blkCnt--;
+    }
+  }
   /* If the blockSize is not a multiple of 4, compute any remaining output samples here.
    ** No loop unrolling is used. */
   blkCnt = blockSize % 0x4u;
@@ -105,7 +195,21 @@ void arm_scale_q31(
   {
     /* C = A * scale */
     /* Scale the input and then store the result in the destination buffer. */
-    *pDst++ = clip_q63_to_q31(((q63_t) * pSrc++ * scaleFract) >> kShift);
+    in = *pSrc++;
+    in = ((q63_t) in * scaleFract) >> 32;
+
+    if(sign == 0)
+    {
+      out = in << kShift;
+      if(in != (out >> kShift))
+        out = 0x7FFFFFFF ^ (in >> 31);
+    }
+    else
+    {
+      out = in >> kShift;
+    }
+
+    *pDst++ = out;
 
     /* Decrement the loop counter */
     blkCnt--;

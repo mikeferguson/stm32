@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_abs_f32.c
@@ -10,6 +10,9 @@
 * Description:	Vector absolute value.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,6 +76,7 @@ void arm_abs_f32(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+  float32_t in1, in2, in3, in4;                  /* temporary variables */
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -83,10 +87,44 @@ void arm_abs_f32(
   {
     /* C = |A| */
     /* Calculate absolute and then store the results in the destination buffer. */
-    *pDst++ = fabsf(*pSrc++);
-    *pDst++ = fabsf(*pSrc++);
-    *pDst++ = fabsf(*pSrc++);
-    *pDst++ = fabsf(*pSrc++);
+    /* read sample from source */
+    in1 = *pSrc;
+    in2 = *(pSrc + 1);
+    in3 = *(pSrc + 2);
+
+    /* find absolute value */
+    in1 = fabsf(in1);
+
+    /* read sample from source */
+    in4 = *(pSrc + 3);
+
+    /* find absolute value */
+    in2 = fabsf(in2);
+
+    /* read sample from source */
+    *pDst = in1;
+
+    /* find absolute value */
+    in3 = fabsf(in3);
+
+    /* find absolute value */
+    in4 = fabsf(in4);
+
+    /* store result to destination */
+    *(pDst + 1) = in2;
+
+    /* store result to destination */
+    *(pDst + 2) = in3;
+
+    /* store result to destination */
+    *(pDst + 3) = in4;
+
+
+    /* Update source pointer to process next sampels */
+    pSrc += 4u;
+
+    /* Update destination pointer to process next sampels */
+    pDst += 4u;
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -114,7 +152,6 @@ void arm_abs_f32(
     /* Decrement the loop counter */
     blkCnt--;
   }
-
 }
 
 /**

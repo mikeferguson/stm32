@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_sin_cos_q31.c
@@ -10,6 +10,9 @@
 * Description:	Cosine & Sine calculation for Q31 values.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -256,7 +259,7 @@ static const int32_t cosTableQ31[360] = {
  * @param[out] *pCosVal points to the processed cosine output.
  * @return none.
  *
- * The Q31 input value is in the range [-1 +1) and is mapped to a degree value in the range [-180 180).
+ * The Q31 input value is in the range [-1 0.999999] and is mapped to a degree value in the range [-180 179].
  *
  */
 
@@ -269,7 +272,7 @@ void arm_sin_cos_q31(
   q31_t x0;                                      /* Nearest input value */
   q31_t y0, y1;                                  /* Nearest output values */
   q31_t xSpacing = INPUT_SPACING;                /* Spaing between inputs */
-  uint32_t i;                                    /* Index */
+  int32_t i;                                     /* Index */
   q31_t oneByXSpacing;                           /* 1/ xSpacing value */
   q31_t out;                                     /* temporary variable */
   uint32_t sign_bits;                            /* No.of sign bits */
@@ -277,6 +280,16 @@ void arm_sin_cos_q31(
 
   /* Calculation of index */
   i = ((uint32_t) theta - firstX) / (uint32_t) xSpacing;
+
+  /* Checking min and max index of table */
+  if(i < 0)
+  {
+    i = 0;
+  }
+  else if(i >= 359)
+  {
+    i = 358;
+  }
 
   /* Calculation of first nearest input value */
   x0 = (q31_t) firstX + ((q31_t) i * xSpacing);
@@ -295,14 +308,14 @@ void arm_sin_cos_q31(
     (((q31_t) (((q63_t) (theta - x0) * oneByXSpacing) >> 32)) << sign_bits);
 
   /* Calculation of y0 + (y1 - y0) * ((theta - x0)/(x1-x0)) */
-  *pSinVal = y0 + ((q31_t) (((q63_t) (y1 - y0) * out) >> 30));
+  *pSinVal = __QADD(y0, ((q31_t) (((q63_t) (y1 - y0) * out) >> 30)));
 
   /* Reading nearest cosine output values from table */
   y0 = cosTableQ31[i];
   y1 = cosTableQ31[i + 1u];
 
   /* Calculation of y0 + (y1 - y0) * ((theta - x0)/(x1-x0)) */
-  *pCosVal = y0 + ((q31_t) (((q63_t) (y1 - y0) * out) >> 30));
+  *pCosVal = __QADD(y0, ((q31_t) (((q63_t) (y1 - y0) * out) >> 30)));
 
 }
 

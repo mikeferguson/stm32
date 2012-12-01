@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:        arm_mat_scale_f32.c
@@ -10,6 +10,9 @@
 * Description:	Multiplies a floating-point matrix by a scalar.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -83,9 +86,14 @@ arm_status arm_mat_scale_f32(
   uint32_t blkCnt;                               /* loop counters */
   arm_status status;                             /* status of matrix scaling     */
 
+#ifndef ARM_MATH_CM0
+
+  float32_t in1, in2, in3, in4;                  /* temporary variables */
+  float32_t out1, out2, out3, out4;              /* temporary variables */
+
+#endif //      #ifndef ARM_MATH_CM0
+
 #ifdef ARM_MATH_MATRIX_CHECK
-
-
   /* Check for matrix mismatch condition */
   if((pSrc->numRows != pDst->numRows) || (pSrc->numCols != pDst->numCols))
   {
@@ -94,7 +102,6 @@ arm_status arm_mat_scale_f32(
   }
   else
 #endif /*    #ifdef ARM_MATH_MATRIX_CHECK    */
-
   {
     /* Total number of samples in the input matrix */
     numSamples = (uint32_t) pSrc->numRows * pSrc->numCols;
@@ -112,10 +119,25 @@ arm_status arm_mat_scale_f32(
     {
       /* C(m,n) = A(m,n) * scale */
       /* Scaling and results are stored in the destination buffer. */
-      *pOut++ = (*pIn++) * scale;
-      *pOut++ = (*pIn++) * scale;
-      *pOut++ = (*pIn++) * scale;
-      *pOut++ = (*pIn++) * scale;
+      in1 = pIn[0];
+      in2 = pIn[1];
+      in3 = pIn[2];
+      in4 = pIn[3];
+
+      out1 = in1 * scale;
+      out2 = in2 * scale;
+      out3 = in3 * scale;
+      out4 = in4 * scale;
+
+
+      pOut[0] = out1;
+      pOut[1] = out2;
+      pOut[2] = out3;
+      pOut[3] = out4;
+
+      /* update pointers to process next sampels */
+      pIn += 4u;
+      pOut += 4u;
 
       /* Decrement the numSamples loop counter */
       blkCnt--;
@@ -143,6 +165,7 @@ arm_status arm_mat_scale_f32(
       /* Decrement the loop counter */
       blkCnt--;
     }
+
     /* Set status as ARM_MATH_SUCCESS */
     status = ARM_MATH_SUCCESS;
   }

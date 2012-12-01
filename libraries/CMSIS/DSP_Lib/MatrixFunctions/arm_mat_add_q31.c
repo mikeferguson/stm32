@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_add_q31.c
@@ -10,6 +10,9 @@
 * Description:	Q31 matrix addition
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -66,13 +69,20 @@ arm_status arm_mat_add_q31(
   q31_t *pIn1 = pSrcA->pData;                    /* input data matrix pointer A */
   q31_t *pIn2 = pSrcB->pData;                    /* input data matrix pointer B */
   q31_t *pOut = pDst->pData;                     /* output data matrix pointer */
+  q31_t inA1, inB1;                              /* temporary variables */
+
+#ifndef ARM_MATH_CM0
+
+  q31_t inA2, inB2;                              /* temporary variables */
+  q31_t out1, out2;                              /* temporary variables */
+
+#endif //      #ifndef ARM_MATH_CM0
+
   uint32_t numSamples;                           /* total number of elements in the matrix  */
   uint32_t blkCnt;                               /* loop counters */
   arm_status status;                             /* status of matrix addition */
 
 #ifdef ARM_MATH_MATRIX_CHECK
-
-
   /* Check for matrix mismatch condition */
   if((pSrcA->numRows != pSrcB->numRows) ||
      (pSrcA->numCols != pSrcB->numCols) ||
@@ -82,8 +92,7 @@ arm_status arm_mat_add_q31(
     status = ARM_MATH_SIZE_MISMATCH;
   }
   else
-#endif /*    #ifdef ARM_MATH_MATRIX_CHECK    */
-
+#endif
   {
     /* Total number of samples in the input matrix */
     numSamples = (uint32_t) pSrcA->numRows * pSrcA->numCols;
@@ -102,10 +111,52 @@ arm_status arm_mat_add_q31(
     {
       /* C(m,n) = A(m,n) + B(m,n) */
       /* Add, saturate and then store the results in the destination buffer. */
-      *pOut++ = __QADD(*pIn1++, *pIn2++);
-      *pOut++ = __QADD(*pIn1++, *pIn2++);
-      *pOut++ = __QADD(*pIn1++, *pIn2++);
-      *pOut++ = __QADD(*pIn1++, *pIn2++);
+      /* Read values from source A */
+      inA1 = pIn1[0];
+
+      /* Read values from source B */
+      inB1 = pIn2[0];
+
+      /* Read values from source A */
+      inA2 = pIn1[1];
+
+      /* Add and saturate */
+      out1 = __QADD(inA1, inB1);
+
+      /* Read values from source B */
+      inB2 = pIn2[1];
+
+      /* Read values from source A */
+      inA1 = pIn1[2];
+
+      /* Add and saturate */
+      out2 = __QADD(inA2, inB2);
+
+      /* Read values from source B */
+      inB1 = pIn2[2];
+
+      /* Store result in destination */
+      pOut[0] = out1;
+      pOut[1] = out2;
+
+      /* Read values from source A */
+      inA2 = pIn1[3];
+
+      /* Read values from source B */
+      inB2 = pIn2[3];
+
+      /* Add and saturate */
+      out1 = __QADD(inA1, inB1);
+      out2 = __QADD(inA2, inB2);
+
+      /* Store result in destination */
+      pOut[2] = out1;
+      pOut[3] = out2;
+
+      /* update pointers to process next sampels */
+      pIn1 += 4u;
+      pIn2 += 4u;
+      pOut += 4u;
 
       /* Decrement the loop counter */
       blkCnt--;
@@ -115,16 +166,6 @@ arm_status arm_mat_add_q31(
      ** No loop unrolling is used. */
     blkCnt = numSamples % 0x4u;
 
-    while(blkCnt > 0u)
-    {
-      /* C(m,n) = A(m,n) + B(m,n) */
-      /* Add, saturate and then store the results in the destination buffer. */
-      *pOut++ = __QADD(*pIn1++, *pIn2++);
-
-      /* Decrement the loop counter */
-      blkCnt--;
-    }
-
 #else
 
     /* Run the below code for Cortex-M0 */
@@ -132,17 +173,24 @@ arm_status arm_mat_add_q31(
     /* Initialize blkCnt with number of samples */
     blkCnt = numSamples;
 
+
+#endif /* #ifndef ARM_MATH_CM0 */
+
     while(blkCnt > 0u)
     {
       /* C(m,n) = A(m,n) + B(m,n) */
       /* Add, saturate and then store the results in the destination buffer. */
-      *pOut++ = clip_q63_to_q31(((q63_t) (*pIn1++)) + (*pIn2++));
+      inA1 = *pIn1++;
+      inB1 = *pIn2++;
+
+      inA1 = __QADD(inA1, inB1);
 
       /* Decrement the loop counter */
       blkCnt--;
-    }
 
-#endif /* #ifndef ARM_MATH_CM0 */
+      *pOut++ = inA1;
+
+    }
 
     /* set status as ARM_MATH_SUCCESS */
     status = ARM_MATH_SUCCESS;

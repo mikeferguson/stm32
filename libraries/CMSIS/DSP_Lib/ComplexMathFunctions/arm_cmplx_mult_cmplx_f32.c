@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_cmplx_mult_cmplx_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point complex-by-complex multiplication
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -26,7 +29,6 @@
 * Version 1.0.0 2010/09/20
 *    Production release and review comments incorporated.
 * -------------------------------------------------------------------- */
-
 #include "arm_math.h"
 
 /**
@@ -76,12 +78,15 @@ void arm_cmplx_mult_cmplx_f32(
   float32_t * pDst,
   uint32_t numSamples)
 {
-  float32_t a, b, c, d;                          /* Temporary variables to store real and imaginary values */
+  float32_t a1, b1, c1, d1;                      /* Temporary variables to store real and imaginary values */
+  uint32_t blkCnt;                               /* loop counters */
 
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
-  uint32_t blkCnt;                               /* loop counters */
+  float32_t a2, b2, c2, d2;                      /* Temporary variables to store real and imaginary values */
+  float32_t acc1, acc2, acc3, acc4;
+
 
   /* loop Unrolling */
   blkCnt = numSamples >> 2u;
@@ -92,38 +97,69 @@ void arm_cmplx_mult_cmplx_f32(
   {
     /* C[2 * i] = A[2 * i] * B[2 * i] - A[2 * i + 1] * B[2 * i + 1].  */
     /* C[2 * i + 1] = A[2 * i] * B[2 * i + 1] + A[2 * i + 1] * B[2 * i].  */
-    a = *pSrcA++;
-    b = *pSrcA++;
-    c = *pSrcB++;
-    d = *pSrcB++;
+    a1 = *pSrcA;                /* A[2 * i] */
+    c1 = *pSrcB;                /* B[2 * i] */
 
-    /* store the result in the destination buffer. */
-    *pDst++ = (a * c) - (b * d);
-    *pDst++ = (a * d) + (b * c);
+    b1 = *(pSrcA + 1);          /* A[2 * i + 1] */
+    acc1 = a1 * c1;             /* acc1 = A[2 * i] * B[2 * i] */
 
-    a = *pSrcA++;
-    b = *pSrcA++;
-    c = *pSrcB++;
-    d = *pSrcB++;
+    a2 = *(pSrcA + 2);          /* A[2 * i + 2] */
+    acc2 = (b1 * c1);           /* acc2 = A[2 * i + 1] * B[2 * i] */
 
-    *pDst++ = (a * c) - (b * d);
-    *pDst++ = (a * d) + (b * c);
+    d1 = *(pSrcB + 1);          /* B[2 * i + 1] */
+    c2 = *(pSrcB + 2);          /* B[2 * i + 2] */
+    acc1 -= b1 * d1;            /* acc1 =      A[2 * i] * B[2 * i] - A[2 * i + 1] * B[2 * i + 1] */
 
-    a = *pSrcA++;
-    b = *pSrcA++;
-    c = *pSrcB++;
-    d = *pSrcB++;
+    d2 = *(pSrcB + 3);          /* B[2 * i + 3] */
+    acc3 = a2 * c2;             /* acc3 =       A[2 * i + 2] * B[2 * i + 2] */
 
-    *pDst++ = (a * c) - (b * d);
-    *pDst++ = (a * d) + (b * c);
+    b2 = *(pSrcA + 3);          /* A[2 * i + 3] */
+    acc2 += (a1 * d1);          /* acc2 =      A[2 * i + 1] * B[2 * i] + A[2 * i] * B[2 * i + 1] */
 
-    a = *pSrcA++;
-    b = *pSrcA++;
-    c = *pSrcB++;
-    d = *pSrcB++;
+    a1 = *(pSrcA + 4);          /* A[2 * i + 4] */
+    acc4 = (a2 * d2);           /* acc4 =   A[2 * i + 2] * B[2 * i + 3] */
 
-    *pDst++ = (a * c) - (b * d);
-    *pDst++ = (a * d) + (b * c);
+    c1 = *(pSrcB + 4);          /* B[2 * i + 4] */
+    acc3 -= (b2 * d2);          /* acc3 =       A[2 * i + 2] * B[2 * i + 2] - A[2 * i + 3] * B[2 * i + 3] */
+    *pDst = acc1;               /* C[2 * i] = A[2 * i] * B[2 * i] - A[2 * i + 1] * B[2 * i + 1] */
+
+    b1 = *(pSrcA + 5);          /* A[2 * i + 5] */
+    acc4 += b2 * c2;            /* acc4 =   A[2 * i + 2] * B[2 * i + 3] + A[2 * i + 3] * B[2 * i + 2] */
+
+    *(pDst + 1) = acc2;         /* C[2 * i + 1] = A[2 * i + 1] * B[2 * i] + A[2 * i] * B[2 * i + 1]  */
+    acc1 = (a1 * c1);
+
+    d1 = *(pSrcB + 5);
+    acc2 = (b1 * c1);
+
+    *(pDst + 2) = acc3;
+    *(pDst + 3) = acc4;
+
+    a2 = *(pSrcA + 6);
+    acc1 -= (b1 * d1);
+
+    c2 = *(pSrcB + 6);
+    acc2 += (a1 * d1);
+
+    b2 = *(pSrcA + 7);
+    acc3 = (a2 * c2);
+
+    d2 = *(pSrcB + 7);
+    acc4 = (b2 * c2);
+
+    *(pDst + 4) = acc1;
+    pSrcA += 8u;
+
+    acc3 -= (b2 * d2);
+    acc4 += (a2 * d2);
+
+    *(pDst + 5) = acc2;
+    pSrcB += 8u;
+
+    *(pDst + 6) = acc3;
+    *(pDst + 7) = acc4;
+
+    pDst += 8u;
 
     /* Decrement the numSamples loop counter */
     blkCnt--;
@@ -133,46 +169,29 @@ void arm_cmplx_mult_cmplx_f32(
    ** No loop unrolling is used. */
   blkCnt = numSamples % 0x4u;
 
+#else
+
+  /* Run the below code for Cortex-M0 */
+  blkCnt = numSamples;
+
+#endif /* #ifndef ARM_MATH_CM0 */
+
   while(blkCnt > 0u)
   {
     /* C[2 * i] = A[2 * i] * B[2 * i] - A[2 * i + 1] * B[2 * i + 1].  */
     /* C[2 * i + 1] = A[2 * i] * B[2 * i + 1] + A[2 * i + 1] * B[2 * i].  */
-    a = *pSrcA++;
-    b = *pSrcA++;
-    c = *pSrcB++;
-    d = *pSrcB++;
+    a1 = *pSrcA++;
+    b1 = *pSrcA++;
+    c1 = *pSrcB++;
+    d1 = *pSrcB++;
 
     /* store the result in the destination buffer. */
-    *pDst++ = (a * c) - (b * d);
-    *pDst++ = (a * d) + (b * c);
+    *pDst++ = (a1 * c1) - (b1 * d1);
+    *pDst++ = (a1 * d1) + (b1 * c1);
 
     /* Decrement the numSamples loop counter */
     blkCnt--;
   }
-
-#else
-
-  /* Run the below code for Cortex-M0 */
-
-  while(numSamples > 0u)
-  {
-    /* C[2 * i] = A[2 * i] * B[2 * i] - A[2 * i + 1] * B[2 * i + 1].  */
-    /* C[2 * i + 1] = A[2 * i] * B[2 * i + 1] + A[2 * i + 1] * B[2 * i].  */
-    a = *pSrcA++;
-    b = *pSrcA++;
-    c = *pSrcB++;
-    d = *pSrcB++;
-
-    /* store the result in the destination buffer. */
-    *pDst++ = (a * c) - (b * d);
-    *pDst++ = (a * d) + (b * c);
-
-    /* Decrement the numSamples loop counter */
-    numSamples--;
-  }
-
-#endif /* #ifndef ARM_MATH_CM0 */
-
 }
 
 /**

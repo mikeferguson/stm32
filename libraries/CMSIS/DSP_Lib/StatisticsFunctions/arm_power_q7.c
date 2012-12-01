@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_power_q7.c
@@ -10,6 +10,9 @@
 * Description:	Sum of the squares of the elements of a Q7 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -73,7 +76,7 @@ void arm_power_q7(
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
   q31_t input1;                                  /* Temporary variable to store packed input */
-  q15_t in1, in2;                                /* Temporary variables to store input */
+  q31_t in1, in2;                                /* Temporary variables to store input */
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -83,22 +86,15 @@ void arm_power_q7(
   while(blkCnt > 0u)
   {
     /* Reading two inputs of pSrc vector and packing */
-    in1 = (q15_t) * pSrc++;
-    in2 = (q15_t) * pSrc++;
-    input1 = ((q31_t) in1 & 0x0000FFFF) | ((q31_t) in2 << 16);
+    input1 = *__SIMD32(pSrc)++;
+
+    in1 = __SXTB16(__ROR(input1, 8));
+    in2 = __SXTB16(input1);
 
     /* C = A[0] * A[0] + A[1] * A[1] + A[2] * A[2] + ... + A[blockSize-1] * A[blockSize-1] */
-    /* Compute Power and then store the result in a temporary variable, sum. */
-    sum = __SMLAD(input1, input1, sum);
-
-    /* Reading two inputs of pSrc vector and packing */
-    in1 = (q15_t) * pSrc++;
-    in2 = (q15_t) * pSrc++;
-    input1 = ((q31_t) in1 & 0x0000FFFF) | ((q31_t) in2 << 16);
-
-    /* C = A[0] * A[0] + A[1] * A[1] + A[2] * A[2] + ... + A[blockSize-1] * A[blockSize-1] */
-    /* Compute Power and then store the result in a temporary variable, sum. */
-    sum = __SMLAD(input1, input1, sum);
+    /* calculate power and accumulate to accumulator */
+    sum = __SMLAD(in1, in1, sum);
+    sum = __SMLAD(in2, in2, sum);
 
     /* Decrement the loop counter */
     blkCnt--;

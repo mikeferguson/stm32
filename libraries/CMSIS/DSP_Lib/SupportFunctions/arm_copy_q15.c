@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_copy_q15.c
@@ -10,6 +10,9 @@
 * Description:	Copies the elements of a Q15 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -60,9 +63,6 @@ void arm_copy_q15(
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
-  q15_t in1, in2;                                /* Temporary variables */
-
-
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
 
@@ -72,29 +72,8 @@ void arm_copy_q15(
   {
     /* C = A */
     /* Read two inputs */
-    in1 = *pSrc++;
-    in2 = *pSrc++;
-
-#ifndef ARM_MATH_BIG_ENDIAN
-
-    /* Store the values in the destination buffer by packing the two inputs */
-    *__SIMD32(pDst)++ = __PKHBT(in1, in2, 16);
-
-    in1 = *pSrc++;
-    in2 = *pSrc++;
-    *__SIMD32(pDst)++ = __PKHBT(in1, in2, 16);
-
-#else
-
-    /* Store the values in the destination buffer by packing the two inputs */
-    *__SIMD32(pDst)++ = __PKHBT(in2, in1, 16);
-
-    in1 = *pSrc++;
-    in2 = *pSrc++;
-    *__SIMD32(pDst)++ = __PKHBT(in2, in1, 16);
-
-
-#endif /*      #ifndef ARM_MATH_BIG_ENDIAN     */
+    *__SIMD32(pDst)++ = *__SIMD32(pSrc)++;
+    *__SIMD32(pDst)++ = *__SIMD32(pSrc)++;
 
     /* Decrement the loop counter */
     blkCnt--;

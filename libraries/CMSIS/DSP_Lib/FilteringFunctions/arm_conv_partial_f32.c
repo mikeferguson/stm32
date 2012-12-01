@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_conv_partial_f32.c
@@ -10,6 +10,12 @@
 * Description:	Partial convolution of floating-point sequences.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
+*
+* Version 1.0.11 2011/10/18
+*    Bug Fix in conv, correlation, partial convolution.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -52,6 +58,20 @@
  * If the requested subset does not fall in this range then the functions return ARM_MATH_ARGUMENT_ERROR.
  * Otherwise the functions return ARM_MATH_SUCCESS.
  * \note Refer arm_conv_f32() for details on fixed point behavior.
+ *
+ *
+ * <b>Fast Versions</b>
+ *
+ * \par
+ * Fast versions are supported for Q31 and Q15 of partial convolution.  Cycles for Fast versions are less compared to Q31 and Q15 of partial conv and the design requires
+ * the input signals should be scaled down to avoid intermediate overflows.
+ *
+ *
+ * <b>Opt Versions</b>
+ *
+ * \par
+ * Opt versions are supported for Q15 and Q7.  Design uses internal scratch buffer for getting good optimisation.
+ * These versions are optimised in cycles and consumes more memory(Scratch memory) compared to Q15 and Q7 versions of partial convolution
  */
 
 /**
@@ -259,7 +279,7 @@ arm_status arm_conv_partial_f32(
     py = pSrc2;
 
     /* count is index by which the pointer pIn1 to be incremented */
-    count = 1u;
+    count = 0u;
 
     /* -------------------
      * Stage2 process
@@ -400,12 +420,12 @@ arm_status arm_conv_partial_f32(
         *pOut++ = acc2;
         *pOut++ = acc3;
 
-        /* Update the inputA and inputB pointers for next MAC calculation */
-        px = pIn1 + (count * 4u);
-        py = pSrc2;
-
         /* Increment the pointer pIn1 index, count by 1 */
-        count++;
+        count += 4u;
+
+        /* Update the inputA and inputB pointers for next MAC calculation */
+        px = pIn1 + count;
+        py = pSrc2;
 
         /* Decrement the loop counter */
         blkCnt--;
@@ -453,12 +473,12 @@ arm_status arm_conv_partial_f32(
         /* Store the result in the accumulator in the destination buffer. */
         *pOut++ = sum;
 
+        /* Increment the MAC count */
+        count++;
+
         /* Update the inputA and inputB pointers for next MAC calculation */
         px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the MAC count */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;
@@ -490,12 +510,12 @@ arm_status arm_conv_partial_f32(
         /* Store the result in the accumulator in the destination buffer. */
         *pOut++ = sum;
 
+        /* Increment the MAC count */
+        count++;
+
         /* Update the inputA and inputB pointers for next MAC calculation */
         px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the MAC count */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;

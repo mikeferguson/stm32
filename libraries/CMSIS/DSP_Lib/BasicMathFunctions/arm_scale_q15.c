@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_scale_q15.c
@@ -10,6 +10,9 @@
 * Description:	Multiplies a Q15 vector by a scalar.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -70,8 +73,9 @@ void arm_scale_q15(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
-
-  q15_t in1, in2;                                /* Temporary variables */
+  q15_t in1, in2, in3, in4;
+  q31_t inA1, inA2;                              /* Temporary variables */
+  q31_t out1, out2, out3, out4;
 
 
   /*loop Unrolling */
@@ -82,41 +86,32 @@ void arm_scale_q15(
   while(blkCnt > 0u)
   {
     /* Reading 2 inputs from memory */
-    in1 = *pSrc++;
-    in2 = *pSrc++;
+    inA1 = *__SIMD32(pSrc)++;
+    inA2 = *__SIMD32(pSrc)++;
+
     /* C = A * scale */
     /* Scale the inputs and then store the 2 results in the destination buffer
      * in single cycle by packing the outputs */
-#ifndef  ARM_MATH_BIG_ENDIAN
+    out1 = (q31_t) ((q15_t) (inA1 >> 16) * scaleFract);
+    out2 = (q31_t) ((q15_t) inA1 * scaleFract);
+    out3 = (q31_t) ((q15_t) (inA2 >> 16) * scaleFract);
+    out4 = (q31_t) ((q15_t) inA2 * scaleFract);
 
-    *__SIMD32(pDst)++ =
-      __PKHBT(__SSAT((in1 * scaleFract) >> kShift, 16),
-              __SSAT((in2 * scaleFract) >> kShift, 16), 16);
+    /* apply shifting */
+    out1 = out1 >> kShift;
+    out2 = out2 >> kShift;
+    out3 = out3 >> kShift;
+    out4 = out4 >> kShift;
 
-#else
+    /* saturate the output */
+    in1 = (q15_t) (__SSAT(out1, 16));
+    in2 = (q15_t) (__SSAT(out2, 16));
+    in3 = (q15_t) (__SSAT(out3, 16));
+    in4 = (q15_t) (__SSAT(out4, 16));
 
-    *__SIMD32(pDst)++ =
-      __PKHBT(__SSAT((in2 * scaleFract) >> kShift, 16),
-              __SSAT((in1 * scaleFract) >> kShift, 16), 16);
-
-#endif /* #ifndef  ARM_MATH_BIG_ENDIAN    */
-
-    in1 = *pSrc++;
-    in2 = *pSrc++;
-
-#ifndef  ARM_MATH_BIG_ENDIAN
-
-    *__SIMD32(pDst)++ =
-      __PKHBT(__SSAT((in1 * scaleFract) >> kShift, 16),
-              __SSAT((in2 * scaleFract) >> kShift, 16), 16);
-
-#else
-
-    *__SIMD32(pDst)++ =
-      __PKHBT(__SSAT((in2 * scaleFract) >> kShift, 16),
-              __SSAT((in1 * scaleFract) >> kShift, 16), 16);
-
-#endif /* #ifndef  ARM_MATH_BIG_ENDIAN    */
+    /* store the result to destination */
+    *__SIMD32(pDst)++ = __PKHBT(in2, in1, 16);
+    *__SIMD32(pDst)++ = __PKHBT(in4, in3, 16);
 
     /* Decrement the loop counter */
     blkCnt--;

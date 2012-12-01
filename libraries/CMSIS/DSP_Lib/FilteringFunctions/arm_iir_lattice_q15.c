@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_iir_lattice_q15.c
@@ -10,6 +10,9 @@
 * Description:	Q15 IIR lattice filter processing function.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -82,6 +85,7 @@ void arm_iir_lattice_q15(
   q15_t *pState;                                 /* State pointer */
   q15_t *pStateCurnt;                            /* State current pointer */
   q15_t out;                                     /* Temporary variable for output */
+  q15_t v1, v2;
   q31_t v;                                       /* Temporary variable for ladder coefficient */
 
 
@@ -159,7 +163,26 @@ void arm_iir_lattice_q15(
       *px2++ = (q15_t) gnext2;
 
       /* Read vN-1 and vN-2 at a time */
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
       v = *__SIMD32(pv)++;
+
+#else
+
+	  v1 = *pv++;
+	  v2 = *pv++;
+
+#ifndef ARM_MATH_BIG_ENDIAN
+
+	  v = __PKHBT(v1, v2, 16);
+
+#else
+
+	  v = __PKHBT(v2, v1, 16);
+
+#endif	/* 	#ifndef ARM_MATH_BIG_ENDIAN		*/
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE */
 
 
       /* Pack gN-1(n) and gN-2(n) */
@@ -209,7 +232,27 @@ void arm_iir_lattice_q15(
       *px2++ = (q15_t) gnext2;
 
       /* Read vN-3 and vN-4 at a time */
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
       v = *__SIMD32(pv)++;
+
+#else
+
+	  v1 = *pv++;
+	  v2 = *pv++;
+
+#ifndef ARM_MATH_BIG_ENDIAN
+
+	  v = __PKHBT(v1, v2, 16);
+
+#else
+
+	  v = __PKHBT(v2, v1, 16);
+
+#endif	/* #ifndef ARM_MATH_BIG_ENDIAN	 */
+
+#endif	/*	#ifndef UNALIGNED_SUPPORT_DISABLE */
+
 
       /* Pack gN-3(n) and gN-4(n) */
 #ifndef  ARM_MATH_BIG_ENDIAN
@@ -279,8 +322,19 @@ void arm_iir_lattice_q15(
   /* copy data */
   while(stgCnt > 0u)
   {
+#ifndef UNALIGNED_SUPPORT_DISABLE
+
     *__SIMD32(pStateCurnt)++ = *__SIMD32(pState)++;
     *__SIMD32(pStateCurnt)++ = *__SIMD32(pState)++;
+
+#else
+
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+    *pStateCurnt++ = *pState++;
+
+#endif /*	#ifndef UNALIGNED_SUPPORT_DISABLE */
 
     /* Decrement the loop counter */
     stgCnt--;

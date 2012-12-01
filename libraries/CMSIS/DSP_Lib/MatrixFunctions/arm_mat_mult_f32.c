@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_mat_mult_f32.c
@@ -10,6 +10,9 @@
 * Description:  Floating-point matrix multiplication.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -89,6 +92,7 @@ arm_status arm_mat_mult_f32(
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
+  float32_t in1, in2, in3, in4;
   uint16_t col, i = 0u, j, row = numRowsA, colCnt;      /* loop counters */
   arm_status status;                             /* status of matrix multiplication */
 
@@ -133,20 +137,30 @@ arm_status arm_mat_mult_f32(
         pIn1 = pInA;
 
         /* Apply loop unrolling and compute 4 MACs simultaneously. */
-        colCnt = numColsA >> 2;
+        colCnt = numColsA >> 2u;
 
         /* matrix multiplication        */
         while(colCnt > 0u)
         {
           /* c(m,n) = a(1,1)*b(1,1) + a(1,2) * b(2,1) + .... + a(m,p)*b(p,n) */
-          sum += *pIn1++ * (*pIn2);
+          in3 = *pIn2;
           pIn2 += numColsB;
-          sum += *pIn1++ * (*pIn2);
+          in1 = pIn1[0];
+          in2 = pIn1[1];
+          sum += in1 * in3;
+          in4 = *pIn2;
           pIn2 += numColsB;
-          sum += *pIn1++ * (*pIn2);
+          sum += in2 * in4;
+
+          in3 = *pIn2;
           pIn2 += numColsB;
-          sum += *pIn1++ * (*pIn2);
+          in1 = pIn1[2];
+          in2 = pIn1[3];
+          sum += in1 * in3;
+          in4 = *pIn2;
           pIn2 += numColsB;
+          sum += in2 * in4;
+          pIn1 += 4u;
 
           /* Decrement the loop count */
           colCnt--;

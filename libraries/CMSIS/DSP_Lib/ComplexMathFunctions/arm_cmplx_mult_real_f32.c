@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_cmplx_mult_real_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point complex by real multiplication
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -78,11 +81,16 @@ void arm_cmplx_mult_real_f32(
   uint32_t numSamples)
 {
   float32_t in;                                  /* Temporary variable to store input value */
+  uint32_t blkCnt;                               /* loop counters */
 
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
-  uint32_t blkCnt;                               /* loop counters */
+  float32_t inA1, inA2, inA3, inA4;              /* Temporary variables to hold input data */
+  float32_t inA5, inA6, inA7, inA8;              /* Temporary variables to hold input data */
+  float32_t inB1, inB2, inB3, inB4;              /* Temporary variables to hold input data */
+  float32_t out1, out2, out3, out4;              /* Temporary variables to hold output data */
+  float32_t out5, out6, out7, out8;              /* Temporary variables to hold output data */
 
   /* loop Unrolling */
   blkCnt = numSamples >> 2u;
@@ -93,22 +101,87 @@ void arm_cmplx_mult_real_f32(
   {
     /* C[2 * i] = A[2 * i] * B[i].            */
     /* C[2 * i + 1] = A[2 * i + 1] * B[i].        */
-    in = *pSrcReal++;
-    /* store the result in the destination buffer. */
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
+    /* read input from complex input buffer */
+    inA1 = pSrcCmplx[0];
+    inA2 = pSrcCmplx[1];
+    /* read input from real input buffer */
+    inB1 = pSrcReal[0];
 
-    in = *pSrcReal++;
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
+    /* read input from complex input buffer */
+    inA3 = pSrcCmplx[2];
 
-    in = *pSrcReal++;
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
+    /* multiply complex buffer real input with real buffer input */
+    out1 = inA1 * inB1;
 
-    in = *pSrcReal++;
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
+    /* read input from complex input buffer */
+    inA4 = pSrcCmplx[3];
+
+    /* multiply complex buffer imaginary input with real buffer input */
+    out2 = inA2 * inB1;
+
+    /* read input from real input buffer */
+    inB2 = pSrcReal[1];
+    /* read input from complex input buffer */
+    inA5 = pSrcCmplx[4];
+
+    /* multiply complex buffer real input with real buffer input */
+    out3 = inA3 * inB2;
+
+    /* read input from complex input buffer */
+    inA6 = pSrcCmplx[5];
+    /* read input from real input buffer */
+    inB3 = pSrcReal[2];
+
+    /* multiply complex buffer imaginary input with real buffer input */
+    out4 = inA4 * inB2;
+
+    /* read input from complex input buffer */
+    inA7 = pSrcCmplx[6];
+
+    /* multiply complex buffer real input with real buffer input */
+    out5 = inA5 * inB3;
+
+    /* read input from complex input buffer */
+    inA8 = pSrcCmplx[7];
+
+    /* multiply complex buffer imaginary input with real buffer input */
+    out6 = inA6 * inB3;
+
+    /* read input from real input buffer */
+    inB4 = pSrcReal[3];
+
+    /* store result to destination bufer */
+    pCmplxDst[0] = out1;
+
+    /* multiply complex buffer real input with real buffer input */
+    out7 = inA7 * inB4;
+
+    /* store result to destination bufer */
+    pCmplxDst[1] = out2;
+
+    /* multiply complex buffer imaginary input with real buffer input */
+    out8 = inA8 * inB4;
+
+    /* store result to destination bufer */
+    pCmplxDst[2] = out3;
+    pCmplxDst[3] = out4;
+    pCmplxDst[4] = out5;
+
+    /* incremnet complex input buffer by 8 to process next samples */
+    pSrcCmplx += 8u;
+
+    /* store result to destination bufer */
+    pCmplxDst[5] = out6;
+
+    /* increment real input buffer by 4 to process next samples */
+    pSrcReal += 4u;
+
+    /* store result to destination bufer */
+    pCmplxDst[6] = out7;
+    pCmplxDst[7] = out8;
+
+    /* increment destination buffer by 8 to process next sampels */
+    pCmplxDst += 8u;
 
     /* Decrement the numSamples loop counter */
     blkCnt--;
@@ -117,6 +190,13 @@ void arm_cmplx_mult_real_f32(
   /* If the numSamples is not a multiple of 4, compute any remaining output samples here.
    ** No loop unrolling is used. */
   blkCnt = numSamples % 0x4u;
+
+#else
+
+  /* Run the below code for Cortex-M0 */
+  blkCnt = numSamples;
+
+#endif /* #ifndef ARM_MATH_CM0 */
 
   while(blkCnt > 0u)
   {
@@ -130,26 +210,6 @@ void arm_cmplx_mult_real_f32(
     /* Decrement the numSamples loop counter */
     blkCnt--;
   }
-
-#else
-
-  /* Run the below code for Cortex-M0 */
-
-  while(numSamples > 0u)
-  {
-    /* realOut = realA * realB.            */
-    /* imagOut = imagA * realB.                */
-    in = *pSrcReal++;
-    /* store the result in the destination buffer. */
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
-    *pCmplxDst++ = (*pSrcCmplx++) * (in);
-
-    /* Decrement the numSamples loop counter */
-    numSamples--;
-  }
-
-#endif /* #ifndef ARM_MATH_CM0 */
-
 }
 
 /**

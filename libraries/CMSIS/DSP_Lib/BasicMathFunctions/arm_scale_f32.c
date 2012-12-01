@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_scale_f32.c
@@ -10,6 +10,9 @@
 * Description:	Multiplies a floating-point vector by a scalar.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -82,10 +85,11 @@ void arm_scale_f32(
   uint32_t blockSize)
 {
   uint32_t blkCnt;                               /* loop counter */
-
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
+  float32_t in1, in2, in3, in4;                  /* temporary variabels */
+
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
 
@@ -95,10 +99,34 @@ void arm_scale_f32(
   {
     /* C = A * scale */
     /* Scale the input and then store the results in the destination buffer. */
-    *pDst++ = (*pSrc++) * scale;
-    *pDst++ = (*pSrc++) * scale;
-    *pDst++ = (*pSrc++) * scale;
-    *pDst++ = (*pSrc++) * scale;
+    /* read input samples from source */
+    in1 = *pSrc;
+    in2 = *(pSrc + 1);
+
+    /* multiply with scaling factor */
+    in1 = in1 * scale;
+
+    /* read input sample from source */
+    in3 = *(pSrc + 2);
+
+    /* multiply with scaling factor */
+    in2 = in2 * scale;
+
+    /* read input sample from source */
+    in4 = *(pSrc + 3);
+
+    /* multiply with scaling factor */
+    in3 = in3 * scale;
+    in4 = in4 * scale;
+    /* store the result to destination */
+    *pDst = in1;
+    *(pDst + 1) = in2;
+    *(pDst + 2) = in3;
+    *(pDst + 3) = in4;
+
+    /* update pointers to process next samples */
+    pSrc += 4u;
+    pDst += 4u;
 
     /* Decrement the loop counter */
     blkCnt--;

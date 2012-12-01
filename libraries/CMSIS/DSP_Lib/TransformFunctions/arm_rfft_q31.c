@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_rfft_q31.c
@@ -11,6 +11,9 @@
 *
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -154,9 +157,6 @@ void arm_split_rfft_q31(
   q31_t CoefA1, CoefA2, CoefB1;                  /* Temporary variables for twiddle coefficients */
   q31_t *pOut1 = &pDst[2], *pOut2 = &pDst[(4u * fftLen) - 1u];
   q31_t *pIn1 = &pSrc[2], *pIn2 = &pSrc[(2u * fftLen) - 1u];
-
-  pSrc[2u * fftLen] = pSrc[0];
-  pSrc[(2u * fftLen) + 1u] = pSrc[1];
 
   /* Init coefficient pointers */
   pCoefA = &pATable[modifier * 2u];

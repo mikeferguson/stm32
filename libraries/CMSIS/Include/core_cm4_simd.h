@@ -1,11 +1,11 @@
 /**************************************************************************//**
  * @file     core_cm4_simd.h
  * @brief    CMSIS Cortex-M4 SIMD Header File
- * @version  V2.10
- * @date     19. July 2011
+ * @version  V3.01
+ * @date     06. March 2012
  *
  * @note
- * Copyright (C) 2010-2011 ARM Limited. All rights reserved.
+ * Copyright (C) 2010-2012 ARM Limited. All rights reserved.
  *
  * @par
  * ARM Limited (ARM) is supplying this software for use with Cortex-M
@@ -43,7 +43,7 @@
 #if   defined ( __CC_ARM ) /*------------------RealView Compiler -----------------*/
 /* ARM armcc specific functions */
 
-/*------ CM4 SOMD Intrinsics -----------------------------------------------------*/
+/*------ CM4 SIMD Intrinsics -----------------------------------------------------*/
 #define __SADD8                           __sadd8
 #define __QADD8                           __qadd8
 #define __SHADD8                          __shadd8
@@ -118,70 +118,18 @@
 #elif defined ( __ICCARM__ ) /*------------------ ICC Compiler -------------------*/
 /* IAR iccarm specific functions */
 
+/*------ CM4 SIMD Intrinsics -----------------------------------------------------*/
 #include <cmsis_iar.h>
 
-/*------ CM4 SIMDDSP Intrinsics -----------------------------------------------------*/
-/* intrinsic __SADD8      see intrinsics.h */
-/* intrinsic __QADD8      see intrinsics.h */
-/* intrinsic __SHADD8     see intrinsics.h */
-/* intrinsic __UADD8      see intrinsics.h */
-/* intrinsic __UQADD8     see intrinsics.h */
-/* intrinsic __UHADD8     see intrinsics.h */
-/* intrinsic __SSUB8      see intrinsics.h */
-/* intrinsic __QSUB8      see intrinsics.h */
-/* intrinsic __SHSUB8     see intrinsics.h */
-/* intrinsic __USUB8      see intrinsics.h */
-/* intrinsic __UQSUB8     see intrinsics.h */
-/* intrinsic __UHSUB8     see intrinsics.h */
-/* intrinsic __SADD16     see intrinsics.h */
-/* intrinsic __QADD16     see intrinsics.h */
-/* intrinsic __SHADD16    see intrinsics.h */
-/* intrinsic __UADD16     see intrinsics.h */
-/* intrinsic __UQADD16    see intrinsics.h */
-/* intrinsic __UHADD16    see intrinsics.h */
-/* intrinsic __SSUB16     see intrinsics.h */
-/* intrinsic __QSUB16     see intrinsics.h */
-/* intrinsic __SHSUB16    see intrinsics.h */
-/* intrinsic __USUB16     see intrinsics.h */
-/* intrinsic __UQSUB16    see intrinsics.h */
-/* intrinsic __UHSUB16    see intrinsics.h */
-/* intrinsic __SASX       see intrinsics.h */
-/* intrinsic __QASX       see intrinsics.h */
-/* intrinsic __SHASX      see intrinsics.h */
-/* intrinsic __UASX       see intrinsics.h */
-/* intrinsic __UQASX      see intrinsics.h */
-/* intrinsic __UHASX      see intrinsics.h */
-/* intrinsic __SSAX       see intrinsics.h */
-/* intrinsic __QSAX       see intrinsics.h */
-/* intrinsic __SHSAX      see intrinsics.h */
-/* intrinsic __USAX       see intrinsics.h */
-/* intrinsic __UQSAX      see intrinsics.h */
-/* intrinsic __UHSAX      see intrinsics.h */
-/* intrinsic __USAD8      see intrinsics.h */
-/* intrinsic __USADA8     see intrinsics.h */
-/* intrinsic __SSAT16     see intrinsics.h */
-/* intrinsic __USAT16     see intrinsics.h */
-/* intrinsic __UXTB16     see intrinsics.h */
-/* intrinsic __SXTB16     see intrinsics.h */
-/* intrinsic __UXTAB16    see intrinsics.h */
-/* intrinsic __SXTAB16    see intrinsics.h */
-/* intrinsic __SMUAD      see intrinsics.h */
-/* intrinsic __SMUADX     see intrinsics.h */
-/* intrinsic __SMLAD      see intrinsics.h */
-/* intrinsic __SMLADX     see intrinsics.h */
-/* intrinsic __SMLALD     see intrinsics.h */
-/* intrinsic __SMLALDX    see intrinsics.h */
-/* intrinsic __SMUSD      see intrinsics.h */
-/* intrinsic __SMUSDX     see intrinsics.h */
-/* intrinsic __SMLSD      see intrinsics.h */
-/* intrinsic __SMLSDX     see intrinsics.h */
-/* intrinsic __SMLSLD     see intrinsics.h */
-/* intrinsic __SMLSLDX    see intrinsics.h */
-/* intrinsic __SEL        see intrinsics.h */
-/* intrinsic __QADD       see intrinsics.h */
-/* intrinsic __QSUB       see intrinsics.h */
-/* intrinsic __PKHBT      see intrinsics.h */
-/* intrinsic __PKHTB      see intrinsics.h */
+/*-- End CM4 SIMD Intrinsics -----------------------------------------------------*/
+
+
+
+#elif defined ( __TMS470__ ) /*---------------- TI CCS Compiler ------------------*/
+/* TI CCS specific functions */
+
+/*------ CM4 SIMD Intrinsics -----------------------------------------------------*/
+#include <cmsis_ccs.h>
 
 /*-- End CM4 SIMD Intrinsics -----------------------------------------------------*/
 
@@ -191,7 +139,7 @@
 /* GNU gcc specific functions */
 
 /*------ CM4 SIMD Intrinsics -----------------------------------------------------*/
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SADD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SADD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -199,7 +147,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SADD8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QADD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QADD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -207,7 +155,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QADD8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SHADD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SHADD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -215,7 +163,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SHADD8(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UADD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UADD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -223,7 +171,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UADD8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UQADD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UQADD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -231,7 +179,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UQADD8(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UHADD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UHADD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -240,7 +188,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UHADD8(uint32_t op
 }
 
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SSUB8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SSUB8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -248,7 +196,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SSUB8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QSUB8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QSUB8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -256,7 +204,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QSUB8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SHSUB8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SHSUB8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -264,7 +212,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SHSUB8(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __USUB8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __USUB8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -272,7 +220,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __USUB8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UQSUB8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UQSUB8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -280,7 +228,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UQSUB8(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UHSUB8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UHSUB8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -289,7 +237,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UHSUB8(uint32_t op
 }
 
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SADD16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SADD16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -297,7 +245,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SADD16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QADD16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QADD16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -305,7 +253,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QADD16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SHADD16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SHADD16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -313,7 +261,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SHADD16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UADD16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UADD16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -321,7 +269,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UADD16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UQADD16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UQADD16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -329,7 +277,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UQADD16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UHADD16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UHADD16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -337,7 +285,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UHADD16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SSUB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SSUB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -345,7 +293,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SSUB16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QSUB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QSUB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -353,7 +301,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QSUB16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SHSUB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SHSUB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -361,7 +309,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SHSUB16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __USUB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __USUB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -369,7 +317,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __USUB16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UQSUB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UQSUB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -377,7 +325,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UQSUB16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UHSUB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UHSUB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -385,7 +333,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UHSUB16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SASX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SASX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -393,7 +341,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SASX(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QASX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QASX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -401,7 +349,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QASX(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SHASX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SHASX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -409,7 +357,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SHASX(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UASX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UASX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -417,7 +365,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UASX(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UQASX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UQASX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -425,7 +373,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UQASX(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UHASX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UHASX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -433,7 +381,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UHASX(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SSAX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SSAX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -441,7 +389,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SSAX(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QSAX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QSAX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -449,7 +397,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QSAX(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SHSAX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SHSAX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -457,7 +405,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SHSAX(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __USAX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __USAX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -465,7 +413,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __USAX(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UQSAX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UQSAX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -473,7 +421,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UQSAX(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UHSAX(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UHSAX(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -481,7 +429,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UHSAX(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __USAD8(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __USAD8(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -489,7 +437,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __USAD8(uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __USADA8(uint32_t op1, uint32_t op2, uint32_t op3)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __USADA8(uint32_t op1, uint32_t op2, uint32_t op3)
 {
   uint32_t result;
 
@@ -511,7 +459,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __USADA8(uint32_t op
   __RES; \
  })
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UXTB16(uint32_t op1)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UXTB16(uint32_t op1)
 {
   uint32_t result;
 
@@ -519,7 +467,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UXTB16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __UXTAB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __UXTAB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -527,7 +475,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __UXTAB16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SXTB16(uint32_t op1)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SXTB16(uint32_t op1)
 {
   uint32_t result;
 
@@ -535,7 +483,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SXTB16(uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SXTAB16(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SXTAB16(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -543,7 +491,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SXTAB16(uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUAD  (uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMUAD  (uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -551,7 +499,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUAD  (uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUADX (uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMUADX (uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -559,7 +507,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUADX (uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLAD (uint32_t op1, uint32_t op2, uint32_t op3)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMLAD (uint32_t op1, uint32_t op2, uint32_t op3)
 {
   uint32_t result;
 
@@ -567,7 +515,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLAD (uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLADX (uint32_t op1, uint32_t op2, uint32_t op3)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMLADX (uint32_t op1, uint32_t op2, uint32_t op3)
 {
   uint32_t result;
 
@@ -589,7 +537,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLADX (uint32_t o
   (uint64_t)(((uint64_t)__ARG3_H << 32) | __ARG3_L); \
  })
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUSD  (uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMUSD  (uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -597,7 +545,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUSD  (uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUSDX (uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMUSDX (uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -605,7 +553,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMUSDX (uint32_t o
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLSD (uint32_t op1, uint32_t op2, uint32_t op3)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMLSD (uint32_t op1, uint32_t op2, uint32_t op3)
 {
   uint32_t result;
 
@@ -613,7 +561,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLSD (uint32_t op
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLSDX (uint32_t op1, uint32_t op2, uint32_t op3)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SMLSDX (uint32_t op1, uint32_t op2, uint32_t op3)
 {
   uint32_t result;
 
@@ -635,7 +583,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SMLSDX (uint32_t o
   (uint64_t)(((uint64_t)__ARG3_H << 32) | __ARG3_L); \
  })
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __SEL  (uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __SEL  (uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -643,7 +591,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __SEL  (uint32_t op1
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QADD(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QADD(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -651,7 +599,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QADD(uint32_t op1,
   return(result);
 }
 
-__attribute__( ( always_inline ) ) static __INLINE uint32_t __QSUB(uint32_t op1, uint32_t op2)
+__attribute__( ( always_inline ) ) __STATIC_INLINE uint32_t __QSUB(uint32_t op1, uint32_t op2)
 {
   uint32_t result;
 
@@ -671,7 +619,7 @@ __attribute__( ( always_inline ) ) static __INLINE uint32_t __QSUB(uint32_t op1,
   uint32_t __RES, __ARG1 = (ARG1), __ARG2 = (ARG2); \
   if (ARG3 == 0) \
     __ASM ("pkhtb %0, %1, %2" : "=r" (__RES) :  "r" (__ARG1), "r" (__ARG2)  ); \
-  else	\
+  else \
     __ASM ("pkhtb %0, %1, %2, asr %3" : "=r" (__RES) :  "r" (__ARG1), "r" (__ARG2), "I" (ARG3)  ); \
   __RES; \
  })

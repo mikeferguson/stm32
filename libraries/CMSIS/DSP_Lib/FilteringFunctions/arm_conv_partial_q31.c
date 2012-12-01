@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_conv_partial_q31.c
@@ -10,6 +10,12 @@
 * Description:	Partial convolution of Q31 sequences.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
+*
+* Version 1.0.11 2011/10/18
+*    Bug Fix in conv, correlation, partial convolution.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -77,8 +83,8 @@ arm_status arm_conv_partial_q31(
   q31_t *px;                                     /* Intermediate inputA pointer  */
   q31_t *py;                                     /* Intermediate inputB pointer  */
   q31_t *pSrc1, *pSrc2;                          /* Intermediate pointers        */
-  q63_t sum, acc0, acc1, acc2, acc3;             /* Accumulator                  */
-  q31_t x0, x1, x2, x3, c0;
+  q63_t sum, acc0, acc1, acc2;                   /* Accumulator                  */
+  q31_t x0, x1, x2, c0;
   uint32_t j, k, count, check, blkCnt;
   int32_t blockSize1, blockSize2, blockSize3;    /* loop counter                 */
   arm_status status;                             /* status of Partial convolution */
@@ -241,7 +247,7 @@ arm_status arm_conv_partial_q31(
     py = pSrc2;
 
     /* count is index by which the pointer pIn1 to be incremented */
-    count = 1u;
+    count = 0u;
 
     /* -------------------
      * Stage2 process
@@ -252,34 +258,32 @@ arm_status arm_conv_partial_q31(
      * srcBLen should be greater than or equal to 4 */
     if(srcBLen >= 4u)
     {
-      /* Loop unroll over blockSize2 */
-      blkCnt = ((uint32_t) blockSize2 >> 2u);
+      /* Loop unroll over blkCnt */
 
+      blkCnt = blockSize2 / 3;
       while(blkCnt > 0u)
       {
         /* Set all accumulators to zero */
         acc0 = 0;
         acc1 = 0;
         acc2 = 0;
-        acc3 = 0;
 
-        /* read x[0], x[1], x[2] samples */
+        /* read x[0], x[1] samples */
         x0 = *(px++);
         x1 = *(px++);
-        x2 = *(px++);
 
-        /* Apply loop unrolling and compute 4 MACs simultaneously. */
-        k = srcBLen >> 2u;
+        /* Apply loop unrolling and compute 3 MACs simultaneously. */
+        k = srcBLen / 3;
 
-        /* First part of the processing with loop unrolling.  Compute 4 MACs at a time.
-         ** a second loop below computes MACs for the remaining 1 to 3 samples. */
+        /* First part of the processing with loop unrolling.  Compute 3 MACs at a time.
+         ** a second loop below computes MACs for the remaining 1 to 2 samples. */
         do
         {
           /* Read y[srcBLen - 1] sample */
-          c0 = *(py--);
+          c0 = *(py);
 
-          /* Read x[3] sample */
-          x3 = *(px++);
+          /* Read x[2] sample */
+          x2 = *(px);
 
           /* Perform the multiply-accumulates */
           /* acc0 +=  x[0] * y[srcBLen - 1] */
@@ -288,14 +292,12 @@ arm_status arm_conv_partial_q31(
           acc1 += (q63_t) x1 *c0;
           /* acc2 +=  x[2] * y[srcBLen - 1] */
           acc2 += (q63_t) x2 *c0;
-          /* acc3 +=  x[3] * y[srcBLen - 1] */
-          acc3 += (q63_t) x3 *c0;
 
           /* Read y[srcBLen - 2] sample */
-          c0 = *(py--);
+          c0 = *(py - 1u);
 
-          /* Read x[4] sample */
-          x0 = *(px++);
+          /* Read x[3] sample */
+          x0 = *(px + 1u);
 
           /* Perform the multiply-accumulate */
           /* acc0 +=  x[1] * y[srcBLen - 2] */
@@ -303,47 +305,32 @@ arm_status arm_conv_partial_q31(
           /* acc1 +=  x[2] * y[srcBLen - 2] */
           acc1 += (q63_t) x2 *c0;
           /* acc2 +=  x[3] * y[srcBLen - 2] */
-          acc2 += (q63_t) x3 *c0;
-          /* acc3 +=  x[4] * y[srcBLen - 2] */
-          acc3 += (q63_t) x0 *c0;
+          acc2 += (q63_t) x0 *c0;
 
           /* Read y[srcBLen - 3] sample */
-          c0 = *(py--);
+          c0 = *(py - 2u);
 
-          /* Read x[5] sample */
-          x1 = *(px++);
+          /* Read x[4] sample */
+          x1 = *(px + 2u);
 
           /* Perform the multiply-accumulates */
           /* acc0 +=  x[2] * y[srcBLen - 3] */
           acc0 += (q63_t) x2 *c0;
           /* acc1 +=  x[3] * y[srcBLen - 2] */
-          acc1 += (q63_t) x3 *c0;
-          /* acc2 +=  x[4] * y[srcBLen - 2] */
-          acc2 += (q63_t) x0 *c0;
-          /* acc3 +=  x[5] * y[srcBLen - 2] */
-          acc3 += (q63_t) x1 *c0;
-
-          /* Read y[srcBLen - 4] sample */
-          c0 = *(py--);
-
-          /* Read x[6] sample */
-          x2 = *(px++);
-
-          /* Perform the multiply-accumulates */
-          /* acc0 +=  x[3] * y[srcBLen - 4] */
-          acc0 += (q63_t) x3 *c0;
-          /* acc1 +=  x[4] * y[srcBLen - 4] */
           acc1 += (q63_t) x0 *c0;
-          /* acc2 +=  x[5] * y[srcBLen - 4] */
+          /* acc2 +=  x[4] * y[srcBLen - 2] */
           acc2 += (q63_t) x1 *c0;
-          /* acc3 +=  x[6] * y[srcBLen - 4] */
-          acc3 += (q63_t) x2 *c0;
+
+
+          px += 3u;
+
+          py -= 3u;
 
         } while(--k);
 
-        /* If the srcBLen is not a multiple of 4, compute any remaining MACs here.
+        /* If the srcBLen is not a multiple of 3, compute any remaining MACs here.
          ** No loop unrolling is used. */
-        k = srcBLen % 0x4u;
+        k = srcBLen - (3 * (srcBLen / 3));
 
         while(k > 0u)
         {
@@ -351,7 +338,7 @@ arm_status arm_conv_partial_q31(
           c0 = *(py--);
 
           /* Read x[7] sample */
-          x3 = *(px++);
+          x2 = *(px++);
 
           /* Perform the multiply-accumulates */
           /* acc0 +=  x[4] * y[srcBLen - 5] */
@@ -360,13 +347,10 @@ arm_status arm_conv_partial_q31(
           acc1 += (q63_t) x1 *c0;
           /* acc2 +=  x[6] * y[srcBLen - 5] */
           acc2 += (q63_t) x2 *c0;
-          /* acc3 +=  x[7] * y[srcBLen - 5] */
-          acc3 += (q63_t) x3 *c0;
 
           /* Reuse the present samples for the next MAC */
           x0 = x1;
           x1 = x2;
-          x2 = x3;
 
           /* Decrement the loop counter */
           k--;
@@ -376,22 +360,21 @@ arm_status arm_conv_partial_q31(
         *pOut++ = (q31_t) (acc0 >> 31);
         *pOut++ = (q31_t) (acc1 >> 31);
         *pOut++ = (q31_t) (acc2 >> 31);
-        *pOut++ = (q31_t) (acc3 >> 31);
+
+        /* Increment the pointer pIn1 index, count by 3 */
+        count += 3u;
 
         /* Update the inputA and inputB pointers for next MAC calculation */
-        px = pIn1 + (count * 4u);
+        px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the pointer pIn1 index, count by 1 */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;
       }
 
-      /* If the blockSize2 is not a multiple of 4, compute any remaining output samples here.
+      /* If the blockSize2 is not a multiple of 3, compute any remaining output samples here.
        ** No loop unrolling is used. */
-      blkCnt = (uint32_t) blockSize2 % 0x4u;
+      blkCnt = blockSize2 - 3 * (blockSize2 / 3);
 
       while(blkCnt > 0u)
       {
@@ -431,12 +414,12 @@ arm_status arm_conv_partial_q31(
         /* Store the result in the accumulator in the destination buffer. */
         *pOut++ = (q31_t) (sum >> 31);
 
+        /* Increment the MAC count */
+        count++;
+
         /* Update the inputA and inputB pointers for next MAC calculation */
         px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the MAC count */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;
@@ -468,12 +451,12 @@ arm_status arm_conv_partial_q31(
         /* Store the result in the accumulator in the destination buffer. */
         *pOut++ = (q31_t) (sum >> 31);
 
+        /* Increment the MAC count */
+        count++;
+
         /* Update the inputA and inputB pointers for next MAC calculation */
         px = pIn1 + count;
         py = pSrc2;
-
-        /* Increment the MAC count */
-        count++;
 
         /* Decrement the loop counter */
         blkCnt--;

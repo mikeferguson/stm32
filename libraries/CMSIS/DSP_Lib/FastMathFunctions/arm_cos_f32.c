@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_cos_f32.c
@@ -10,6 +10,9 @@
 * Description:	Fast cosine calculation for floating-point values.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -40,7 +43,7 @@
  * Q15, Q31, and floating-point data types.
  * The input to the floating-point version is in radians while the
  * fixed-point Q15 and Q31 have a scaled input with the range
- * [0 1) mapping to [0 2*pi).
+ * [0 +0.9999] mapping to [0 2*pi), Where range excludes 2*pi.
  *
  * The implementation is based on table lookup using 256 values together with cubic interpolation.
  * The steps used are:
@@ -76,14 +79,14 @@
 * \par
 * <b>Example code for Generation of Cos Table:</b>
 * tableSize = 256;
-* <pre>for(n = -1; n < (tableSize + 1); n++)
+* <pre>for(n = -1; n < (tableSize + 2); n++)
 * {
 *	cosTable[n+1]= cos(2*pi*n/tableSize);
 * } </pre>
 * where pi value is  3.14159265358979
 */
 
-static const float32_t cosTable[259] = {
+static const float32_t cosTable[260] = {
   0.999698817729949950f, 1.000000000000000000f, 0.999698817729949950f,
   0.998795449733734130f, 0.997290432453155520f, 0.995184719562530520f,
   0.992479562759399410f, 0.989176511764526370f,
@@ -180,7 +183,8 @@ static const float32_t cosTable[259] = {
   0.975702106952667240f, 0.980785250663757320f, 0.985277652740478520f,
   0.989176511764526370f, 0.992479562759399410f, 0.995184719562530520f,
   0.997290432453155520f, 0.998795449733734130f,
-  0.999698817729949950f, 1.000000000000000000f, 0.999698817729949950f
+  0.999698817729949950f, 1.000000000000000000f, 0.999698817729949950f,
+  0.998795449733734130f
 };
 
 /**
@@ -189,16 +193,20 @@ static const float32_t cosTable[259] = {
  * @return cos(x).
  */
 
+
 float32_t arm_cos_f32(
   float32_t x)
 {
   float32_t cosVal, fract, in;
-  uint32_t index;
+  int32_t index;
   uint32_t tableSize = (uint32_t) TABLE_SIZE;
   float32_t wa, wb, wc, wd;
   float32_t a, b, c, d;
   float32_t *tablePtr;
   int32_t n;
+  float32_t fractsq, fractby2, fractby6, fractby3, fractsqby2;
+  float32_t oneminusfractby2;
+  float32_t frby2xfrsq, frby6xfrsq;
 
   /* input x is in radians */
   /* Scale the input to [0 1] range from [0 2*PI] , divide input by 2*pi */
@@ -222,27 +230,45 @@ float32_t arm_cos_f32(
   /* fractional value calculation */
   fract = ((float32_t) tableSize * in) - (float32_t) index;
 
+  /* Checking min and max index of table */
+  if(index < 0)
+  {
+    index = 0;
+  }
+  else if(index > 256)
+  {
+    index = 256;
+  }
+
   /* Initialise table pointer */
   tablePtr = (float32_t *) & cosTable[index];
 
   /* Read four nearest values of input value from the cos table */
-  a = *tablePtr++;
-  b = *tablePtr++;
-  c = *tablePtr++;
-  d = *tablePtr++;
+  a = tablePtr[0];
+  b = tablePtr[1];
+  c = tablePtr[2];
+  d = tablePtr[3];
 
   /* Cubic interpolation process */
-  wa = -(((0.166666667f) * fract) * (fract * fract)) +
-    (((0.5f) * (fract * fract)) - ((0.3333333333333f) * fract));
-  wb = ((((0.5f) * fract) * (fract * fract)) - (fract * fract)) +
-    (-((0.5f) * fract) + 1.0f);
-  wc = -(((0.5f) * fract) * (fract * fract)) +
-    (((0.5f) * (fract * fract)) + fract);
-  wd = (((0.166666667f) * fract) * (fract * fract)) -
-    ((0.166666667f) * fract);
+  fractsq = fract * fract;
+  fractby2 = fract * 0.5f;
+  fractby6 = fract * 0.166666667f;
+  fractby3 = fract * 0.3333333333333f;
+  fractsqby2 = fractsq * 0.5f;
+  frby2xfrsq = (fractby2) * fractsq;
+  frby6xfrsq = (fractby6) * fractsq;
+  oneminusfractby2 = 1.0f - fractby2;
+  wb = fractsqby2 - fractby3;
+  wc = (fractsqby2 + fract);
+  wa = wb - frby6xfrsq;
+  wb = frby2xfrsq - fractsq;
+  cosVal = wa * a;
+  wc = wc - frby2xfrsq;
+  wd = (frby6xfrsq) - fractby6;
+  wb = wb + oneminusfractby2;
 
   /* Calculate cos value */
-  cosVal = ((a * wa) + (b * wb)) + ((c * wc) + (d * wd));
+  cosVal = (cosVal + (b * wb)) + ((c * wc) + (d * wd));
 
   /* Return the output value */
   return (cosVal);

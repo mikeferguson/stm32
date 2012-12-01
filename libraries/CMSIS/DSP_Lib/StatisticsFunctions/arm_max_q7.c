@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_max_q7.c
@@ -10,6 +10,9 @@
 * Description:	Maximum value of a Q7 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -54,118 +57,79 @@ void arm_max_q7(
   q7_t * pResult,
   uint32_t * pIndex)
 {
-
 #ifndef ARM_MATH_CM0
-
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
-  q7_t res, maxVal, x0, x1, maxVal2, maxVal1;    /* Temporary variables to store the output value. */
-  uint32_t blkCnt, index1, index2, index3, indx, indxMod;       /* loop counter */
+  q7_t maxVal1, maxVal2, out;                    /* Temporary variables to store the output value. */
+  uint32_t blkCnt, outIndex, count;              /* loop counter */
 
+  /* Initialise the count value. */
+  count = 0u;
   /* Initialise the index value to zero. */
-  indx = 0u;
-
+  outIndex = 0u;
   /* Load first input value that act as reference value for comparision */
-  res = *pSrc++;
+  out = *pSrc++;
 
   /* Loop unrolling */
   blkCnt = (blockSize - 1u) >> 2u;
 
-  /* First part of the processing with loop unrolling.  Compute 4 outputs at a time.
-   ** a second loop below computes the remaining 1 to 3 samples. */
-  while(blkCnt > 0u)
-  {
-    indxMod = blockSize - (blkCnt * 4u);
-
-    /* Load two input values for comparision */
-    x0 = *pSrc++;
-    x1 = *pSrc++;
-
-    if(x0 < x1)
-    {
-      /* Update the maximum value and its index */
-      maxVal1 = x1;
-      index1 = indxMod + 1u;
-    }
-    else
-    {
-      /* Update the maximum value and its index */
-      maxVal1 = x0;
-      index1 = indxMod;
-    }
-
-    /* Load two input values for comparision */
-    x0 = *pSrc++;
-    x1 = *pSrc++;
-
-    if(x0 < x1)
-    {
-      /* Update the maximum value and its index */
-      maxVal2 = x1;
-      index2 = indxMod + 3u;
-    }
-    else
-    {
-      /* Update the maximum value and its index */
-      maxVal2 = x0;
-      index2 = indxMod + 2u;
-    }
-
-    if(maxVal1 < maxVal2)
-    {
-      /* Update the maximum value and its index */
-      maxVal = maxVal2;
-      index3 = index2;
-    }
-    else
-    {
-      /* Update the maximum value and its index */
-      maxVal = maxVal1;
-      index3 = index1;
-    }
-
-    if(res < maxVal)
-    {
-      /* Update the maximum value and its index */
-      res = maxVal;
-      indx = index3;
-    }
-
-    /* Decrement the loop counter */
-    blkCnt--;
-
-  }
-
-  /* If the blockSize - 1 is not a multiple of 4, compute any remaining output samples here.
-   ** No loop unrolling is used. */
-  blkCnt = (blockSize - 1u) % 0x04u;
-
+  /* Run the below code for Cortex-M4 and Cortex-M3 */
   while(blkCnt > 0u)
   {
     /* Initialize maxVal to the next consecutive values one by one */
-    maxVal = *pSrc++;
+    maxVal1 = *pSrc++;
+
+    maxVal2 = *pSrc++;
 
     /* compare for the maximum value */
-    if(res < maxVal)
+    if(out < maxVal1)
     {
       /* Update the maximum value and its index */
-      res = maxVal;
-      indx = blockSize - blkCnt;
+      out = maxVal1;
+      outIndex = count + 1u;
     }
+
+    maxVal1 = *pSrc++;
+
+    /* compare for the maximum value */
+    if(out < maxVal2)
+    {
+      /* Update the maximum value and its index */
+      out = maxVal2;
+      outIndex = count + 2u;
+    }
+
+    maxVal2 = *pSrc++;
+
+    /* compare for the maximum value */
+    if(out < maxVal1)
+    {
+      /* Update the maximum value and its index */
+      out = maxVal1;
+      outIndex = count + 3u;
+    }
+
+    /* compare for the maximum value */
+    if(out < maxVal2)
+    {
+      /* Update the maximum value and its index */
+      out = maxVal2;
+      outIndex = count + 4u;
+    }
+
+    count += 4u;
 
     /* Decrement the loop counter */
     blkCnt--;
   }
 
-  /* Store the maximum value and its index into destination pointers */
-  *pResult = res;
-  *pIndex = indx;
+  /* if (blockSize - 1u) is not multiple of 4 */
+  blkCnt = (blockSize - 1u) % 4u;
 
 #else
 
   /* Run the below code for Cortex-M0 */
-
-  q7_t maxVal, out;                              /* Temporary variables to store the output value. */
+  q7_t maxVal1, out;                             /* Temporary variables to store the output value. */
   uint32_t blkCnt, outIndex;                     /* loop counter */
 
   /* Initialise the index value to zero. */
@@ -173,19 +137,20 @@ void arm_max_q7(
   /* Load first input value that act as reference value for comparision */
   out = *pSrc++;
 
-  /* Loop over blockSize - 1 number of values */
   blkCnt = (blockSize - 1u);
+
+#endif /* #ifndef ARM_MATH_CM0 */
 
   while(blkCnt > 0u)
   {
     /* Initialize maxVal to the next consecutive values one by one */
-    maxVal = *pSrc++;
+    maxVal1 = *pSrc++;
 
     /* compare for the maximum value */
-    if(out < maxVal)
+    if(out < maxVal1)
     {
-      /* Update the maximum value and its index */
-      out = maxVal;
+      /* Update the maximum value and it's index */
+      out = maxVal1;
       outIndex = blockSize - blkCnt;
     }
     /* Decrement the loop counter */
@@ -196,8 +161,6 @@ void arm_max_q7(
   /* Store the maximum value and its index into destination pointers */
   *pResult = out;
   *pIndex = outIndex;
-
-#endif /* #ifndef ARM_MATH_CM0 */
 
 }
 

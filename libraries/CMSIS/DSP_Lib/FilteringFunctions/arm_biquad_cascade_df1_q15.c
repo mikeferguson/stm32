@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:	    arm_biquad_cascade_df1_q15.c
@@ -11,6 +11,9 @@
 *				Q15 Biquad cascade DirectFormI(DF1) filter.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -86,18 +89,16 @@ void arm_biquad_cascade_df1_q15(
   q31_t b0;                                      /*  Temporary variable to hold bo value          */
   q31_t b1, a1;                                  /*  Filter coefficients                          */
   q31_t state_in, state_out;                     /*  Filter state variables                       */
+  q31_t acc_l, acc_h;
   q63_t acc;                                     /*  Accumulator                                  */
-  int32_t shift = (15 - (int32_t) S->postShift); /*  Post shift                                   */
+  int32_t lShift = (15 - (int32_t) S->postShift);       /*  Post shift                                   */
   q15_t *pState = S->pState;                     /*  State pointer                                */
   q15_t *pCoeffs = S->pCoeffs;                   /*  Coefficient pointer                          */
-  q31_t *pState_q31;                             /*  32-bit state pointer for SIMD implementation */
   uint32_t sample, stage = (uint32_t) S->numStages;     /*  Stage loop counter                           */
+  int32_t uShift = (32 - lShift);
 
   do
   {
-    /* Initialize state pointer of type q31 */
-    pState_q31 = (q31_t *) (pState);
-
     /* Read the b0 and 0 coefficients using SIMD  */
     b0 = *__SIMD32(pCoeffs)++;
 
@@ -108,10 +109,10 @@ void arm_biquad_cascade_df1_q15(
     a1 = *__SIMD32(pCoeffs)++;
 
     /* Read the input state values from the state buffer:  x[n-1], x[n-2] */
-    state_in = (q31_t) (*pState_q31++);
+    state_in = *__SIMD32(pState)++;
 
     /* Read the output state values from the state buffer:  y[n-1], y[n-2] */
-    state_out = (q31_t) (*pState_q31);
+    state_out = *__SIMD32(pState)--;
 
     /* Apply loop unrolling and compute 2 output values simultaneously. */
     /*      The variable acc hold output values that are being computed:
@@ -138,7 +139,16 @@ void arm_biquad_cascade_df1_q15(
       acc = __SMLALD(a1, state_out, acc);
 
       /* The result is converted from 3.29 to 1.31 if postShift = 1, and then saturation is applied */
-      out = __SSAT((acc >> shift), 16);
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      out = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+      out = __SSAT(out, 16);
 
       /* Every time after the output is computed state should be updated. */
       /* The states should be updated as:  */
@@ -169,7 +179,16 @@ void arm_biquad_cascade_df1_q15(
       acc = __SMLALD(a1, state_out, acc);
 
       /* The result is converted from 3.29 to 1.31 if postShift = 1, and then saturation is applied */
-      out = __SSAT((acc >> shift), 16);
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      out = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+      out = __SSAT(out, 16);
 
       /* Store the output in the destination buffer. */
 
@@ -235,7 +254,16 @@ void arm_biquad_cascade_df1_q15(
       acc = __SMLALD(a1, state_out, acc);
 
       /* The result is converted from 3.29 to 1.31 if postShift = 1, and then saturation is applied */
-      out = __SSAT((acc >> shift), 16);
+      /* Calc lower part of acc */
+      acc_l = acc & 0xffffffff;
+
+      /* Calc upper part of acc */
+      acc_h = (acc >> 32) & 0xffffffff;
+
+      /* Apply shift for lower part of acc and upper part of acc */
+      out = (uint32_t) acc_l >> lShift | acc_h << uShift;
+
+      out = __SSAT(out, 16);
 
       /* Store the output in the destination buffer. */
       *pOut++ = (q15_t) out;

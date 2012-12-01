@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_q31_to_q15.c
@@ -10,6 +10,9 @@
 * Description:	Converts the elements of the Q31 vector to Q15 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -67,6 +70,8 @@ void arm_q31_to_q15(
 #ifndef ARM_MATH_CM0
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t in1, in2, in3, in4;
+  q31_t out1, out2;
 
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
@@ -77,10 +82,26 @@ void arm_q31_to_q15(
   {
     /* C = (q15_t) A >> 16 */
     /* convert from q31 to q15 and then store the results in the destination buffer */
-    *pDst++ = (q15_t) (*pIn++ >> 16);
-    *pDst++ = (q15_t) (*pIn++ >> 16);
-    *pDst++ = (q15_t) (*pIn++ >> 16);
-    *pDst++ = (q15_t) (*pIn++ >> 16);
+    in1 = *pIn++;
+    in2 = *pIn++;
+    in3 = *pIn++;
+    in4 = *pIn++;
+
+    /* pack two higher 16-bit values from two 32-bit values */
+#ifndef ARM_MATH_BIG_ENDIAN
+
+    out1 = __PKHTB(in2, in1, 16);
+    out2 = __PKHTB(in4, in3, 16);
+
+#else
+
+    out1 = __PKHTB(in1, in2, 16);
+    out2 = __PKHTB(in3, in4, 16);
+
+#endif //      #ifdef ARM_MATH_BIG_ENDIAN
+
+    *__SIMD32(pDst)++ = out1;
+    *__SIMD32(pDst)++ = out2;
 
     /* Decrement the loop counter */
     blkCnt--;

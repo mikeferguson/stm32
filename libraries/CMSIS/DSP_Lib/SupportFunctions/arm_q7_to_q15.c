@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_q7_to_q15.c
@@ -10,6 +10,9 @@
 * Description:	Converts the elements of the Q7 vector to Q15 vector.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -68,6 +71,9 @@ void arm_q7_to_q15(
   uint32_t blkCnt;                               /* loop counter */
 
 #ifndef ARM_MATH_CM0
+  q31_t in;
+  q31_t in1, in2;
+  q31_t out1, out2;
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
 
@@ -80,10 +86,34 @@ void arm_q7_to_q15(
   {
     /* C = (q15_t) A << 8 */
     /* convert from q7 to q15 and then store the results in the destination buffer */
-    *pDst++ = (q15_t) * pIn++ << 8;
-    *pDst++ = (q15_t) * pIn++ << 8;
-    *pDst++ = (q15_t) * pIn++ << 8;
-    *pDst++ = (q15_t) * pIn++ << 8;
+    in = *__SIMD32(pIn)++;
+
+    /* rotatate in by 8 and extend two q7_t values to q15_t values */
+    in1 = __SXTB16(__ROR(in, 8));
+
+    /* extend remainig two q7_t values to q15_t values */
+    in2 = __SXTB16(in);
+
+    in1 = in1 << 8u;
+    in2 = in2 << 8u;
+
+    in1 = in1 & 0xFF00FF00;
+    in2 = in2 & 0xFF00FF00;
+
+#ifndef ARM_MATH_BIG_ENDIAN
+
+    out2 = __PKHTB(in1, in2, 16);
+    out1 = __PKHBT(in2, in1, 16);
+
+#else
+
+    out1 = __PKHTB(in1, in2, 16);
+    out2 = __PKHBT(in2, in1, 16);
+
+#endif
+
+    *__SIMD32(pDst)++ = out1;
+    *__SIMD32(pDst)++ = out2;
 
     /* Decrement the loop counter */
     blkCnt--;

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_sub_q31.c
@@ -10,6 +10,9 @@
 * Description:	Q31 vector subtraction.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -67,6 +70,9 @@ void arm_sub_q31(
 #ifndef ARM_MATH_CM0
 
 /* Run the below code for Cortex-M4 and Cortex-M3 */
+  q31_t inA1, inA2, inA3, inA4;
+  q31_t inB1, inB2, inB3, inB4;
+
   /*loop Unrolling */
   blkCnt = blockSize >> 2u;
 
@@ -76,10 +82,20 @@ void arm_sub_q31(
   {
     /* C = A - B */
     /* Subtract and then store the results in the destination buffer. */
-    *pDst++ = __QSUB(*pSrcA++, *pSrcB++);
-    *pDst++ = __QSUB(*pSrcA++, *pSrcB++);
-    *pDst++ = __QSUB(*pSrcA++, *pSrcB++);
-    *pDst++ = __QSUB(*pSrcA++, *pSrcB++);
+    inA1 = *pSrcA++;
+    inA2 = *pSrcA++;
+    inB1 = *pSrcB++;
+    inB2 = *pSrcB++;
+
+    inA3 = *pSrcA++;
+    inA4 = *pSrcA++;
+    inB3 = *pSrcB++;
+    inB4 = *pSrcB++;
+
+    *pDst++ = __QSUB(inA1, inB1);
+    *pDst++ = __QSUB(inA2, inB2);
+    *pDst++ = __QSUB(inA3, inB3);
+    *pDst++ = __QSUB(inA4, inB4);
 
     /* Decrement the loop counter */
     blkCnt--;

@@ -1,8 +1,8 @@
 /* ----------------------------------------------------------------------
 * Copyright (C) 2010 ARM Limited. All rights reserved.
 *
-* $Date:        15. July 2011
-* $Revision: 	V1.0.10
+* $Date:        15. February 2012
+* $Revision: 	V1.1.0
 *
 * Project: 	    CMSIS DSP Library
 * Title:		arm_cmplx_mag_squared_f32.c
@@ -10,6 +10,9 @@
 * Description:	Floating-point complex magnitude squared.
 *
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
+*
+* Version 1.1.0 2012/02/15
+*    Updated with more optimizations, bug fixes and minor API changes.
 *
 * Version 1.0.10 2011/7/15
 *    Big Endian support added and Merged M0 and M3/M4 Source code.
@@ -26,7 +29,6 @@
 * Version 1.0.0 2010/09/20
 *    Production release and review comments incorporated.
 * ---------------------------------------------------------------------------- */
-
 #include "arm_math.h"
 
 /**
@@ -77,11 +79,14 @@ void arm_cmplx_mag_squared_f32(
   uint32_t numSamples)
 {
   float32_t real, imag;                          /* Temporary variables to store real and imaginary values */
+  uint32_t blkCnt;                               /* loop counter */
 
 #ifndef ARM_MATH_CM0
-
-  /* Run the below code for Cortex-M4 and Cortex-M3 */
-  uint32_t blkCnt;                               /* loop counter */
+  float32_t real1, real2, real3, real4;          /* Temporary variables to hold real values */
+  float32_t imag1, imag2, imag3, imag4;          /* Temporary variables to hold imaginary values */
+  float32_t mul1, mul2, mul3, mul4;              /* Temporary variables */
+  float32_t mul5, mul6, mul7, mul8;              /* Temporary variables */
+  float32_t out1, out2, out3, out4;              /* Temporary variables to hold output values */
 
   /*loop Unrolling */
   blkCnt = numSamples >> 2u;
@@ -91,22 +96,80 @@ void arm_cmplx_mag_squared_f32(
   while(blkCnt > 0u)
   {
     /* C[0] = (A[0] * A[0] + A[1] * A[1]) */
-    real = *pSrc++;
-    imag = *pSrc++;
-    /* store the result in the destination buffer. */
-    *pDst++ = (real * real) + (imag * imag);
+    /* read real input sample from source buffer */
+    real1 = pSrc[0];
+    /* read imaginary input sample from source buffer */
+    imag1 = pSrc[1];
 
-    real = *pSrc++;
-    imag = *pSrc++;
-    *pDst++ = (real * real) + (imag * imag);
+    /* calculate power of real value */
+    mul1 = real1 * real1;
 
-    real = *pSrc++;
-    imag = *pSrc++;
-    *pDst++ = (real * real) + (imag * imag);
+    /* read real input sample from source buffer */
+    real2 = pSrc[2];
 
-    real = *pSrc++;
-    imag = *pSrc++;
-    *pDst++ = (real * real) + (imag * imag);
+    /* calculate power of imaginary value */
+    mul2 = imag1 * imag1;
+
+    /* read imaginary input sample from source buffer */
+    imag2 = pSrc[3];
+
+    /* calculate power of real value */
+    mul3 = real2 * real2;
+
+    /* read real input sample from source buffer */
+    real3 = pSrc[4];
+
+    /* calculate power of imaginary value */
+    mul4 = imag2 * imag2;
+
+    /* read imaginary input sample from source buffer */
+    imag3 = pSrc[5];
+
+    /* calculate power of real value */
+    mul5 = real3 * real3;
+    /* calculate power of imaginary value */
+    mul6 = imag3 * imag3;
+
+    /* read real input sample from source buffer */
+    real4 = pSrc[6];
+
+    /* accumulate real and imaginary powers */
+    out1 = mul1 + mul2;
+
+    /* read imaginary input sample from source buffer */
+    imag4 = pSrc[7];
+
+    /* accumulate real and imaginary powers */
+    out2 = mul3 + mul4;
+
+    /* calculate power of real value */
+    mul7 = real4 * real4;
+    /* calculate power of imaginary value */
+    mul8 = imag4 * imag4;
+
+    /* store output to destination */
+    pDst[0] = out1;
+
+    /* accumulate real and imaginary powers */
+    out3 = mul5 + mul6;
+
+    /* store output to destination */
+    pDst[1] = out2;
+
+    /* accumulate real and imaginary powers */
+    out4 = mul7 + mul8;
+
+    /* store output to destination */
+    pDst[2] = out3;
+
+    /* increment destination pointer by 8 to process next samples */
+    pSrc += 8u;
+
+    /* store output to destination */
+    pDst[3] = out4;
+
+    /* increment destination pointer by 4 to process next samples */
+    pDst += 4u;
 
     /* Decrement the loop counter */
     blkCnt--;
@@ -116,25 +179,17 @@ void arm_cmplx_mag_squared_f32(
    ** No loop unrolling is used. */
   blkCnt = numSamples % 0x4u;
 
-  while(blkCnt > 0u)
-  {
-    /* C[0] = (A[0] * A[0] + A[1] * A[1]) */
-    real = *pSrc++;
-    imag = *pSrc++;
-    /* store the result in the destination buffer. */
-    *pDst++ = (real * real) + (imag * imag);
-
-    /* Decrement the loop counter */
-    blkCnt--;
-  }
-
 #else
 
   /* Run the below code for Cortex-M0 */
 
-  while(numSamples > 0u)
+  blkCnt = numSamples;
+
+#endif /* #ifndef ARM_MATH_CM0 */
+
+  while(blkCnt > 0u)
   {
-    /* reading real and imaginary values */
+    /* C[0] = (A[0] * A[0] + A[1] * A[1]) */
     real = *pSrc++;
     imag = *pSrc++;
 
@@ -143,11 +198,8 @@ void arm_cmplx_mag_squared_f32(
     *pDst++ = (real * real) + (imag * imag);
 
     /* Decrement the loop counter */
-    numSamples--;
+    blkCnt--;
   }
-
-#endif /* #ifndef ARM_MATH_CM0 */
-
 }
 
 /**
