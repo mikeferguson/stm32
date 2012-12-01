@@ -1,69 +1,69 @@
-/* ----------------------------------------------------------------------   
-* Copyright (C) 2010 ARM Limited. All rights reserved.   
-*   
-* $Date:        15. July 2011  
-* $Revision: 	V1.0.10  
-*   
-* Project: 	    CMSIS DSP Library   
-* Title:	    arm_common_tables.c   
-*   
-* Description:	This file has common tables like Bitreverse, reciprocal etc which are used across different functions   
-*   
+/* ----------------------------------------------------------------------
+* Copyright (C) 2010 ARM Limited. All rights reserved.
+*
+* $Date:        15. July 2011
+* $Revision: 	V1.0.10
+*
+* Project: 	    CMSIS DSP Library
+* Title:	    arm_common_tables.c
+*
+* Description:	This file has common tables like Bitreverse, reciprocal etc which are used across different functions
+*
 * Target Processor: Cortex-M4/Cortex-M3/Cortex-M0
-*  
-* Version 1.0.10 2011/7/15 
-*    Big Endian support added and Merged M0 and M3/M4 Source code.  
-*   
-* Version 1.0.3 2010/11/29  
-*    Re-organized the CMSIS folders and updated documentation.   
-*    
-* Version 1.0.2 2010/11/11   
-*    Documentation updated.    
-*   
-* Version 1.0.1 2010/10/05    
-*    Production release and review comments incorporated.   
-*   
-* Version 1.0.0 2010/09/20    
-*    Production release and review comments incorporated.   
+*
+* Version 1.0.10 2011/7/15
+*    Big Endian support added and Merged M0 and M3/M4 Source code.
+*
+* Version 1.0.3 2010/11/29
+*    Re-organized the CMSIS folders and updated documentation.
+*
+* Version 1.0.2 2010/11/11
+*    Documentation updated.
+*
+* Version 1.0.1 2010/10/05
+*    Production release and review comments incorporated.
+*
+* Version 1.0.0 2010/09/20
+*    Production release and review comments incorporated.
 * -------------------------------------------------------------------- */
 
 
 #include "arm_math.h"
 
-/**   
- * @ingroup groupTransforms   
+/**
+ * @ingroup groupTransforms
  */
 
-/**   
- * @addtogroup CFFT_CIFFT   
- * @{   
+/**
+ * @addtogroup CFFT_CIFFT
+ * @{
  */
 
-/**   
-* \par   
-* Pseudo code for Generation of Bit reversal Table is   
-* \par   
-* <pre>for(l=1;l <= N/4;l++)   
-* {   
-*   for(i=0;i<logN2;i++)   
-*   {    
-*     a[i]=l&(1<<i);   
-*   }   
-*   for(j=0; j<logN2; j++)   
-*   {   
-*     if (a[j]!=0)   
-*     y[l]+=(1<<((logN2-1)-j));   
-*   }   
-*   y[l] = y[l] >> 1;   
-*  } </pre>   
-* \par   
-* where N = 1024	logN2 = 10   
-* \par   
-* N is the maximum FFT Size supported   
+/**
+* \par
+* Pseudo code for Generation of Bit reversal Table is
+* \par
+* <pre>for(l=1;l <= N/4;l++)
+* {
+*   for(i=0;i<logN2;i++)
+*   {
+*     a[i]=l&(1<<i);
+*   }
+*   for(j=0; j<logN2; j++)
+*   {
+*     if (a[j]!=0)
+*     y[l]+=(1<<((logN2-1)-j));
+*   }
+*   y[l] = y[l] >> 1;
+*  } </pre>
+* \par
+* where N = 1024	logN2 = 10
+* \par
+* N is the maximum FFT Size supported
 */
 
-/*   
-* @brief  Table for bit reversal process   
+/*
+* @brief  Table for bit reversal process
 */
 const uint16_t armBitRevTable[256] = {
   0x100, 0x80, 0x180, 0x40, 0x140, 0xc0, 0x1c0,
@@ -105,12 +105,12 @@ const uint16_t armBitRevTable[256] = {
   0x17e, 0xfe, 0x1fe, 0x1
 };
 
-/**   
- * @} end of CFFT_CIFFT group   
+/**
+ * @} end of CFFT_CIFFT group
  */
 
-/*   
-* @brief  Q15 table for reciprocal   
+/*
+* @brief  Q15 table for reciprocal
 */
 const q15_t armRecipTableQ15[64] = {
   0x7F03, 0x7D13, 0x7B31, 0x795E, 0x7798, 0x75E0,
@@ -126,8 +126,8 @@ const q15_t armRecipTableQ15[64] = {
   0x41CC, 0x4146, 0x40C2, 0x4040
 };
 
-/*   
-* @brief  Q31 table for reciprocal   
+/*
+* @brief  Q31 table for reciprocal
 */
 const q31_t armRecipTableQ31[64] = {
   0x7F03F03F, 0x7D137420, 0x7B31E739, 0x795E9F94, 0x7798FD29, 0x75E06928,
