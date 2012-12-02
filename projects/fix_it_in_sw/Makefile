@@ -4,8 +4,10 @@ PRG         := fix_it_in_sw
 MCU         := STM32F4XX
 MCU_FLAGS   := -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 MCU_FLAGS   += -DARM_MATH_CM4 -D__FPU_PRESENT
+# Library location
+LIB_PATH    := ../../libraries
 # Linker Script
-LD_SCRIPT   := ../../libraries/ST/ld/STM32F407VET6.ld
+LD_SCRIPT   := $(LIB_PATH)/ST/ld/STM32F407VET6.ld
 
 # tools
 CC          := arm-none-eabi-gcc
@@ -18,7 +20,7 @@ OD          := arm-none-eabi-objdump
 SIZE        := arm-none-eabi-size
 
 # Flags
-INCLUDES    := -I. -I../../libraries/CMSIS/Include -I../../libraries/ST/inc
+INCLUDES    := -I. -I$(LIB_PATH)/CMSIS/Include -I$(LIB_PATH)/ST/inc
 CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections
 CXXFLAGS    := $(CFLAGS) -fno-exceptions
 LDFLAGS     := -T$(LD_SCRIPT) --gc-sections -v
@@ -27,7 +29,7 @@ ODFLAGS     := -S -t
 ARFLAGS     := 
 
 # DSP library support -- to use this, need to run "make" in CMSIS folder
-#LDFLAGS     += -L../../libraries/CMSIS/Lib/
+#LDFLAGS     += -L$(LIB_PATH)/CMSIS/Lib/
 #LIBS        = -larm_cortexM4lf_math
 
 BUILD_PATH  := build
@@ -41,15 +43,15 @@ clean:
 	rm -rf build
 
 # Build STM32_CPP
-INCLUDES    += -I../../libraries/libcpp/inc
+INCLUDES    += -I$(LIB_PATH)/libcpp/inc
 BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
 #TGT_BIN     += $(BUILD_PATH)/stm32_cpp/test.o
 
-$(BUILD_PATH)/stm32_cpp/%.o: ../../libraries/libcpp/src/%.cpp
+$(BUILD_PATH)/stm32_cpp/%.o: $(LIB_PATH)/libcpp/src/%.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
 
 # Build STDPERIPH_DRIVER
-INCLUDES    += -I../../libraries/STM32F4xx_StdPeriph_Driver/inc
+INCLUDES    += -I$(LIB_PATH)/STM32F4xx_StdPeriph_Driver/inc
 CFLAGS      += -DUSE_STDPERIPH_DRIVER
 BUILDDIRS   += $(BUILD_PATH)/std_periph
 #TGT_BIN     += $(BUILD_PATH)/std_periph/misc.o
@@ -76,7 +78,7 @@ TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_spi.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_usart.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_wwdg.o
 
-$(BUILD_PATH)/std_periph/%.o: ../../libraries/STM32F4xx_StdPeriph_Driver/src/%.c
+$(BUILD_PATH)/std_periph/%.o: $(LIB_PATH)/STM32F4xx_StdPeriph_Driver/src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $<
 
 # Primary build rules
