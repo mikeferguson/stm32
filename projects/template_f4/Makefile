@@ -7,7 +7,7 @@ MCU_FLAGS   += -DARM_MATH_CM4 -D__FPU_PRESENT
 # Library location
 LIB_PATH    := ../../libraries
 # Linker Script
-LD_SCRIPT   := $(LIB_PATH)/ST/ld/STM32F407VET6.ld
+LD_SCRIPT   := STM32F407VET6.ld
 
 # tools
 CC          := arm-none-eabi-gcc
@@ -23,7 +23,7 @@ SIZE        := arm-none-eabi-size
 INCLUDES    := -I. -I$(LIB_PATH)/CMSIS/Include -I$(LIB_PATH)/ST/inc
 CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections
 CXXFLAGS    := $(CFLAGS) -fno-exceptions
-LDFLAGS     := -T$(LD_SCRIPT) --gc-sections -v
+LDFLAGS     := -L$(LIB_PATH)/ST/ld -T$(LD_SCRIPT) --gc-sections -v
 CPFLAGS     := -Obinary -v
 ODFLAGS     := -S -t
 ARFLAGS     := 
