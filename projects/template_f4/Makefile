@@ -50,11 +50,11 @@ BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
 $(BUILD_PATH)/stm32_cpp/%.o: $(LIB_PATH)/libcpp/src/%.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
 
-# Build STDPERIPH_DRIVER
+# Build STM32F4xx_StdPeriph_Driver
 INCLUDES    += -I$(LIB_PATH)/STM32F4xx_StdPeriph_Driver/inc
 CFLAGS      += -DUSE_STDPERIPH_DRIVER
 BUILDDIRS   += $(BUILD_PATH)/std_periph
-#TGT_BIN     += $(BUILD_PATH)/std_periph/misc.o
+#TGT_BIN    += $(BUILD_PATH)/std_periph/misc.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_adc.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_bkp.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_can.o
