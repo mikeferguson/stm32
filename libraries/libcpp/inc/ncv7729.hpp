@@ -32,7 +32,19 @@
  * Driver for the NCV7729 motor driver from ON Semi.
  *
  * Usage:
- *  
+ *
+ * Ncv7729<SPI2_BASE, CS, TIM1_BASE, motor_enable, fault, 1> motor;
+ * ...
+ * RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+ * RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+ * tim1_ch1::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+ * tim1_ch1n::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+ * sck::mode(GPIO_ALTERNATE | GPIO_AF_SPI2);
+ * miso::mode(GPIO_ALTERNATE | GPIO_AF_SPI2);
+ * mosi::mode(GPIO_ALTERNATE | GPIO_AF_SPI2);
+ * motor.init();
+ * ...
+ * motor.set(1.0);
  *
  */
 
@@ -94,6 +106,7 @@ public:
     En::mode(GPIO_OUTPUT);
     En::low();
     
+    /* it appears we have to hold this low in order for the bridge to enable? */
     Fault::mode(GPIO_OUTPUT);
     Fault::low();
 
