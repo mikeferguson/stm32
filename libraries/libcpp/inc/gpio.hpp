@@ -253,7 +253,7 @@ public:
     inline static void pullup()
     {
 #ifdef STM32F4XX
-        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR &= ~(0xf<<(N*2));
+        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR &= ~(0x3<<(N*2));
         reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR |    0x1<<(N*2);
 #else
         high();
@@ -263,7 +263,7 @@ public:
     inline static void pulldown()
     {
 #ifdef STM32F4XX
-        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR &= ~(0xf<<(N*2));
+        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR &= ~(0x3<<(N*2));
         reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR |    0x2<<(N*2);
 #else
         low();
