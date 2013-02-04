@@ -1,11 +1,13 @@
 # Program name
-PRG         := template_f4
+PRG         := eth_bridge
 # Architecture
 MCU         := STM32F4XX
 MCU_FLAGS   := -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
 MCU_FLAGS   += -DARM_MATH_CM4 -D__FPU_PRESENT
 # Library location
 LIB_PATH    := ../../libraries
+# Toolchain path (for newlib)
+TOOL_PATH   := ../../../../bin
 # Linker Script
 LD_SCRIPT   := STM32F407VET6.ld
 
@@ -29,14 +31,19 @@ ODFLAGS     := -S -t
 ARFLAGS     := 
 
 # DSP library support -- to use this, need to run "make" in CMSIS folder
-LDFLAGS     += -L$(LIB_PATH)/CMSIS/Lib/
-LIBS        = -larm_cortexM4lf_math
+#LDFLAGS     += -L$(LIB_PATH)/CMSIS/Lib/
+#LIBS        = -larm_cortexM4lf_math
+
+# Link against arm-gcc newlib
+LDFLAGS     += -L$(TOOL_PATH)/gcc-arm-none-eabi-4_6-2012q2/arm-none-eabi/lib/armv7e-m/fpu
+LIBS        += -lc
 
 BUILD_PATH  := build
 BUILDDIRS   := $(BUILD_PATH)
 
 # Build main stuff
 TGT_BIN     := $(BUILD_PATH)/main.o $(BUILD_PATH)/startup_f4.o $(BUILD_PATH)/system_stm32f4xx.o
+TGT_BIN     += $(BUILD_PATH)/netconf.o $(BUILD_PATH)/netapp.o
 
 all: $(BUILD_PATH)/$(PRG).bin
 clean:
@@ -49,6 +56,61 @@ BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
 
 $(BUILD_PATH)/stm32_cpp/%.o: $(LIB_PATH)/libcpp/src/%.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
+
+# Build LWIP
+BUILDDIRS   += $(BUILD_PATH)/lwip/core $(BUILD_PATH)/lwip/core/ipv4 \
+               $(BUILD_PATH)/lwip/netif $(BUILD_PATH)/lwip/port \
+               $(BUILD_PATH)/lwip/port/STM32F4x7
+
+LWIP_INCLUDES := -I. \
+               -I$(LIB_PATH)/lwip/port/STM32F4x7 \
+               -I$(LIB_PATH)/lwip/src/include/ipv4 \
+               -I$(LIB_PATH)/lwip/src/include
+
+TGT_BIN     += $(BUILD_PATH)/lwip/core/init.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/mem.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/memp.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/netif.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/pbuf.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/raw.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/stats.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/sys.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/tcp.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/tcp_in.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/tcp_out.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/udp.o
+
+TGT_BIN    += $(BUILD_PATH)/lwip/core/ipv4/autoip.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/ipv4/icmp.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/ipv4/inet.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/ipv4/inet_chksum.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/ipv4/ip_addr.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/ipv4/ip.o
+TGT_BIN     += $(BUILD_PATH)/lwip/core/ipv4/ip_frag.o
+
+TGT_BIN     += $(BUILD_PATH)/lwip/netif/etharp.o
+
+TGT_BIN     += $(BUILD_PATH)/lwip/port/STM32F4x7/ethernetif.o
+
+$(BUILD_PATH)/lwip/core/%.o: $(LIB_PATH)/lwip/src/core/%.c
+	$(CC) $(CFLAGS) $(LWIP_INCLUDES) -o $@ $<
+
+$(BUILD_PATH)/lwip/core/ipv4/%.o: $(LIB_PATH)/lwip/src/core/ipv4/%.c
+	$(CC) $(CFLAGS) $(LWIP_INCLUDES) -o $@ $<
+
+$(BUILD_PATH)/lwip/netif/%.o: $(LIB_PATH)/lwip/src/netif/%.c
+	$(CC) $(CFLAGS) $(LWIP_INCLUDES) -o $@ $<
+
+$(BUILD_PATH)/lwip/port/%.o: $(LIB_PATH)/lwip/port/%.c
+	$(CC) $(CFLAGS) $(LWIP_INCLUDES) $(INCLUDES) -o $@ $<
+
+# Build STM32F4x7_ETH_Driver
+INCLUDES    += -I$(LIB_PATH)/STM32F4x7_ETH_Driver/inc
+BUILDDIRS   += $(BUILD_PATH)/eth_driver
+TGT_BIN     += $(BUILD_PATH)/eth_driver/stm32f4x7_eth.o
+
+$(BUILD_PATH)/eth_driver/%.o: $(LIB_PATH)/STM32F4x7_ETH_Driver/src/%.c
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $<
 
 # Build STM32F4xx_StdPeriph_Driver
 INCLUDES    += -I$(LIB_PATH)/STM32F4xx_StdPeriph_Driver/inc
@@ -70,7 +132,7 @@ BUILDDIRS   += $(BUILD_PATH)/std_periph
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_i2c.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_iwdg.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_pwr.o
-#TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_rcc.o
+TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_rcc.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_rtc.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_sdio.o
 #TGT_BIN    += $(BUILD_PATH)/std_periph/stm32f4xx_spi.o
@@ -83,10 +145,10 @@ $(BUILD_PATH)/std_periph/%.o: $(LIB_PATH)/STM32F4xx_StdPeriph_Driver/src/%.c
 
 # Primary build rules
 $(BUILD_PATH)/%.o: %.c
-	$(CC) $(CFLAGS) -std=c99 $(INCLUDES) -o $@ $<
+	$(CC) $(CFLAGS) -std=c99 $(INCLUDES) $(LWIP_INCLUDES) -o $@ $<
 
 $(BUILD_PATH)/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LWIP_INCLUDES) -o $@ $<
 
 $(BUILD_PATH)/$(PRG).bin: $(BUILD_PATH)/$(PRG).elf
 	$(CP) $(CPFLAGS) $(BUILD_PATH)/$(PRG).elf $@
@@ -120,5 +182,3 @@ $(BUILDDIRS):
 	echo " mon soft_reset_halt" >> .gdbinit
 	echo " mon reset init" >> .gdbinit
 	echo "end" >> .gdbinit
-
-
