@@ -110,7 +110,7 @@ $(BUILDDIRS):
 	echo "def flash" >> .gdbinit
 	echo " file $(BUILD_PATH)/$(PRG).elf" >> .gdbinit
 	echo " mon soft_reset_halt" >> .gdbinit
-	echo " mon stm32f2x mass_erase 0" >> .gdbinit
+	echo " mon flash erase_address pad 0x08000000 [file size $(PWD)/$(BUILD_PATH)/$(PRG).bin]" >> .gdbinit
 	echo " mon flash write_bank 0 $(PWD)/$(BUILD_PATH)/$(PRG).bin 0" >> .gdbinit
 	echo " mon soft_reset_halt" >> .gdbinit
 	echo " mon reset init" >> .gdbinit
