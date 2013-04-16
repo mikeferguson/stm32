@@ -1,9 +1,13 @@
 #STM32 Sandbox
-This is a sandbox full of stuff/garbage for the STM32.
+This is a sandbox full of stuff/garbage for the STM32, specifically the STM32F4 series.
 
 This repository is currently using:
  * CMSIS v3.01
  * STM32F4xx_StdPeriph_driver v1.0.1
+
+Things to keep in mind if adapting to STM32F1, F2, or F3:
+ * You'll need to locate the proper device-specific files (stored in libraries/ST folder).
+ * Much of libcpp has been tested with F1 series. Notably, the gpio.h will not work with F2 or F3 processors right now.
 
 #Setup of development environment (12.04)
 
