@@ -34,7 +34,9 @@
 #include "stm32f4x7_eth.h"
 #include "dynamixel.h"
 
+uint8_t sys_estop;
 uint32_t sys_time;
+uint32_t last_packet;
 float sys_voltage;
 float sys_current;
 
@@ -45,7 +47,7 @@ int main(void)
   sys_current = 1.0f;
   NVIC_SetPriorityGrouping(3);
 
-  // enable GPIO
+  /* enable GPIO */
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
@@ -55,9 +57,10 @@ int main(void)
   act::mode(GPIO_OUTPUT);
   stat::mode(GPIO_OUTPUT);
   error::mode(GPIO_OUTPUT);
+  error::high();
   estop::mode(GPIO_INPUT);
 
-  // setup ethernet
+  /* setup ethernet */
   phy_rst::mode(GPIO_OUTPUT_2MHz);
   phy_rst::high(); // release reset line
 
@@ -84,7 +87,7 @@ int main(void)
 
   init_dynamixel();
 
-  // setup systick
+  /* setup systick */
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
   //NVIC_SetPriority(SysTick_IRQn,2);
@@ -95,6 +98,9 @@ int main(void)
     while(1);
 
   __enable_irq();
+
+  /* done with setup, turn off err led */
+  error::low();
 
   while(1)
   {
@@ -138,23 +144,24 @@ void SysTick_Handler(void)
 
   /* check e-stop */
   if(estop::value() > 0){
-    //stat::high();
     // TODO: stop stuffs?
+    sys_estop = ESTOP_PRESSED;
+    stat::high();
   }else{
-    //stat::low();
+    sys_estop = ESTOP_RELEASED;
+    stat::low();
   }
 
   /* toggle activity led */
-  if(sys_time % 1000 == 0)
+  if(sys_time - last_packet < 500)
   {
-    uint8_t i;
-    act::high();
+    if(sys_time % 200 == 0)
+      act::high();
+    else if (sys_time % 100 == 0)
+      act::low();
   }
-  else if (sys_time % 1000 == 500)
-  {
-    uint8_t i;
+  else
     act::low();
-  }
 }
 
 }

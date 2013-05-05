@@ -1,6 +1,14 @@
 #Eth-bridge Firmware
 This is the firmware for the "stm32 eth/xbee/ax/rx bridge" board.
 
+##LED Usage
+The bridge has 3 leds:
+ * ACT - green - indicates system activity, blinks at 5hz when packets are
+   being properly recieved
+ * STAT - yellow - indicates status of e-stop, illuminated when e-stop is pressed
+ * ERROR - red - similar to the LED on the back of a dynamixel servo, can be
+   controlled via register table.
+
 ##Ethernet Protocol
 Packets sent over ethernet need the following 4-character magic number
 prepended to the packet: '0xffETH'
@@ -31,6 +39,7 @@ is as follows:
     RETURN_DELAY        5
     RETURN_LEVEL        16
     ALARM_LED           17
+    POWER_ENABLE        24      // 0 if estopped, 1 otherwise
     LED                 25
     PRESENT_VOLTAGE     42
     CURRENT_L           68      // Same as MX-64, 2048 (0x800) when idle
@@ -51,5 +60,5 @@ This firmware is a work-in-progress. Things left to do:
  * Relax all servos on e-stop, and stop passing goal position commands
  * Actually implement XBEE port (UART2), RX port (UART1)
  * Currently, an 8-bit ID is always prepended to each packet, it is 0 if no ID
-   was sent. This should be fixed
+   was sent. This should be fixed.
  * DMA-read/write for serial port

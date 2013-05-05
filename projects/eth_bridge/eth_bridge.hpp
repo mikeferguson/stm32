@@ -101,9 +101,14 @@ typedef Gpio<GPIOA_BASE,9> usart1_tx;
 typedef Gpio<GPIOA_BASE,10> usart1_rx;
 typedef Gpio<GPIOA_BASE,11> usart1_en;
 
+#define ESTOP_RELEASED  1
+#define ESTOP_PRESSED   0
+
 extern uint32_t sys_time;
+extern uint32_t last_packet;
 extern float sys_voltage;
 extern float sys_current;
+extern uint8_t sys_estop;
 extern struct udp_pcb * eth_udp;
 extern struct ip_addr return_ipaddr;
 

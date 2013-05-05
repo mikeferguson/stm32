@@ -81,12 +81,12 @@ static void udp_recv_callback(void *arg, struct udp_pcb *udp, struct pbuf *p, st
 
   /* Update return ip */
   return_ipaddr = *ipaddr;
+  last_packet = sys_time;
 
   /* Split out individual dynamixel packets */
   uint16_t offset = ETH_MAGIC_LENGTH;
   while(offset < p->len)
   {
-
     /* handle destination/port */
     pkt.destination = DESTINATION_ETH;
     pkt.port = port;
@@ -169,9 +169,9 @@ static void udp_recv_callback(void *arg, struct udp_pcb *udp, struct pbuf *p, st
             // TODO
           }else if(addr == REG_LED){
             if(pkt.data[6+i] > 0)
-                stat::high();  // TODO: eventually use "error" led
+                error::high();
             else
-                stat::low();
+                error::low();
           }
           addr++;
         }
