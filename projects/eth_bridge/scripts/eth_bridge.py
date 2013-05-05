@@ -191,6 +191,18 @@ class EthBridge:
         except:
             return -1
 
+    ## @brief Get the current of a device.
+    ##
+    ## @param index The ID of the device to read.
+    ##
+    ## @return The current, in Amps.
+    def getCurrent(self, index):
+        values = self.read(index, P_CURRENT_L, 2)
+        try:
+            return (int(values[0]) + (int(values[1])<<8)-2048)*0.0045
+        except:
+            return -1
+
 if __name__=="__main__":
     eth = EthBridge()
 
@@ -203,6 +215,10 @@ if __name__=="__main__":
     eth.setPosition(1,512)
     print(eth.getPosition(1))
     print(eth.getVoltage(1))
+
+    # read from eth-bridge itself
+    print(eth.getVoltage(253))
+    print(eth.getCurrent(253))
     
     eth.recv()
 
