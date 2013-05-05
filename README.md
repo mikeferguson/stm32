@@ -58,4 +58,11 @@ arm-none-eabi-gdb
 > flash
 ```
 
+# Common Problems
+
+## Undefined reference to '__aeabi_f2d', '__aeabi_d2iz', etc
+The FPU is only single precision, using doubles cause lots of problems -- if you see an error like this, make sure you are appending 'f' to floats:
+
+    // 0.0 doesn't work, 0.0f does.
+    float val = 0.0f;
 
