@@ -69,11 +69,11 @@ typedef Gpio<GPIOC_BASE,7> right_enc_b;
 typedef Gpio<GPIOC_BASE,8> right_CS;
 typedef Gpio<GPIOC_BASE,9> right_fault;
 typedef Gpio<GPIOC_BASE,10> top_r_led;
-typedef Gpio<GPIOC_BASE,11> top_g_led;
-typedef Gpio<GPIOC_BASE,12> top_b_led;
+typedef Gpio<GPIOC_BASE,11> top_b_led;
+typedef Gpio<GPIOC_BASE,12> top_g_led;
 typedef Gpio<GPIOC_BASE,13> bot_r_led;
-typedef Gpio<GPIOC_BASE,14> bot_g_led;
-typedef Gpio<GPIOC_BASE,15> bot_b_led;
+typedef Gpio<GPIOC_BASE,14> bot_b_led;
+typedef Gpio<GPIOC_BASE,15> bot_g_led;
 
 /* two attached encoders */
 Encoder<TIM5_BASE> left_enc;
@@ -105,14 +105,14 @@ int main(void)
   top_r_led::mode(GPIO_OUTPUT);
   top_g_led::mode(GPIO_OUTPUT);
   top_b_led::mode(GPIO_OUTPUT);
-  //bot_r_led::mode(GPIO_OUTPUT);
+  bot_r_led::mode(GPIO_OUTPUT);
   bot_g_led::mode(GPIO_OUTPUT);
   bot_b_led::mode(GPIO_OUTPUT);
 
   top_r_led::high();
   top_g_led::high();
-  top_b_led::high();
-  bot_r_led::high();
+  top_b_led::low();
+  bot_r_led::low();
   bot_g_led::high();
   bot_b_led::high();
 
