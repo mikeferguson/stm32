@@ -48,6 +48,8 @@ the Ethernet protocol.
 This firmware is a work-in-progress. Things left to do:
  * Drivers for Voltage/Current Sense
  * Drivers for IMU
- * DMA-read/write for serial port
  * Relax all servos on e-stop, and stop passing goal position commands
  * Actually implement XBEE port (UART2), RX port (UART1)
+ * Currently, an 8-bit ID is always prepended to each packet, it is 0 if no ID
+   was sent. This should be fixed
+ * DMA-read/write for serial port

@@ -159,9 +159,36 @@ static void udp_recv_callback(void *arg, struct udp_pcb *udp, struct pbuf *p, st
         udp_sendto(eth_udp, p_send, ipaddr, port);
         pbuf_free(p_send);
       }
-      else if(pkt.data[3] == AX_WRITE_DATA)
+      else if(pkt.data[4] == AX_WRITE_DATA)
       {
-
+        int addr = pkt.data[5];
+        /* write to table */
+        for(int i = 0; i<pkt.data[5]; i++)
+        {
+          if(addr == REG_BAUD_RATE){
+            // TODO
+          }else if(addr == REG_LED){
+            if(pkt.data[6+i] > 0)
+                stat::high();  // TODO: eventually use "error" led
+            else
+                stat::low();
+          }
+          addr++;
+        }
+        /* status packet? */
+        struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, ETH_MAGIC_LENGTH + 7, PBUF_RAM);
+        unsigned char * x = (unsigned char *) p_send->payload;
+        /* ethernet header */
+        *x++ = 0xff; *x++ = 'E'; *x++ = 'T'; *x++ = 'H';
+        /* packet id */
+        *x++ = pkt.destination & 0xff;
+        /* dynamixel header */
+        *x++ = 0xff; *x++ = 0xff; *x++ = 253; *x++ = 2;
+        *x++=0/*TODO: meaningful error*/;
+        *x++=0/*checksum*/;
+        /* send it */
+        udp_sendto(eth_udp, p_send, ipaddr, port);
+        pbuf_free(p_send);
       }
     }
     else
