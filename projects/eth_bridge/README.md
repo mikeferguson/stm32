@@ -31,9 +31,10 @@ is as follows:
     RETURN_DELAY        5
     RETURN_LEVEL        16
     ALARM_LED           17
-    CURRENT_L           20      // Measured current going to servos, in mA. 
-    CURRENT_H           21
     LED                 25
+    PRESENT_VOLTAGE     42
+    CURRENT_L           68      // Same as MX-64, 2048 (0x800) when idle
+    CURRENT_H           69      // I = 4.5mA * (Current - 2048)
 
 ##Support for Sync Read
 This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
