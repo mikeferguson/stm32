@@ -194,11 +194,11 @@ public:
   /* set PWM. duty should be -1.0 to 1.0 */
   void set(float duty)
   {
-    int d = reinterpret_cast<TIM_TypeDef*>(TIMx)->ARR;
-    d = d/2 + (d * duty);
+    int arr = reinterpret_cast<TIM_TypeDef*>(TIMx)->ARR;
+    int d = arr/2 + (arr * duty);
 
     if (d < 0) d = 0;
-    if (d > reinterpret_cast<TIM_TypeDef*>(TIMx)->ARR) d = reinterpret_cast<TIM_TypeDef*>(TIMx)->ARR;
+    if (d > arr) d = arr;
 
     if(CH == 1) reinterpret_cast<TIM_TypeDef*>(TIMx)->CCR1 = d;
     else if(CH == 2) reinterpret_cast<TIM_TypeDef*>(TIMx)->CCR2 = d;
