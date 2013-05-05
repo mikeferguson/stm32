@@ -86,7 +86,6 @@ public:
     reinterpret_cast<USART_TypeDef*>(USARTx)->CR1 |= USART_CR1_RE | USART_CR1_TE;
 
     /* set baud rate */
-    uint32_t apbclock = 0;
     if(USARTx == USART1_BASE || USARTx == USART6_BASE)
       reinterpret_cast<USART_TypeDef*>(USARTx)->BRR = RccImpl::get_pclk2() / baud_rate;
     else
