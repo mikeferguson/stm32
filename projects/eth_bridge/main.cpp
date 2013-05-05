@@ -27,67 +27,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "stm32f4xx.h"
-#include "gpio.hpp"
+#include "eth_bridge.hpp"
 #include "delay.hpp"
-
 #include "netconf.h"
 #include "netapp.h"
-
 #include "stm32f4x7_eth.h"
+#include "dynamixel.h"
 
-#include "lwip/udp.h"
-
-/* activity, status and error LEDs */
-typedef Gpio<GPIOD_BASE,1> act;
-typedef Gpio<GPIOD_BASE,3> stat;
-typedef Gpio<GPIOD_BASE,4> error;
-
-/* estop switch */
-typedef Gpio<GPIOE_BASE,7> estop;
-
-/* Ethernet Pins */
-typedef Gpio<GPIOA_BASE,0> eth_mii_crs;
-typedef Gpio<GPIOA_BASE,1> eth_rx_clk;
-typedef Gpio<GPIOA_BASE,2> eth_mdio;
-typedef Gpio<GPIOA_BASE,3> eth_mii_col;
-typedef Gpio<GPIOA_BASE,7> eth_mii_rx_dv;
-
-typedef Gpio<GPIOB_BASE,0> eth_mii_rxd2;
-typedef Gpio<GPIOB_BASE,1> eth_mii_rxd3;
-typedef Gpio<GPIOB_BASE,10> eth_mii_rx_er;
-typedef Gpio<GPIOB_BASE,11> eth_mii_tx_en;
-typedef Gpio<GPIOB_BASE,12> eth_mii_txd0;
-typedef Gpio<GPIOB_BASE,13> eth_mii_txd1;
-
-typedef Gpio<GPIOC_BASE,1> eth_mdc;
-typedef Gpio<GPIOC_BASE,2> eth_mii_txd2;
-typedef Gpio<GPIOC_BASE,3> eth_mii_tx_clk;
-typedef Gpio<GPIOC_BASE,4> eth_mii_rxd0;
-typedef Gpio<GPIOC_BASE,5> eth_mii_rxd1;
-
-typedef Gpio<GPIOE_BASE,2> eth_mii_txd3;
-typedef Gpio<GPIOE_BASE,3> phy_rst;
-
-/* analog - voltage/current sense */
-typedef Gpio<GPIOC_BASE,0> voltage_sense;           /* adc123_in10 */
-typedef Gpio<GPIOA_BASE,4> current_sense;           /* adc12_in4 */
-
-/* usart3 - ax/mx bus */
-typedef Gpio<GPIOD_BASE,8> usart3_tx;
-typedef Gpio<GPIOD_BASE,9> usart3_rx;
-typedef Gpio<GPIOD_BASE,10> usart3_en;
-
-/* usart1 - rs-485 bus */
-typedef Gpio<GPIOA_BASE,9> usart1_tx;
-typedef Gpio<GPIOA_BASE,10> usart1_rx;
-typedef Gpio<GPIOA_BASE,11> usart1_en;
-
-unsigned long sys_time;
+uint32_t sys_time;
+float sys_voltage;
+float sys_current;
 
 int main(void)
 {
   sys_time = 0;
+  sys_voltage = 12.0f;
+  sys_current = 1.0f;
   NVIC_SetPriorityGrouping(3);
 
   // enable GPIO
@@ -127,16 +82,7 @@ int main(void)
 
   eth_mii_txd3::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
 
-  /* setup usarts
-  RCC->APB2ENR |= RCC_APB2ENR_USART1EN; // APB2 also has USART6
-  RCC->APB1ENR |= RCC_APB1ENR_USART2EN; // ABP1 also has USART3, UART4/5
-  */
-
-  RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
-  usart3_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  usart3_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  usart3_en::mode(GPIO_OUTPUT);
-  //NVIC_EnableIRQ(USART3_IRQn);
+  init_dynamixel();
 
   // setup systick
   SysTick_Config(SystemCoreClock/1000);
@@ -146,13 +92,7 @@ int main(void)
   Ethernet_Init();
   LwIP_Init();
   if (!netapp_init())
-    while(1)
-    {
-      error::high();
-      delay_ms(50);
-      error::low();
-      delay_ms(1000);
-    }
+    while(1);
 
   __enable_irq();
 
@@ -166,9 +106,27 @@ int main(void)
     }
     LwIP_Periodic_Handle(sys_time);
 
-    /* process devices */
+    /* process dynamixel */
+    dynamixel_packet_t p;
+    if(recv_packet(p) > 0)
+    {
+      if((p.destination & DESTINATION_DEVICE_MASK) == DESTINATION_ETH)
+      {
+        /* send data as ethernet packet */
+        struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, p.data_length + ETH_MAGIC_LENGTH + 1, PBUF_RAM);
+        unsigned char * x = (unsigned char *) p_send->payload;
+        *x++ = 0xff; *x++ = 'E'; *x++ = 'T'; *x++ = 'H';
+        *x++ = p.destination & 0xff;
+        for(int i = 0; i < p.data_length; i++)
+        {
+          *x++ = p.data[i];
+        }
+        udp_sendto(eth_udp, p_send, &return_ipaddr, p.port);
+        pbuf_free(p_send);
+      }
+      // TODO: xbee
+    }
   }
-
 }
 
 extern "C"
@@ -180,10 +138,10 @@ void SysTick_Handler(void)
 
   /* check e-stop */
   if(estop::value() > 0){
-    stat::high();
+    //stat::high();
     // TODO: stop stuffs?
   }else{
-    stat::low();
+    //stat::low();
   }
 
   /* toggle activity led */
