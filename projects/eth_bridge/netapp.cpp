@@ -73,7 +73,7 @@ static void udp_recv_callback(void *arg, struct udp_pcb *udp, struct pbuf *p, st
   uint8_t* data = (uint8_t*) p->payload;
   if( (p->len < ETH_MAGIC_LENGTH) ||
       (p->len != p->tot_len) ||
-      (data[0] != 0xff) || (data[1] != 'E') || (data[2] != 'T') || (data[3] != 'H') )
+      (data[0] != 0xff) || (data[1] != 'B') || (data[2] != 'O') || (data[3] != 'T') )
   {
     pbuf_free(p);
     return;
@@ -110,7 +110,7 @@ static void udp_recv_callback(void *arg, struct udp_pcb *udp, struct pbuf *p, st
         struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, ETH_MAGIC_LENGTH + 7 + len, PBUF_RAM);
         unsigned char * x = (unsigned char *) p_send->payload;
         /* ethernet header */
-        *x++ = 0xff; *x++ = 'E'; *x++ = 'T'; *x++ = 'H';
+        *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
         /* packet id */
         *x++ = pkt.destination & 0xff;
         /* dynamixel header */
@@ -179,7 +179,7 @@ static void udp_recv_callback(void *arg, struct udp_pcb *udp, struct pbuf *p, st
         struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, ETH_MAGIC_LENGTH + 7, PBUF_RAM);
         unsigned char * x = (unsigned char *) p_send->payload;
         /* ethernet header */
-        *x++ = 0xff; *x++ = 'E'; *x++ = 'T'; *x++ = 'H';
+        *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
         /* packet id */
         *x++ = pkt.destination & 0xff;
         /* dynamixel header */

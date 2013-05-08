@@ -11,17 +11,17 @@ The bridge has 3 leds:
 
 ##Ethernet Protocol
 Packets sent over ethernet need the following 4-character magic number
-prepended to the packet: '0xffETH'
+prepended to the packet: '0xffBOT'
 
 After the magic number, any number of valid Dynamixel packets may be
 appended. For instance:
 
-  0xff E T H 0xff 0xff 1 5 3 30 0 2 214 0xff 0xff 1 5 3 30 0 2 214
+  0xff B O T 0xff 0xff 1 5 3 30 0 2 214 0xff 0xff 1 5 3 30 0 2 214
 
 Additionally, a packet can be prepended with a 8-bit ID number, allowing
 return packets to be easier lined up with sent packets:
 
-  0xff E T H packet# 0xff 0xff 1 5 3 30 0 2 214 packet# 0xff 0xff 1 5 3 30 0 2 214
+  0xff B O T packet# 0xff 0xff 1 5 3 30 0 2 214 packet# 0xff 0xff 1 5 3 30 0 2 214
 
 Each Dynamixel packet is put into a queue and processed sequentially, return packets
 are sent individually, with the same magic number attached, and will also carry

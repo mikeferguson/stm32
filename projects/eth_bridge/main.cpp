@@ -121,7 +121,7 @@ int main(void)
         /* send data as ethernet packet */
         struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, p.data_length + ETH_MAGIC_LENGTH + 1, PBUF_RAM);
         unsigned char * x = (unsigned char *) p_send->payload;
-        *x++ = 0xff; *x++ = 'E'; *x++ = 'T'; *x++ = 'H';
+        *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
         *x++ = p.destination & 0xff;
         for(int i = 0; i < p.data_length; i++)
         {

@@ -31,7 +31,7 @@ from ax12 import *
 
 ## @brief This connects to the stm32 eth/xbee/ax/rx bridge over Ethernet.
 class EthBridge:
-    magic = '\xffETH'
+    magic = '\xffBOT'
 
     ## @brief Constructs an EthBridge instance and creates the ethernet socket.
     ##
