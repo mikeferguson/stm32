@@ -47,6 +47,7 @@ class EthBridge:
         self.ip = ip
         self.port = port
         self.timeout = timeout
+        self.p_id = 0
 
     ## @brief Send packet(s) over Ethernet.
     ##
@@ -104,6 +105,11 @@ class EthBridge:
     ##
     ## @return A list of integers that can be sent over the port.
     def makePacket(self, index, ins, params, p_id = 0):
+        if p_id == 0:
+            p_id = self.p_id
+        self.p_id += 1
+        if self.p_id > 255:
+            self.p_id = 0
         length = 2 + len(params)
         checksum = 255 - ((index + length + ins + sum(params))%256)
         return [p_id, 0xff, 0xff, index, length, ins] + params + [checksum, ]
