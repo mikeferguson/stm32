@@ -53,12 +53,26 @@ Packets sent over the XBEE connection are standard Dynamixel packets. The
 XBEE socket supports all the extended devices and sync read, the same as
 the Ethernet protocol.
 
+##Packet Router
+Internally, the firmware acts as a router, sending packets to the proper device (ethernet, ax-bus, etc).
+This is implemented in router.cpp. Each device has a dev_X_getState() function to determine if it is ready for
+more packets, and a dev_X_dispatch(packet_t& p) function to send it a new packet. The router itself has a
+generic dispatch function to which all packets should be sent. It will internally route to the proper device,
+and will buffer them until that device is ready.
+
 #Status
 This firmware is a work-in-progress. Things left to do:
  * Drivers for Voltage/Current Sense
- * Drivers for IMU
+ * Drivers for IMU, including streamer (that bypasses router?)
+ * Perhaps a GPS device?
  * Relax all servos on e-stop, and stop passing goal position commands
  * Actually implement XBEE port (UART2), RX port (UART1)
  * Currently, an 8-bit ID is always prepended to each packet, it is 0 if no ID
    was sent. This should be fixed.
- * DMA-read/write for serial port
+ * DMA-read/write for serial port.
+ * Implement ability to forward packets through the XBEE (or any device for that matter). For instance:
+
+        ex: 0xff 0xff XBEE_ID outer_len=9 0xff 0xff servo_id inner_len=4 READ read_addr read_len inner_chk outer_chk
+
+   could be recognized as an improper packet (0xff is not a valid instruction) and the XBEE could determine that the
+   internal payload of the packet is indeed a valid packet and forward it on.
