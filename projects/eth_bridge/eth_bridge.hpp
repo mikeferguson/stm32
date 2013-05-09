@@ -33,6 +33,7 @@
 #include "stm32f4xx.h"
 #include "gpio.hpp"
 #include "lwip/udp.h"
+#include "packets.h"
 
 /* Header Stuff */
 #define ETH_MAGIC_LENGTH    4
@@ -111,5 +112,15 @@ extern float sys_current;
 extern uint8_t sys_estop;
 extern struct udp_pcb * eth_udp;
 extern struct ip_addr return_ipaddr;
+
+/* devices */
+uint8_t dev_eth_getState();
+uint8_t dev_ax_getState();
+
+void dev_eth_dispatch(packet_t& p);
+void dev_ax_dispatch(packet_t& p);
+void core_dispatch(packet_t& p);
+
+void dynamixel_init();
 
 #endif // ETH_BRIDGE_HPP_

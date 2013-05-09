@@ -29,17 +29,48 @@
 
 #include "eth_bridge.hpp"
 #include "usart.hpp"
-#include "dynamixel.h"
+
+/*
+ * Possible states for bus arbitration
+ */
+enum
+{
+  BUS_IDLE,
+  BUS_WRITING,
+  BUS_READING_FF,
+  BUS_READING_2ND_FF,
+  BUS_READING_ID,
+  BUS_READING_LENGTH,
+  BUS_READING_PARAMS
+};
+
+/*
+ * Simple structure to encompass the workings of a dynamixel bus
+ */
+typedef struct
+{
+  /* state */
+  uint8_t state;
+  uint32_t timeout;
+
+  /* diagnostics */
+  uint32_t p_sent;      /* # of packets successfully sent over dynamixel bus */
+  uint32_t p_recv;      /* # of packets successfully recieved from dynamixel bus */
+  uint32_t p_timedout;  /* # of packets that timed out before a recieve */
+
+  /* return data */
+  packet_t p;           /* return packet */
+  uint8_t head;         /* head of return packet */
+} dynamixel_bus_t;
 
 dynamixel_bus_t bus;
 UsartWithEnable<USART3_BASE, 64, usart3_en> usart3;
 
-void init_dynamixel()
+void dynamixel_init()
 {
   /* initialize bus data structure */
   bus.state = BUS_IDLE;
-  bus.p_sent = bus.p_recv = bus.p_dropped = 0;
-  bus.tx_head = bus.tx_tail = 0;
+  bus.p_sent = bus.p_recv = bus.p_timedout = 0;
 
   /* setup usarts */
   RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
@@ -58,9 +89,9 @@ extern "C"
   }
 }
 
-uint8_t recv_packet(dynamixel_packet_t& packet)
+uint8_t dev_ax_getState()
 {
-  if(bus.state == BUS_IDLE) return 0; // TODO ??
+  if(bus.state == BUS_IDLE) return STATE_READY;
 
   /* process any data in the IRQ buffer */
   int16_t b = usart3.read();
@@ -70,8 +101,8 @@ uint8_t recv_packet(dynamixel_packet_t& packet)
     {
       if(b == 0xff)
       {
-        bus.rx.data_head = 0;
-        bus.rx.data[bus.rx.data_head++] = b;
+        bus.head = 0;
+        bus.p.payload[bus.head++] = b;
         bus.state = BUS_READING_2ND_FF;
       }
     }
@@ -79,7 +110,7 @@ uint8_t recv_packet(dynamixel_packet_t& packet)
     {
       if(b == 0xff)
       {
-        bus.rx.data[bus.rx.data_head++] = b;
+        bus.p.payload[bus.head++] = b;
         bus.state = BUS_READING_ID;
       }
       else
@@ -91,7 +122,7 @@ uint8_t recv_packet(dynamixel_packet_t& packet)
     {
       if(b != 0xff)
       {
-        bus.rx.data[bus.rx.data_head++] = b;
+        bus.p.payload[bus.head++] = b;
         bus.state = BUS_READING_LENGTH;
       }
     }
@@ -99,9 +130,9 @@ uint8_t recv_packet(dynamixel_packet_t& packet)
     {
       if(b < 140) // TODO: calculate actual threshold for this
       {
-        bus.rx.data[bus.rx.data_head++] = b;
+        bus.p.payload[bus.head++] = b;
         bus.state = BUS_READING_PARAMS;
-        bus.rx.data_length = bus.rx.data[3] + 4;
+        bus.p.payload_length = bus.p.payload[3] + 4;
       }
       else
       {
@@ -110,17 +141,18 @@ uint8_t recv_packet(dynamixel_packet_t& packet)
     }
     else if(bus.state == BUS_READING_PARAMS)
     {
-      bus.rx.data[bus.rx.data_head++] = b;
-      if(bus.rx.data_head == bus.rx.data_length)
+      bus.p.payload[bus.head++] = b;
+      if(bus.head == bus.p.payload_length)
       {
         /* checksum check */
         int checksum = 0;
-        for(int i=2; i < bus.rx.data_length; i++)
-          checksum += bus.rx.data[i];
+        for(int i=2; i < bus.p.payload_length; i++)
+          checksum += bus.p.payload[i];
         if((checksum & 0xff) == 0xff)
         {
           bus.p_recv++;
-          bus.state = BUS_PACKET_READY;
+          router_dispatch(bus.p);
+          bus.state = BUS_IDLE;
           break;
         }
         else
@@ -133,82 +165,33 @@ uint8_t recv_packet(dynamixel_packet_t& packet)
     b = usart3.read();
   }
 
-  /* now, return if we have a packet */
-  if(bus.state == BUS_PACKET_READY)
+  if(sys_time > bus.timeout)
   {
-    /* setup packet to return */
-    packet.data_length = bus.rx.data_length;
-    for(int i=0; i < packet.data_length; i++)
-        packet.data[i] = bus.rx.data[i];
-    packet.destination = bus.rx.destination;
-    packet.port = bus.rx.port;
-    bus.state = BUS_WRITING;
-  }
-  else
-  {
-    packet.data_length = 0;
-  }
-  
-  /* kick off a new packet if any */
-  if((bus.state == BUS_WRITING) || (sys_time > bus.timeout))
-  {
-    if(bus.tx_head != bus.tx_tail)
-    {
-      /* send next packet */
-      usart3.setTX();
-      for(int i = 0; i < bus.tx[bus.tx_tail].data_length; i++)
-        usart3.write(bus.tx[bus.tx_tail].data[i]);
-      usart3.setRX();
-      bus.rx.destination = bus.tx[bus.tx_tail].destination;
-      bus.rx.port = bus.tx[bus.tx_tail].port;
-      /* update structs */
-      if(bus.tx[bus.tx_tail].data[2] == 254)
-        bus.timeout = 1; // tiny hack for sync write
-      else
-        bus.timeout = sys_time + 10;
-      bus.tx_tail = (bus.tx_tail + 1) % DYNAMIXEL_BUFFER_COUNT;
-      bus.state = BUS_READING_FF;
-      bus.p_sent++;
-    }
-    else
-    {
-      bus.state = BUS_IDLE;
-    }
+    bus.p_timedout++;
+    bus.state = BUS_IDLE;
   }
 
-  return packet.data_length;
+  if(bus.state == BUS_IDLE)
+    return STATE_READY;
+  else
+    return STATE_BUSY;
 }
 
-uint8_t send_packet(dynamixel_packet_t& packet)
+void dev_ax_dispatch(packet_t& p)
 {
-  if((bus.tx_head+1)%DYNAMIXEL_BUFFER_COUNT == bus.tx_tail)
-  {
-    /* overflowed packet depth */
-    bus.p_dropped++;
-  }
-  else
-  {
-    if(bus.state == BUS_IDLE)
-    {
-      /* skip the queue */
-      usart3.setTX();
-      for(int i = 0; i < packet.data_length; i++)
-        usart3.write(packet.data[i]);
-      usart3.setRX();
-      bus.state = BUS_READING_FF;
-      bus.timeout = sys_time + 10;
-      bus.rx.destination = packet.destination;
-      bus.rx.port = packet.port;
-      bus.p_sent++;
-    }
-    else
-    {
-      bus.tx[bus.tx_head].data_length = packet.data_length; 
-      bus.tx[bus.tx_head].destination = packet.destination;
-      bus.tx[bus.tx_head].port = packet.port;
-      for(int i = 0; i < packet.data_length; i++)
-        bus.tx[bus.tx_head].data[i] = packet.data[i];
-      bus.tx_head = (bus.tx_head+1)%DYNAMIXEL_BUFFER_COUNT;
-    }
-  }
+  /* copy required data for return trip */
+  bus.p.id = p.id;
+  bus.p.destination = p.source;
+  bus.p.source = p.destination; // NOTE: already known to be DEVICE_AX
+
+  /* set state */
+  bus.state = BUS_READING_FF;
+  bus.timeout = sys_time + 10;
+
+  /* send payload */
+  usart3.setTX();
+  for(int i = 0; i < p.payload_length; i++)
+    usart3.write(p.payload[i]);
+  usart3.setRX();
+  bus.p_sent++;
 }

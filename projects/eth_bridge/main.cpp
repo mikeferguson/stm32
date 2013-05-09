@@ -32,7 +32,6 @@
 #include "netconf.h"
 #include "netapp.h"
 #include "stm32f4x7_eth.h"
-#include "dynamixel.h"
 
 uint8_t sys_estop;
 uint32_t sys_time;
@@ -85,7 +84,8 @@ int main(void)
 
   eth_mii_txd3::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
 
-  init_dynamixel();
+  dynamixel_init();
+  router_init();
 
   /* setup systick */
   SysTick_Config(SystemCoreClock/1000);
@@ -112,26 +112,86 @@ int main(void)
     }
     LwIP_Periodic_Handle(sys_time);
 
-    /* process dynamixel */
-    dynamixel_packet_t p;
-    if(recv_packet(p) > 0)
+    /* process packets */
+    router_process();
+  }
+}
+
+void core_dispatch(packet_t& p)
+{
+  packet_t r;
+  r.id = p.id;
+  r.destination = p.source;
+  r.source = p.destination;
+  r.payload[0] = 0xff;
+  r.payload[1] = 0xff;
+  r.payload[2] = 253;
+
+  // TODO: add additional error checking to this
+  if(p.payload[4] == AX_READ_DATA)
+  {
+    int addr = p.payload[5];
+    int len = p.payload[6];
+    r.payload[3] = len + 2;
+    r.payload[4] = 0; // TODO: meaningful error
+    for(int i = 0; i<len; i++)
     {
-      if((p.destination & DESTINATION_DEVICE_MASK) == DESTINATION_ETH)
-      {
-        /* send data as ethernet packet */
-        struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, p.data_length + ETH_MAGIC_LENGTH + 1, PBUF_RAM);
-        unsigned char * x = (unsigned char *) p_send->payload;
-        *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
-        *x++ = p.destination & 0xff;
-        for(int i = 0; i < p.data_length; i++)
-        {
-          *x++ = p.data[i];
-        }
-        udp_sendto(eth_udp, p_send, &return_ipaddr, p.port);
-        pbuf_free(p_send);
-      }
-      // TODO: xbee
+      if(addr == REG_MODEL_NUMBER_L)
+        r.payload[5+i] = 45;
+      else if(addr == REG_MODEL_NUMBER_H)
+        r.payload[5+i] = 1;  // 301
+      else if(addr == REG_VERSION)
+        r.payload[5+i] = 0;
+      else if(addr == REG_ID)
+        r.payload[5+i] = 253;
+      else if(addr == REG_BAUD_RATE)
+        r.payload[5+i] = 34; // 57600????
+      //else if(addr == REG_RETURN_DELAY)
+      //else if(addr == REG_RETURN_LEVEL)
+      //  *x++ = return_level;
+      //else if(addr == REG_ALARM_LED)
+      //else if(addr == REG_LED)
+      else if(addr == REG_PRESENT_VOLTAGE)
+        r.payload[5+i] = (uint8_t) (sys_voltage*10.0f);
+      else if(addr == REG_CURRENT_L)
+        r.payload[5+i] = (uint8_t) (((int)(sys_current/0.0045f)+2048) & 0xff);
+      else if(addr == REG_CURRENT_H)
+        r.payload[5+i] = (uint8_t) (((int)(sys_current/0.0045f)+2048) >> 8);
+      else
+        r.payload[5+i] = 0;
+      addr++;
     }
+    /* checksum */
+    uint8_t checksum = 0;
+    for(int i = 2; i < 5+len; i++)
+        checksum += r.payload[i];
+    checksum = 255 - (checksum & 0xff);
+    r.payload[5+len] = checksum;
+    r.payload_length = 6+len;
+    /* dispatch */
+    router_dispatch(r);
+  }
+  else if(p.payload[4] == AX_WRITE_DATA)
+  {
+    int addr = p.payload[5];
+    /* write to table */
+    for(int i = 0; i<r.payload[3]-3; i++)
+    {
+      if(addr == REG_BAUD_RATE){
+        // TODO
+      }else if(addr == REG_LED){
+        if(p.payload[6+i] > 0)
+          error::high();
+        else
+          error::low();
+      }
+      addr++;
+    }
+    r.payload_length = 6;
+    r.payload[3] = 2;
+    r.payload[4] = 0; // TODO: meaningful error?
+    r.payload[5] = 0; /* checksum == 0 */
+    router_dispatch(r);
   }
 }
 
