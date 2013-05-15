@@ -64,9 +64,9 @@ void LwIP_Init(void)
   /* Initializes the memory pools defined by MEMP_NUM_x.*/
   memp_init();
 
-  IP4_ADDR(&ipaddr, 10, 42, 0, 42);
-  IP4_ADDR(&netmask, 255, 0, 0, 0);
-  IP4_ADDR(&gw, 10, 68, 0, 1);
+  IP4_ADDR(&ipaddr, 192, 168, 0, 42);
+  IP4_ADDR(&netmask, 255, 255, 255, 0);
+  IP4_ADDR(&gw, 192, 168, 0, 1);
 
   //Set_MAC_Address(macaddress);
 

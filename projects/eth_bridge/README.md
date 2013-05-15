@@ -76,3 +76,8 @@ This firmware is a work-in-progress. Things left to do:
 
    could be recognized as an improper packet (0xff is not a valid instruction) and the XBEE could determine that the
    internal payload of the packet is indeed a valid packet and forward it on.
+
+## Networking Notes
+I'm connecting through an IOGEAR GWU627 Ethernet-to-Wifi adapter (sometimes). My wifi is setup for 192.168.0.1/24.
+I then configure my ethernet adapter for 192.168.0.33/28 when I want to bypass the wifi and directly connect to the
+board. The board is always 192.168.0.42/24 (static, no DHCP).
