@@ -184,14 +184,17 @@ void dev_ax_dispatch(packet_t& p)
   bus.p.destination = p.source;
   bus.p.source = p.destination; // NOTE: already known to be DEVICE_AX
 
-  /* set state */
-  bus.state = BUS_READING_FF;
-  bus.timeout = sys_time + 10;
-
   /* send payload */
   usart3.setTX();
   for(int i = 0; i < p.payload_length; i++)
     usart3.write(p.payload[i]);
   usart3.setRX();
+
+  /* set state */
+  if(p.payload[2] != 254) // sync_write means no return packet
+  {
+    bus.state = BUS_READING_FF;
+    bus.timeout = sys_time + 10;
+  }
   bus.p_sent++;
 }
