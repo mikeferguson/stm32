@@ -48,11 +48,10 @@ public:
   /** \brief Setup the sampler with a set of channels to sample.
    *  \param trigger The trigger source to use. 
    */  
-  void init(uint32_t ch1, uint32_t ch2, uint32_t ch3, uint32_t ch4, 
-            void (*user_callback)(uint32_t , uint32_t , uint32_t, uint32_t),
+  void init(uint32_t ch1, uint32_t ch2 = 0, uint32_t ch3 = 0, uint32_t ch4 = 0,
             uint32_t trigger = ADC_ExternalTrigInjecConv_T1_TRGO)
   {
-    this->user_callback = user_callback;
+    this->user_callback = 0;
 
     /* PCLK2 = 84MHZ, ADC_CLK has max of 36MHz, divide by 4 */
     ADC->CCR |= ADC_CCR_ADCPRE_0;
@@ -85,6 +84,12 @@ public:
     // Enable interrupt when ADC injected conversion completes
     NVIC_EnableIRQ(ADC_IRQn);
     NVIC_SetPriority(ADC_IRQn, 2);
+  }
+
+  /** \brief Set a callback. */
+  void setCallback(void (*user_callback)(uint32_t , uint32_t , uint32_t, uint32_t))
+  {
+    this->user_callback = user_callback;
   }
 
   /** \brief Force start of conversion */
