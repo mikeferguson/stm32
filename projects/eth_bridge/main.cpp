@@ -87,6 +87,13 @@ int main(void)
   dynamixel_init();
   router_init();
 
+  /* setup analog */
+  RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN | RCC_APB2ENR_ADC3EN;
+  adc1.init(VOLTAGE_SENSE_ANALOG_CHANNEL,
+            CURRENT_SENSE_ANALOG_CHANNEL);
+  voltage_sense::mode(GPIO_INPUT_ANALOG);
+  current_sense::mode(GPIO_INPUT_ANALOG);
+
   /* setup systick */
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
@@ -201,6 +208,8 @@ extern "C"
 void SysTick_Handler(void)
 {
   sys_time++;
+  sys_voltage = (adc1.get_channel1()/4096.0f) * 3.3f * 16.0f;
+  sys_current = (adc1.get_channel2()/4096.0f) * 3.3f * 0.055f;  // 55mv/A
 
   /* check e-stop */
   if(estop::value() > 0){
@@ -222,6 +231,8 @@ void SysTick_Handler(void)
   }
   else
     act::low();
+
+  adc1.convert();
 }
 
 }

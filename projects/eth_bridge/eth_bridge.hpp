@@ -32,6 +32,7 @@
 
 #include "stm32f4xx.h"
 #include "gpio.hpp"
+#include "analog_sampler.hpp"
 #include "lwip/udp.h"
 #include "packets.h"
 
@@ -90,7 +91,10 @@ typedef Gpio<GPIOE_BASE,3> phy_rst;
 
 /* analog - voltage/current sense */
 typedef Gpio<GPIOC_BASE,0> voltage_sense;           /* adc123_in10 */
+#define VOLTAGE_SENSE_ANALOG_CHANNEL    10
 typedef Gpio<GPIOA_BASE,4> current_sense;           /* adc12_in4 */
+#define CURRENT_SENSE_ANALOG_CHANNEL    4
+
 
 /* usart3 - ax/mx bus */
 typedef Gpio<GPIOD_BASE,8> usart3_tx;
