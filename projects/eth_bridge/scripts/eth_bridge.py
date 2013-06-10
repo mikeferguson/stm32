@@ -40,7 +40,7 @@ class EthBridge:
     ## @param port The port number to transmit/recieve from.
     ##
     ## @param timeout How long to wait for packets to come back.
-    def __init__(self, ip="10.42.0.42", port = 5048, timeout = 0.1):
+    def __init__(self, ip="192.168.0.42", port = 5048, timeout = 1.0):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind( ("",0) )
         self.sock.setblocking(0)
