@@ -35,8 +35,8 @@ ARFLAGS     :=
 #LIBS        = -larm_cortexM4lf_math
 
 # Link against arm-gcc newlib
-LDFLAGS     += -L$(TOOL_PATH)/gcc-arm-none-eabi-4_6-2012q2/arm-none-eabi/lib/armv7e-m/fpu
-LIBS        += -lc
+#LDFLAGS     += -L$(TOOL_PATH)/gcc-arm-none-eabi-4_6-2012q2/arm-none-eabi/lib/armv7e-m/fpu
+#LIBS        += -lc
 
 BUILD_PATH  := build
 BUILDDIRS   := $(BUILD_PATH)
@@ -52,6 +52,7 @@ clean:
 # Build STM32_CPP
 INCLUDES    += -I$(LIB_PATH)/libcpp/inc
 BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
+TGT_BIN     += $(BUILD_PATH)/stm32_cpp/string.o
 TGT_BIN     += $(BUILD_PATH)/stm32_cpp/analog_sampler.o
 
 $(BUILD_PATH)/stm32_cpp/%.o: $(LIB_PATH)/libcpp/src/%.cpp
