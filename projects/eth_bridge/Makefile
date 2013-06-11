@@ -52,8 +52,9 @@ clean:
 # Build STM32_CPP
 INCLUDES    += -I$(LIB_PATH)/libcpp/inc
 BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
-TGT_BIN     += $(BUILD_PATH)/stm32_cpp/string.o
 TGT_BIN     += $(BUILD_PATH)/stm32_cpp/analog_sampler.o
+TGT_BIN     += $(BUILD_PATH)/stm32_cpp/delay.o
+TGT_BIN     += $(BUILD_PATH)/stm32_cpp/string.o
 
 $(BUILD_PATH)/stm32_cpp/%.o: $(LIB_PATH)/libcpp/src/%.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
