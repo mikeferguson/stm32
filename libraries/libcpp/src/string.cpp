@@ -35,7 +35,7 @@
  *  \param num Number of bytes to copy.
  *  \return returns a pointer to dest.
  */
-void *memcpy(void *destination, const void *source, size_t num)
+void * memcpy(void * destination, const void * source, size_t num)
 {
   char* d = (char*)destination;
   const char* s = (char*)source;
@@ -55,7 +55,7 @@ void *memcpy(void *destination, const void *source, size_t num)
  *  \param n Number of bytes to be set to the value.
  *  \return returns ptr.
  */
-void *memset(void * ptr, int value, size_t num)
+void * memset(void * ptr, int value, size_t num)
 {
   unsigned char* str = (unsigned char*)ptr;
 
@@ -68,4 +68,3 @@ void *memset(void * ptr, int value, size_t num)
   
   return ptr;
 }
-
