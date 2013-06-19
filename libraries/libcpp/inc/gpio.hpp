@@ -254,7 +254,7 @@ public:
     {
 #ifdef STM32F4XX
         reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR &= ~(0x3<<(N*2));
-        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR |    0x1<<(N*2);
+        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR |=   0x1<<(N*2);
 #else
         high();
 #endif
@@ -264,7 +264,7 @@ public:
     {
 #ifdef STM32F4XX
         reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR &= ~(0x3<<(N*2));
-        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR |    0x2<<(N*2);
+        reinterpret_cast<GPIO_TypeDef*>(P)->PUPDR |=   0x2<<(N*2);
 #else
         low();
 #endif
