@@ -48,7 +48,7 @@ public:
   /** \brief Setup the sampler with a set of channels to sample.
    *  \param trigger The trigger source to use. 
    */  
-  void init(uint32_t ch1, uint32_t ch2 = 0, uint32_t ch3 = 0, uint32_t ch4 = 0,
+  void init(uint32_t ch1, uint32_t ch2 = -1, uint32_t ch3 = -1, uint32_t ch4 = -1,
             uint32_t trigger = ADC_ExternalTrigInjecConv_T1_TRGO)
   {
     this->user_callback = 0;
@@ -67,12 +67,36 @@ public:
                                                 | (ADC_SampleTime_15Cycles << 24);
     reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR2 = reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR1;
 
-    /* Set up a 4-sample injected sequence */
-    reinterpret_cast<ADC_TypeDef*>(ADCx)->JSQR = (4-1)<<20 
-                                               | ch4 << 15
-                                               | ch3 << 10
-                                               | ch2 << 5
-                                               | ch1;
+    if (ch4 >= 0)
+    {
+      /* Set up 4-channel injected sequence. */
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->JSQR = (4-1)<< 20
+                                                 |  ch4 << 15
+                                                 |  ch3 << 10
+                                                 |  ch2 << 5
+                                                 |  ch1;
+    }
+    else if (ch3 >= 0)
+    {
+      /* Set up 3-channel injected sequence. */
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->JSQR = (3-1)<< 20
+                                                 |  ch3 << 15
+                                                 |  ch2 << 10
+                                                 |  ch1 << 5;
+    }
+    else if (ch2 >= 0)
+    {
+      /* Set up 2-channel injected sequence. */
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->JSQR = (2-1)<< 20
+                                                 |  ch2 << 15
+                                                 |  ch1 << 10;
+    }
+    else
+    {
+      /* Set up 1-channel injected sequence. */
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->JSQR = (1-1)<< 20
+                                                 |  ch1 << 15;
+    }
     /* Enable scan and end of injected conversion interrupt */
     reinterpret_cast<ADC_TypeDef*>(ADCx)->CR1  = ADC_CR1_SCAN
                                                | ADC_CR1_JEOCIE;
@@ -126,9 +150,9 @@ public:
   /** \brief Set the sample time (in cycles of the ADC) of a channel. */
   int setSampleTime(const uint16_t channel, const uint16_t time)
   {
-    if( !IS_ADC_SAMPLE_TIME(time) ) return -1;
-    if( channel > 18 ) return -1;
-    if( channel > 9 )
+    if (!IS_ADC_SAMPLE_TIME(time)) return -1;
+    if (channel > 18) return -1;
+    if (channel > 9)
     {
       reinterpret_cast<ADC_TypeDef*>(ADCx)->CR1 &= (0xffffffff - (0x7 << ((channel-9)*3)));
       reinterpret_cast<ADC_TypeDef*>(ADCx)->CR1 |= time << ((channel-9)*3);
