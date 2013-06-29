@@ -31,7 +31,20 @@
  * stm32_cpp: a C++ stm32 library
  * Templated injected sampler.
  *
- * TODO: add usage notes
+ * Usage:
+ *
+ *  #define VOLTAGE_SENSE   0   // adc123_in0
+ *
+ *  // set it up
+ *  adc1.init(0);
+ *  adc1.setSampleTime(VOLTAGE_SENSE, ADC_SampleTime_15Cycles);
+ *
+ *  // force a conversion (if trigger isn't actually setup)
+ *  adc1.convert();
+ *
+ *  // some time later
+ *  float voltage = (adc1.get_channel1()/4096.0f) * 3.3f;
+ *
  */
 
 #ifndef _STM32_CPP_ANALOG_SAMPLER_H_
@@ -48,7 +61,7 @@ public:
   /** \brief Setup the sampler with a set of channels to sample.
    *  \param trigger The trigger source to use. 
    */  
-  void init(uint32_t ch1, uint32_t ch2 = -1, uint32_t ch3 = -1, uint32_t ch4 = -1,
+  void init(int32_t ch1, int32_t ch2 = -1, int32_t ch3 = -1, int32_t ch4 = -1,
             uint32_t trigger = ADC_ExternalTrigInjecConv_T1_TRGO)
   {
     this->user_callback = 0;
