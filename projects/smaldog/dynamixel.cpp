@@ -57,10 +57,6 @@ typedef struct
   uint32_t p_sent;      /* # of packets successfully sent over dynamixel bus */
   uint32_t p_recv;      /* # of packets successfully recieved from dynamixel bus */
   uint32_t p_timedout;  /* # of packets that timed out before a recieve */
-
-  /* return data */
-  packet_t p;           /* return packet */
-  uint8_t head;         /* head of return packet */
 } dynamixel_bus_t;
 
 dynamixel_bus_t bus;
@@ -78,6 +74,7 @@ void dynamixel_init()
   usart3_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
   usart3_en::mode(GPIO_OUTPUT);
   usart3.init(1000000);
+  NVIC_SetPriority(USART3_IRQn,2);
   NVIC_EnableIRQ(USART3_IRQn);
 }
 
@@ -89,112 +86,113 @@ extern "C"
   }
 }
 
-uint8_t dev_ax_getState()
+/**
+ *  \brief Write packet to bus, no wait for response
+ */
+void dynamixel_write(uint8_t * packet, uint8_t len)
 {
-  if(bus.state == BUS_IDLE) return STATE_READY;
+  bus.state = BUS_WRITING;
+  usart3.setTX();
+  for(int i = 0; i < len; ++i)
+    usart3.write(packet[i]);
+  usart3.setRX();
+  ++bus.p_sent;
+  bus.state = BUS_IDLE;
+}
 
-  /* process any data in the IRQ buffer */
-  int16_t b = usart3.read();
-  while(b != -1)
+/**
+ *  \brief Write a packet to the bus, read response
+ *  \param packet The bytes to write
+ *  \param len The number of bytes to write
+ *  \param ret_packet The buffer to fill with bytes returned.
+ *  \returns The number of bytes read from bus.
+ */
+uint8_t dynamixel_read(uint8_t * packet, uint8_t len, uint8_t * ret_packet)
+{
+  /* clear buffer */
+  while (usart3.read() != -1)
+    ;
+
+  dynamixel_write(packet, len);
+
+  bus.timeout = register_table.system_time + 5;
+  bus.state = BUS_READING_FF;
+
+  uint8_t l = 0;  // ret_packet_len
+  uint8_t packet_length = 0;  // the packet length recv. by the bus
+
+  while (register_table.system_time < bus.timeout)
   {
-    if(bus.state == BUS_READING_FF)
+    int16_t b = usart3.read();
+    while (b != -1)
     {
-      if(b == 0xff)
+      if(bus.state == BUS_READING_FF)
       {
-        bus.head = 0;
-        bus.p.payload[bus.head++] = b;
-        bus.state = BUS_READING_2ND_FF;
-      }
-    }
-    else if(bus.state == BUS_READING_2ND_FF)
-    {
-      if(b == 0xff)
-      {
-        bus.p.payload[bus.head++] = b;
-        bus.state = BUS_READING_ID;
-      }
-      else
-      {
-        bus.state = BUS_READING_FF;
-      }
-    }
-    else if(bus.state == BUS_READING_ID)
-    {
-      if(b != 0xff)
-      {
-        bus.p.payload[bus.head++] = b;
-        bus.state = BUS_READING_LENGTH;
-      }
-    }
-    else if(bus.state == BUS_READING_LENGTH)
-    {
-      if(b < 140) // TODO: calculate actual threshold for this
-      {
-        bus.p.payload[bus.head++] = b;
-        bus.state = BUS_READING_PARAMS;
-        bus.p.payload_length = bus.p.payload[3] + 4;
-      }
-      else
-      {
-        bus.state = BUS_READING_FF;
-      }
-    }
-    else if(bus.state == BUS_READING_PARAMS)
-    {
-      bus.p.payload[bus.head++] = b;
-      if(bus.head == bus.p.payload_length)
-      {
-        /* checksum check */
-        int checksum = 0;
-        for(int i=2; i < bus.p.payload_length; i++)
-          checksum += bus.p.payload[i];
-        if((checksum & 0xff) == 0xff)
+        if(b == 0xff)
         {
-          bus.p_recv++;
-          router_dispatch(bus.p);
-          bus.state = BUS_IDLE;
-          break;
+          l = 0;
+          ret_packet[l++] = b;
+          bus.state = BUS_READING_2ND_FF;
+        }
+      }
+      else if(bus.state == BUS_READING_2ND_FF)
+      {
+        if(b == 0xff)
+        {
+          ret_packet[l++] = b;
+          bus.state = BUS_READING_ID;
         }
         else
         {
-          // TODO: should this jump straight to writing again?
           bus.state = BUS_READING_FF;
         }
       }
+      else if(bus.state == BUS_READING_ID)
+      {
+        if(b != 0xff)
+        {
+          ret_packet[l++] = b;
+          bus.state = BUS_READING_LENGTH;
+        }
+      }
+      else if(bus.state == BUS_READING_LENGTH)
+      {
+        if(b < 140) // TODO: calculate actual threshold for this
+        {
+          ret_packet[l++] = b;
+          bus.state = BUS_READING_PARAMS;
+          packet_length = ret_packet[3] + 4;
+        }
+        else
+        {
+          bus.state = BUS_READING_FF;
+        }
+      }
+      else if(bus.state == BUS_READING_PARAMS)
+      {
+        ret_packet[l++] = b;
+        if(l == packet_length)
+        {
+          /* checksum check */
+          int checksum = 0;
+          for(int i=2; i < packet_length; i++)
+            checksum += ret_packet[i];
+          if((checksum & 0xff) == 0xff)
+          {
+            ++bus.p_recv;
+            bus.state = BUS_IDLE;
+            return l;
+          }
+          else
+          {
+            bus.state = BUS_READING_FF;
+          }
+        }
+      }
+      b = usart3.read();
     }
-    b = usart3.read();
   }
-
-  if(sys_time > bus.timeout)
-  {
-    bus.p_timedout++;
-    bus.state = BUS_IDLE;
-  }
-
-  if(bus.state == BUS_IDLE)
-    return STATE_READY;
-  else
-    return STATE_BUSY;
-}
-
-void dev_ax_dispatch(packet_t& p)
-{
-  /* copy required data for return trip */
-  bus.p.id = p.id;
-  bus.p.destination = p.source;
-  bus.p.source = p.destination; // NOTE: already known to be DEVICE_AX
-
-  /* send payload */
-  usart3.setTX();
-  for(int i = 0; i < p.payload_length; i++)
-    usart3.write(p.payload[i]);
-  usart3.setRX();
-
-  /* set state */
-  if(p.payload[2] != 254) // sync_write means no return packet
-  {
-    bus.state = BUS_READING_FF;
-    bus.timeout = sys_time + 10;
-  }
-  bus.p_sent++;
+  bus.state = BUS_IDLE;
+  ++bus.p_timedout;
+  return 0;  // no packet
 }

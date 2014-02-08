@@ -42,7 +42,7 @@ BUILD_PATH  := build
 BUILDDIRS   := $(BUILD_PATH)
 
 # Build main stuff
-TGT_BIN     := $(BUILD_PATH)/main.o $(BUILD_PATH)/startup_f4.o $(BUILD_PATH)/system_stm32f4xx.o $(BUILD_PATH)/dynamixel.o $(BUILD_PATH)/router.o
+TGT_BIN     := $(BUILD_PATH)/main.o $(BUILD_PATH)/startup_f4.o $(BUILD_PATH)/system_stm32f4xx.o $(BUILD_PATH)/dynamixel.o
 TGT_BIN     += $(BUILD_PATH)/netconf.o $(BUILD_PATH)/netapp.o
 
 all: $(BUILD_PATH)/$(PRG).bin

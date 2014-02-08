@@ -34,7 +34,6 @@
 #include "gpio.hpp"
 #include "analog_sampler.hpp"
 #include "lwip/udp.h"
-#include "packets.h"
 
 /* Header Stuff */
 #define ETH_MAGIC_LENGTH    4
@@ -44,6 +43,7 @@
 #define AX_WRITE_DATA       3
 #define AX_SYNC_WRITE       131
 #define AX_SYNC_READ        132
+#define AX_FULL_SYNC        133
 
 #define REG_MODEL_NUMBER_L  0
 #define REG_MODEL_NUMBER_H  1
@@ -95,7 +95,6 @@ typedef Gpio<GPIOC_BASE,0> voltage_sense;           /* adc123_in10 */
 typedef Gpio<GPIOA_BASE,4> current_sense;           /* adc12_in4 */
 #define CURRENT_SENSE_ANALOG_CHANNEL    4
 
-
 /* usart3 - ax/mx bus */
 typedef Gpio<GPIOD_BASE,8> usart3_tx;
 typedef Gpio<GPIOD_BASE,9> usart3_rx;
@@ -109,22 +108,66 @@ typedef Gpio<GPIOA_BASE,11> usart1_en;
 #define ESTOP_RELEASED  1
 #define ESTOP_PRESSED   0
 
-extern uint32_t sys_time;
-extern uint32_t last_packet;
-extern float sys_voltage;
-extern float sys_current;
-extern uint8_t sys_estop;
+typedef struct
+{
+  uint16_t model_number;
+  uint8_t  version;
+  uint8_t  id;
+  uint8_t  baud_rate;
+  uint8_t  return_delay;
+  uint16_t REG_6;
+  uint32_t last_packet;
+  uint32_t system_time;
+
+  int16_t system_current;
+  int16_t computer_current;
+  int16_t lf_leg_current;
+  int16_t rr_leg_current;
+  int16_t rf_leg_current;
+  int16_t lr_leg_current;
+  uint8_t  system_voltage;
+  uint8_t  led;
+  uint16_t REG_30;
+
+  uint16_t IMU0;  // TODO: determine IMU data layout
+  uint16_t IMU1;
+  uint16_t IMU2;
+  uint16_t IMU3;
+  uint16_t IMU4;
+  uint16_t IMU5;
+  uint8_t  lf_foot_sensor;
+  uint8_t  rr_foot_sensor;
+  uint8_t  rf_foot_sensor;
+  uint8_t  lr_foot_sensor;
+
+  int16_t  servo_1_pos;
+  int16_t  servo_2_pos;
+  int16_t  servo_3_pos;
+  int16_t  servo_4_pos;
+  int16_t  servo_5_pos;
+  int16_t  servo_6_pos;
+  int16_t  servo_7_pos;
+  int16_t  servo_8_pos;
+
+  int16_t  servo_9_pos;
+  int16_t  servo_10_pos;
+  int16_t  servo_11_pos;
+  int16_t  servo_12_pos;
+  int16_t  servo_13_pos;
+  int16_t  servo_14_pos;
+  uint8_t  estop_status;
+  uint8_t  REG_77;
+  uint16_t REG_78;
+} register_table_t;
+
+extern register_table_t register_table;
+
 extern struct udp_pcb * eth_udp;
 extern struct ip_addr return_ipaddr;
 
-/* devices */
-uint8_t dev_eth_getState();
-uint8_t dev_ax_getState();
-
-void dev_eth_dispatch(packet_t& p);
-void dev_ax_dispatch(packet_t& p);
-void core_dispatch(packet_t& p);
-
+/* dynamixel */
 void dynamixel_init();
+void dynamixel_write(uint8_t * packet, uint8_t len);
+uint8_t dynamixel_read(uint8_t * packet, uint8_t len, uint8_t * ret_packet);
 
 #endif // ETH_BRIDGE_HPP_
