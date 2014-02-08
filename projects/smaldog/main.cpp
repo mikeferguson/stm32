@@ -132,7 +132,7 @@ void SysTick_Handler(void)
   float voltage = (adc1.get_channel1()/4096.0f) * 3.3f * 16.0f;
   register_table.system_voltage = (uint8_t)(voltage * 10.0f);
 
-  float current = (adc1.get_channel2()/4096.0f) * 3.3f * 0.055f;  // 55mv/A
+  float current = (((2048.0f-adc1.get_channel2())/4096.0f) * 3.3f) / 0.055f;  // 55mv/A
   register_table.system_current = (int16_t)(current/0.1f);
 
   /* check e-stop */
