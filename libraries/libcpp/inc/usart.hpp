@@ -98,8 +98,9 @@ public:
 
   static void write(uint16_t data)
   {
+    while ((reinterpret_cast<USART_TypeDef*>(USARTx)->SR & USART_FLAG_TXE) == 0);
     reinterpret_cast<USART_TypeDef*>(USARTx)->DR = data;
-    while( (reinterpret_cast<USART_TypeDef*>(USARTx)->SR & USART_FLAG_TC) == 0 );
+    while ((reinterpret_cast<USART_TypeDef*>(USARTx)->SR & USART_FLAG_TC) == 0);
   }
 
   int16_t read()
