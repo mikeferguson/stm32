@@ -27,19 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
- * stm32_cpp: a C++ stm32 library
- * This module provides access to a GPIO pin.
- *
- * Usage:
- *  
- *  typedef Gpio<PORTA_BASE, 0> green_led;
- *  ...
- *  green_led::mode(Mode::OUTPUT);
- *  green_led::high();
- *
- */
-
 #ifndef _STM32_CPP_GPIO_H
 #define	_STM32_CPP_GPIO_H
 
@@ -155,6 +142,7 @@
 
 #endif
 
+/** \cond HACKY_DO_NOT_INCLUDE */
 #ifdef STM32F4XX
 template<unsigned int P, unsigned char N, bool = N >= 8>
 struct GpioMode
@@ -217,16 +205,36 @@ struct GpioMode<P, N, false>
 };
 
 #endif
+/** \endcond */
 
+/**
+ *  \brief Template-based access to an IO pin.
+ *  \tparam P The port, for instance PORTA_BASE
+ *  \tparam N The pin, 0-7
+ *
+ *  Example:
+ *  \code
+ *  typedef Gpio<PORTA_BASE, 0> green_led;
+ *  ...
+ *  green_led::mode(GPIO_OUTPUT);
+ *  green_led::high();
+ *  \endcode
+ */
 template<unsigned int P, unsigned char N>
 class Gpio
 {
 public:
+    /**
+     *  \brief Set the mode of the pin to input, output or an alternate function.
+     *  \param m The mode, either GPIO_INPUT, GPIO_OUTPUT or GPIO_ALTERNATE and
+     *         some function.
+     */
     static void mode(unsigned int m)
     {
         GpioMode<P, N>::mode(m);
     }
 
+    /** \brief Set the pin to high if it is an output. */
     inline static void high()
     {
 #ifdef STM32F4XX
@@ -236,6 +244,7 @@ public:
 #endif
     }
 
+    /** \brief Set the pin to low if it is an output. */
     inline static void low()
     {
 #ifdef STM32F4XX
@@ -245,11 +254,16 @@ public:
 #endif
     }
 
+    /**
+     *  \brief Get the value of the pin.
+     *  \returns 0 if pin is low, 1 if high.
+     */
     inline static int value()
     {
         return ((reinterpret_cast<GPIO_TypeDef*>(P)->IDR & 1<<N)? 1 : 0);
     }
 
+    /** \brief Enable pullup if pin is output. */
     inline static void pullup()
     {
 #ifdef STM32F4XX
@@ -260,6 +274,7 @@ public:
 #endif
     }
 
+    /** \brief Enable pulldown if pin is output. */
     inline static void pulldown()
     {
 #ifdef STM32F4XX
