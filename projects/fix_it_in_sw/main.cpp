@@ -39,6 +39,7 @@
 #include "usart.hpp"
 #include "encoder.hpp"
 #include "ncv7729.hpp"
+#include "mini_imu9_v2.hpp"
 
 typedef Gpio<GPIOA_BASE,0> left_enc_a;
 typedef Gpio<GPIOA_BASE,1> left_enc_b;
@@ -56,8 +57,8 @@ typedef Gpio<GPIOB_BASE,6> serial_tx; /* USART1 */
 typedef Gpio<GPIOB_BASE,7> serial_rx;
 typedef Gpio<GPIOB_BASE,8> radio_ch3; /* TIM10, CH1 */
 typedef Gpio<GPIOB_BASE,9> radio_ch4; /* TIM11, CH1 */
-typedef Gpio<GPIOB_BASE,10> gyro_scl; /* I2C2 */
-typedef Gpio<GPIOB_BASE,11> gyro_sda;
+typedef Gpio<GPIOB_BASE,10> imu_scl; /* I2C2 */
+typedef Gpio<GPIOB_BASE,11> imu_sda;
 typedef Gpio<GPIOB_BASE,13> sck; /* SPI2 */
 typedef Gpio<GPIOB_BASE,14> miso;
 typedef Gpio<GPIOB_BASE,15> mosi;
@@ -83,13 +84,16 @@ Encoder<TIM3_BASE> right_enc;
 Ncv7729<SPI2_BASE, left_CS, TIM1_BASE, motor_enable, left_fault, 1> left_motor;
 Ncv7729<SPI2_BASE, right_CS, TIM1_BASE, motor_enable, right_fault, 2> right_motor;
 
+/* IMU */
+MiniImu9v2<I2C2_BASE,
+           DMA1_Stream3_BASE, 3 /* stream */, 7 /* channel */,
+           imu_scl, imu_sda> imu;
+
 /* debugging via FTDI */
 Usart<USART1_BASE, 32> usart1;
 
 /* system clock */
 uint32_t system_clock;
-
-volatile int16_t left_status, right_status;
 
 int main(void)
 {
@@ -144,6 +148,9 @@ int main(void)
   NVIC_SetPriority(USART1_IRQn, 1);
   NVIC_EnableIRQ(USART1_IRQn);
 
+  // setup imu
+  imu.init(100000);
+
   // setup systick
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
@@ -152,9 +159,7 @@ int main(void)
   
   while(1)
   {
-    delay_ms(1000);
-    left_status = left_motor.read(NCV7729_RD_DIAG);
-    right_status = right_motor.read(NCV7729_RD_DIAG);
+    imu.update(system_clock);
   }
 
 }
@@ -164,7 +169,7 @@ extern "C"
 
 void SysTick_Handler(void)
 {
-  system_clock++;
+  ++system_clock;
   if( system_clock % 1000 == 0 )
   {
     if( (system_clock / 1000) % 3 == 0)
