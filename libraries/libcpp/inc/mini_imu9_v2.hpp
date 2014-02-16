@@ -111,7 +111,6 @@
  * imu.update(time_in_ms);
  * \endcode
  */
-
 template<int I2C, int DMA, int STREAM, int CHANNEL, typename SCL, typename SDA>
 class MiniImu9v2
 {

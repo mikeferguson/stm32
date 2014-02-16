@@ -27,14 +27,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * stm32_cpp: a C++ stm32 library
- * Helper functions for getting clock speeds.
- */
-
 #ifndef _STM32_CPP_RCC_H_
 #define	_STM32_CPP_RCC_H_
 
+/**
+ *  \brief Helper functions for getting clock speeds.
+ */
 class RccImpl
 {
   /* this is a f() conversion of the table used in the std_periph_lib */
