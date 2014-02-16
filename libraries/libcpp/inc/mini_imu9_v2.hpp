@@ -83,48 +83,38 @@
  */
 #define IMU_FLAG_TIMEOUT        ((uint32_t)0x80*6)
 
-/*
- * stm32_cpp: a C++ stm32 library
- * Driver for Pololu MiniIMU-9 v2, with ST L3GD20 and LSM303DLHC.
+/**
+ *  \brief Driver for Pololu MiniIMU-9 v2, with ST L3GD20 and LSM303DLHC.
+ *  \tparam I2C The I2C device, for instance I2C1.
+ *  \tparam DMA The stream device, for instance DMA1_Stream3_BASE.
+ *  \tparam STREAM The stream number (3 for DMA1_Stream3_BASE).
+ *  \tparam CHANNEL The channel number (0-7).
+ *  \tparam SCL The GPIO used for SCL.
+ *  \tparam SDA The GPIO used for SDA.
  *
- * Usage:
- *
- * typedef Gpio<GPIOB_BASE,11> imu_sda;
- * typedef Gpio<GPIOB_BASE,10> imu_scl;
+ * Example:
+ * \code
+ * // Example definitions for using I2C2, DMA1, Stream 3, Channel 7:
+ * typedef Gpio<GPIOB_BASE,11> SDA;
+ * typedef Gpio<GPIOB_BASE,10> SCL;
  * MiniImu9v2<I2C2_BASE,
  *            DMA1_Stream3_BASE,
  *            3, // DMA STREAM
  *            7, // DMA_CHANNEL
- *            imu_scl
- *            imu_sda> imu;
- * // in setup
- * imu.init(100000);  // I2C speed
- * // at periodic intervals
- * imu.update(clock);  // should be millisecond clock value
+ *            SCL
+ *            SDA> imu;
+ *
+ * // In the beginning of your main, initialize the IMU with the I2C speed.
+ * imu.init(100000);
+ *
+ * // At periodic intervals, call update with the current millisecond clock.
+ * imu.update(time_in_ms);
+ * \endcode
  */
-template<int _I2C_PTR,
-         int _DMA_STREAM_PTR, int _DMA_STREAM_NUM, int _DMA_CHANNEL,
-         typename IMU_SCL, typename IMU_SDA>
+
+template<int I2C, int DMA, int STREAM, int CHANNEL, typename SCL, typename SDA>
 class MiniImu9v2
 {
-  struct accel_data_t
-  {
-    int16_t x;
-    int16_t y;
-    int16_t z;
-  };
-
-  struct gyro_data_t
-  {
-    int8_t temp;
-    uint8_t status;
-    int16_t x;
-    int16_t y;
-    int16_t z;
-  };
-
-  // TODO: define magnetometer_data_t
-
   /** \brief Timeouts, in milliseconds */
   enum
   {
@@ -171,6 +161,26 @@ class MiniImu9v2
   };
 
 public:
+  /** \brief Data read from accelerometer. */
+  struct accel_data_t
+  {
+    int16_t x;
+    int16_t y;
+    int16_t z;
+  };
+
+  /** \brief Data read from gyro. */
+  struct gyro_data_t
+  {
+    int8_t temp;
+    uint8_t status;
+    int16_t x;
+    int16_t y;
+    int16_t z;
+  };
+
+  // TODO: define magnetometer_data_t
+
   /** \brief Accelerometer data read by the DMA */
   accel_data_t accel_data;
 
@@ -185,26 +195,26 @@ public:
   {
     clock_speed_ = clock_speed;
 
-    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) _I2C_PTR;
+    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) I2C;
 
     state_ = IMU_IDLE;
 
     /* Enable the proper I2C */
-    if (_I2C_PTR == I2C1_BASE)
+    if (I2C == I2C1_BASE)
     {
       RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
-      IMU_SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C1);
-      IMU_SDA::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C1);
+      SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C1);
+      SDA::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C1);
     }
-    else if(_I2C_PTR == I2C2_BASE)
+    else if(I2C == I2C2_BASE)
     {
       RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
-      IMU_SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
-      IMU_SDA::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
+      SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
+      SDA::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
     }
 
     /* Enable the proper DMA */
-    if (_DMA_STREAM_PTR < DMA2_BASE)
+    if (DMA < DMA2_BASE)
       RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
     else
       RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
@@ -230,10 +240,10 @@ public:
    */
   bool update(uint64_t clock)
   {
-    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) _DMA_STREAM_PTR;
+    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) DMA;
 
     uint32_t flag_tc;
-    switch(_DMA_STREAM_NUM)
+    switch(STREAM)
     {
       case 0 :flag_tc = DMA_FLAG_TCIF0; break;
       case 1 :flag_tc = DMA_FLAG_TCIF1; break;
@@ -342,8 +352,8 @@ private:
    */
   bool imu_timeout_callback(i2c_error_t error_i2c, imu_error_op_t error_op)
   {
-    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) _I2C_PTR;
-    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) _DMA_STREAM_PTR;
+    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) I2C;
+    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) DMA;
 
     I2C_GenerateSTOP(I2Cx, DISABLE);
 
@@ -358,13 +368,13 @@ private:
     ++num_timeouts_;
 
     /* Pull SCL low for 100us to force release SDA */
-    IMU_SCL::mode(GPIO_OUTPUT_2MHz);
-    IMU_SCL::low();
+    SCL::mode(GPIO_OUTPUT_2MHz);
+    SCL::low();
     delay_us(100);
-    if (_I2C_PTR == I2C1_BASE)
-      IMU_SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C1);
-    else if(_I2C_PTR == I2C2_BASE)
-      IMU_SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
+    if (I2C == I2C1_BASE)
+      SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C1);
+    else if(I2C == I2C2_BASE)
+      SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
 
     /* Deinit and reinit the I2C */
     I2C_DeInit(I2Cx);
@@ -389,7 +399,7 @@ private:
    */
   bool imu_write(uint8_t i2c_addr, uint8_t reg_addr, uint8_t data)
   {
-    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) _I2C_PTR;
+    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) I2C;
 
     /* Generate start bit */
     I2C_GenerateSTART(I2Cx, ENABLE);
@@ -478,10 +488,10 @@ private:
    */
   bool imu_start_read(uint8_t i2c_addr, uint8_t reg_addr, uint8_t* buffer, uint8_t num_bytes)
   {
-    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) _I2C_PTR;
-    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) _DMA_STREAM_PTR;
+    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) I2C;
+    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) DMA;
 
-    uint32_t dma_channel = (_DMA_CHANNEL & 7) << 25;
+    uint32_t dma_channel = (CHANNEL & 7) << 25;
 
     /* Config DMA to move data from IC2 peripheral to memory */
     DMA_InitTypeDef DMA_InitStructure;
@@ -560,8 +570,8 @@ private:
    */
   bool imu_finish_read(void)
   {
-    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) _I2C_PTR;
-    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) _DMA_STREAM_PTR;
+    I2C_TypeDef* const I2Cx = (I2C_TypeDef*) I2C;
+    DMA_Stream_TypeDef* const DMAy_Streamx = (DMA_Stream_TypeDef*) DMA;
 
     /* Send STOP */
     I2C_GenerateSTOP(I2Cx, ENABLE);
@@ -574,7 +584,7 @@ private:
 
     /* Clear DMA RX Transfer Complete Flag */
     uint32_t flag_tc;
-    switch(_DMA_STREAM_NUM)
+    switch(STREAM)
     {
       case 0 :flag_tc = DMA_FLAG_TCIF0; break;
       case 1 :flag_tc = DMA_FLAG_TCIF1; break;
