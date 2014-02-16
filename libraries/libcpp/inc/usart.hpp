@@ -27,25 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
- * stm32_cpp: a C++ stm32 library
- * Driver for a standard 8N1 serial port.
- *
- * Usage:
- *
- *  Usart<USART1_BASE, 32> usart1;
- *  void USART1_IRQHandler(void)
- *  {
- *    usart1.irq();
- *  }
- *  in main():
- *    RCC->APB2ENR |= RCC_APB2ENR_USART1EN; // APB2 also has USART6
- *    RCC->APB1ENR |= RCC_APB1ENR_USART2EN; // ABP1 also has USART3, UART4/5
- *    usart1.init(115200);
- *    NVIC_SetPriority(USART1_IRQn, 1);
- *    NVIC_EnableIRQ(USART1_IRQn);
- */
-
 #ifndef _STM32_CPP_USART_H_
 #define	_STM32_CPP_USART_H_
 
@@ -60,11 +41,35 @@
 #define USART_FLAG_FE       ((uint16_t)0x0002)
 #define USART_FLAG_PE       ((uint16_t)0x0001)
 
-/* Limitations:
- *  1. no support for oversampling by 8
- *  2. mode is always 8N1, no parity
+/**
+ *  \brief Simple driver for a standard 8N1 serial port. Serial write is
+ *         blocking, reads are handled via an IRQ in the background.
+ *  \tparam USARTx The base address of the USART, for isntance, USART1_BASE.
+ *  \tparam SIZE The size of the read buffer to create.
+ *
+ *  Limitations:
+ *   - no support for oversampling by 8.
+ *   - mode is always 8N1, no parity.
+ *
+ *  Example:
+ *  \code
+ *  // define a usart
+ *  Usart<USART1_BASE, 32> usart1;
+ *
+ *  // create an IRQ handler
+ *  void USART1_IRQHandler(void)
+ *  {
+ *    usart1.irq();
+ *  }
+ *
+ *  // in main():
+ *  RCC->APB2ENR |= RCC_APB2ENR_USART1EN; // APB2 also has USART6
+ *  RCC->APB1ENR |= RCC_APB1ENR_USART2EN; // ABP1 also has USART3, UART4/5
+ *  usart1.init(115200);
+ *  NVIC_SetPriority(USART1_IRQn, 1);
+ *  NVIC_EnableIRQ(USART1_IRQn);
+ *  \endcode
  */
-
 template <unsigned int USARTx, unsigned int SIZE>
 class Usart
 {
@@ -73,9 +78,12 @@ class Usart
   uint16_t buffer[SIZE];
 
 public:
-
   Usart() : head(0), tail(0) {}
 
+  /**
+   *  \brief Initialize the serial port.
+   *  \param baud_rate The baud rate in bps to use.
+   */
   static void init(uint32_t baud_rate)
   {
     /* setup for 1 stop bit */
@@ -96,6 +104,10 @@ public:
     reinterpret_cast<USART_TypeDef*>(USARTx)->CR1 |= USART_CR1_UE;
   }
 
+  /**
+   *  \brief Write a byte of data to the serial port. This blocks as byte is written.
+   *  \param data The data to write.
+   */
   static void write(uint16_t data)
   {
     while ((reinterpret_cast<USART_TypeDef*>(USARTx)->SR & USART_FLAG_TXE) == 0);
@@ -103,6 +115,10 @@ public:
     while ((reinterpret_cast<USART_TypeDef*>(USARTx)->SR & USART_FLAG_TC) == 0);
   }
 
+  /**
+   *  \brief Read a byte from the IRQ buffer.
+   *  \returns The byte on the head of the buffer, -1 if buffer is empty.
+   */
   int16_t read()
   {
     int16_t data = -1;
@@ -113,6 +129,18 @@ public:
     return data;
   }
 
+  /**
+   *  \brief Callback for IRQ processing. This moves the value of the data register
+   *         into our internal buffer.
+   *
+   *  This should be called from the IRQ:
+   *  \code
+   *  void USART1_IRQHandler(void)
+   *  {
+   *    usart1.irq();
+   *  }
+   *  \endcode
+   */
   void irq()
   {
     buffer[head] = (reinterpret_cast<USART_TypeDef*>(USARTx)->DR & (uint16_t)0x01ff);
@@ -123,15 +151,25 @@ public:
 /* Similar to above, except it adds an enable pin and functions to toggle it:
  *  Usart<USART1_BASE, 32, gpio_typedef> usart1;
  */
+/**
+ *  \brief Simple driver for a standard 8N1 serial port with a write enable.
+ *         Serial write is blocking, reads are handled via an IRQ in the
+ *         background.
+ *  \tparam USARTx The base address of the USART, for isntance, USART1_BASE.
+ *  \tparam SIZE The size of the read buffer to create.
+ *  \tparam ENABLE The Gpio definition for the enable pin.
+ */
 template<unsigned int USARTx, unsigned int SIZE, typename ENABLE>
 class UsartWithEnable : public Usart<USARTx, SIZE>
 {
 public:
+  /** \brief Set the enable pin to high */
   void setTX()
   {
     ENABLE::high();
   }
 
+  /** \brief Set the enable pin to low */
   void setRX()
   {
     ENABLE::low();

@@ -9,6 +9,7 @@
  * This library provides example projects and library code for things such as:
  *
  *  - \ref Gpio "Easy IO Access"
+ *  - \ref Usart "Serial port driver"
  *  - Motor and encoder drivers
  *    - Encoder A library for using quadrature encoders.
  *    - A4940 A library for controlling an Allegro A4940 motor driver with TIM1 or
