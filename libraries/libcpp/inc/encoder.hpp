@@ -27,22 +27,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
- * stm32_cpp: a C++ stm32 library
- * This module provides quick setup for using TIM2,3,4,5 as 
- * quadrature encoder inputs.
- *
- * Usage:
- *  
- *  Encoder<TIM2_BASE> l_enc;
- *  ...
- *  int32_t position = l_enc.read();
- *
- */
-
 #ifndef _STM32_CPP_ENCODER_H
 #define	_STM32_CPP_ENCODER_H
 
+/**
+ *  \brief Interface a quadrature encoder using TIM2-5.
+ *  \tparam TIMx the timer base to use, for example TIM2_BASE.
+ */
 template<unsigned int TIMx>
 class Encoder
 {
@@ -54,6 +45,7 @@ class Encoder
   int16_t last_timer_diff;
 
 public:
+  /** \brief Initialize the timer. */
   void init(void)
   {
     position = 0;
@@ -82,6 +74,10 @@ public:
     reinterpret_cast<TIM_TypeDef*>(TIMx)->CR1 |= TIM_CR1_CEN;
   }
 
+  /**
+   *  \brief Read the encoder count.
+   *  \returns The current encoder count.
+   */
   int32_t read(void)
   {
     uint16_t timer_value = reinterpret_cast<TIM_TypeDef*>(TIMx)->CNT;
@@ -91,11 +87,19 @@ public:
     return position;
   }
 
+  /**
+   *  \brief Get the encoder speed. This assumes you call read() at a regular rate.
+   *  \returns The change between the last two read() calls.
+   */
   int16_t read_speed(void)
   {
     return last_timer_diff;
   }
 
+  /**
+   *  \brief Reset the internal count to a new value.
+   *  \param value The value to reset the count to.
+   */
   void write(uint32_t value)
   {
     /* disable timer */

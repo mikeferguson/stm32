@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, Michael E. Ferguson
+ * Copyright (c) 2012-2014, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,12 +27,21 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * stm32_cpp: a C++ stm32 library
- * Templated injected sampler.
+#ifndef _STM32_CPP_ANALOG_SAMPLER_H_
+#define	_STM32_CPP_ANALOG_SAMPLER_H_
+
+#include "stm32f4xx.h"
+#include "stm32f4xx_adc.h"
+
+/**
+ *  \brief This class makes it easy to do injected analog sampling.
+ *  \tparam ADCx The Analog to digital converter, for instance ADC1.
  *
- * Usage:
+ *  This class will not be instantiated directly by the user, as it is already
+ *  instantiated, so that the interrupts work properly.
  *
+ *  Example:
+ *  \code
  *  #define VOLTAGE_SENSE   0   // adc123_in0
  *
  *  // set it up
@@ -44,22 +53,19 @@
  *
  *  // some time later
  *  float voltage = (adc1.get_channel1()/4096.0f) * 3.3f;
- *
+ *  \endcode
  */
-
-#ifndef _STM32_CPP_ANALOG_SAMPLER_H_
-#define	_STM32_CPP_ANALOG_SAMPLER_H_
-
-#include "stm32f4xx.h"
-#include "stm32f4xx_adc.h"
-
-/** \brief This class makes it easy to do injected analog sampling. */
 template<unsigned int ADCx>
 class AnalogSampler
 {
 public:
-  /** \brief Setup the sampler with a set of channels to sample.
-   *  \param trigger The trigger source to use. 
+  /**
+   *  \brief Setup the sampler with a set of channels to sample.
+   *  \param ch1 The first analog channel to sample from.
+   *  \param ch2 The (optional) second analog channel to sample from.
+   *  \param ch3 The (optional) third analog channel to sample from.
+   *  \param ch4 The (optional) fourth analog channel to sample from.
+   *  \param trigger The trigger source to use (optional).
    */  
   void init(int32_t ch1, int32_t ch2 = -1, int32_t ch3 = -1, int32_t ch4 = -1,
             uint32_t trigger = ADC_ExternalTrigInjecConv_T1_TRGO)
@@ -110,6 +116,7 @@ public:
       reinterpret_cast<ADC_TypeDef*>(ADCx)->JSQR = (1-1)<< 20
                                                  |  ch1 << 15;
     }
+
     /* Enable scan and end of injected conversion interrupt */
     reinterpret_cast<ADC_TypeDef*>(ADCx)->CR1  = ADC_CR1_SCAN
                                                | ADC_CR1_JEOCIE;
@@ -118,12 +125,12 @@ public:
                                                | ADC_CR2_JEXTEN_0
                                                | ADC_CR2_ADON;
 
-    // Enable interrupt when ADC injected conversion completes
+    /* Enable interrupt when ADC injected conversion completes */
     NVIC_EnableIRQ(ADC_IRQn);
     NVIC_SetPriority(ADC_IRQn, 2);
   }
 
-  /** \brief Set a callback. */
+  /** \brief Set a callback to be called at end of conversion. */
   void setCallback(void (*user_callback)(uint32_t , uint32_t , uint32_t, uint32_t))
   {
     this->user_callback = user_callback;
@@ -160,7 +167,12 @@ public:
   /** \brief Get the last sampled value from channel 4. */
   uint32_t get_channel4(void) { return channel4; }
 
-  /** \brief Set the sample time (in cycles of the ADC) of a channel. */
+  /**
+   *  \brief Set the sample time (in cycles of the ADC) of a channel.
+   *  \param channel The analog channel number.
+   *  \param time The amount of time for sampling, should be one of the defines
+   *         from the ST library, such as ADC_SampleTime_15Cycles.
+   */
   int setSampleTime(const uint16_t channel, const uint16_t time)
   {
     if (!IS_ADC_SAMPLE_TIME(time)) return -1;
@@ -184,8 +196,10 @@ private:
   uint32_t channel3;
   uint32_t channel4;
 
-  /** \brief A stored callback to user code to call when an
-   *         injected sampling is complete. */
+  /**
+   *  \brief A stored callback to user code to call when an
+   *         injected sampling is complete.
+   */
   void (*user_callback)(uint32_t, uint32_t, uint32_t, uint32_t);
 };
 

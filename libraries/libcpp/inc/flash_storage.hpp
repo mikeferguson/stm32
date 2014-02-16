@@ -27,13 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * stm32_cpp: a C++ stm32 library
- * Functions for writing data to flash (basically, eeprom simulation).
- *
- * TODO: add usage notes
- */
-
 #ifndef _STM32_CPP_FLASH_STORAGE_HPP_
 #define _STM32_CPP_FLASH_STORAGE_HPP_
 
@@ -60,6 +53,9 @@
 /* Size of sectors 5-11 */
 #define SECTOR_SIZE_128KB       0x00020000
 
+/**
+ *  \brief Functions for writing data to flash (basically, eeprom simulation).
+ */
 namespace flash_storage
 {
 
@@ -73,7 +69,7 @@ namespace flash_storage
 bool write(uint32_t addr, uint16_t * data, const uint16_t data_len);
 
 /**
- * \brief Read data from the flash.
+ *  \brief Read data from the flash.
  *  \param addr The address to read data from.
  *  \param data Pointer to where to read flash data to.
  *  \param data_len Length of data to be read.

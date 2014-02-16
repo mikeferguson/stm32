@@ -27,38 +27,46 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
- * stm32_cpp: a C++ stm32 library
- * Driver for the A4940 motor driver from Allegro.
- *
- * Usage:
- *
- * a4940<TIM1_BASE, 1, 2> motor;
- * ...
- * RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
- * tim1_ch1::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
- * tim1_ch1n::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
- * tim1_ch2::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
- * tim1_ch2n::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
- * motor.init(period, prescalar);
- * ...
- * motor.set(1.0);
- *
- */
-
 #ifndef _STM32_CPP_A4940_H_
 #define	_STM32_CPP_A4940_H_
 
 /* TODO: add fault pin to template */
 /* TODO: easy way to do prescalar? */
 
-/* TIMx should be 1 or 8 */
+/**
+ *  \brief Driver for the A4940 motor driver from Allegro.
+ *  \tparam TIMx The timer base, TIM1_BASE or TIM8_BASE only.
+ *  \tparam OC1 The output capture channel (1-4)
+ *  \tparam OC2 The second output capture channel (1-4)
+ *
+ *  Example:
+ *  \code
+ *  // Example definitions:
+ *  a4940<TIM1_BASE, 1, 2> motor;
+ *
+ *  // In the beginning of your main, intialize the timer, I/O, and call init:
+ *  RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+ *  tim1_ch1::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+ *  tim1_ch1n::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+ *  tim1_ch2::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+ *  tim1_ch2n::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+ *  motor.init(period, prescalar);
+ *
+ *  // When desired, set the PWM, -1.0 to 1.0
+ *  motor.set(1.0);
+ *  \endcode
+ */
 template<unsigned int TIMx, unsigned int OC1, unsigned int OC2>
 class A4940
 {
   uint16_t period_;
 
 public:
+  /**
+   *  \brief Initialize the motor driver.
+   *  \param period The timer pwm period desired (used to set ARR).
+   *  \param prescalar The timer prescalar desired (used to set prescalar).
+   */
   void init(const uint16_t period, const uint16_t prescalar)
   {
     period_ = period;
@@ -111,6 +119,7 @@ public:
 
   }
 
+  /** \brief Invert the polarity of the output capture outputs. */
   void invert_outputs(void)
   {
     reinterpret_cast<TIM_TypeDef*>(TIMx)->CCER |= TIM_CCER_CC1P<<(4*(OC1-1));               // CHxN active low
@@ -120,7 +129,10 @@ public:
     reinterpret_cast<TIM_TypeDef*>(TIMx)->CCER |= TIM_CCER_CC1NP<<(4*(OC2-1));
   }
 
-  /* Set PWM. Duty should be -1.0 to 1.0 */
+  /**
+   *  \brief Set the PWM duty cycle.
+   *  \param duty The duty cycle. Valid range is -1.0 to 1.0.
+   */
   void set(const float duty)
   {
     uint16_t * ccr = (uint16_t*) &(reinterpret_cast<TIM_TypeDef*>(TIMx)->CCR1);
