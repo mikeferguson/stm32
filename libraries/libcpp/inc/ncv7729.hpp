@@ -27,27 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 
- * stm32_cpp: a C++ stm32 library
- * Driver for the NCV7729 motor driver from ON Semi.
- *
- * Usage:
- *
- * Ncv7729<SPI2_BASE, CS, TIM1_BASE, motor_enable, fault, 1> motor;
- * ...
- * RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
- * RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
- * tim1_ch1::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
- * tim1_ch1n::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
- * sck::mode(GPIO_ALTERNATE | GPIO_AF_SPI2);
- * miso::mode(GPIO_ALTERNATE | GPIO_AF_SPI2);
- * mosi::mode(GPIO_ALTERNATE | GPIO_AF_SPI2);
- * motor.init();
- * ...
- * motor.set(1.0);
- *
- */
-
 #ifndef _STM32_CPP_NCV7729_H_
 #define _STM32_CPP_NCV7729_H_
 
@@ -91,24 +70,38 @@
 #define NCV7729_DIAG_OUT2_SHORT_GND     (0b1000)
 #define NCV7729_DIAG_LOAD_MASK          (0b1111)
 
-template<unsigned int SPIx, typename Cs, 
-         unsigned int TIMx,typename En, typename Fault, unsigned int CH>
+/**
+ *  \brief Driver for the NCV7729 motor driver from ON Semi.
+ *  \tparam SPIx The base address of the SPI port used, for instance SPI2_BASE.
+ *  \tparam CS The Gpio definition for the chip select used.
+ *  \tparam TIMx The base address of the timer used, for instance TIM1_BASE.
+ *  \tparam EN The Gpio definition for the ENable signal.
+ *  \tparam FAULT The Gpio definition for the FAULT signal.
+ *  \tparam CH Which capture compare channel are we using? Choices are 1 or 2,
+ *          and this parameter lets us setup two instances of the Ncv7729 on the
+ *          same timer.
+ *
+ *  See the fix_it_in_software demo code for an example of using this driver.
+ */
+template<unsigned int SPIx, typename CS,
+         unsigned int TIMx,typename EN, typename FAULT, unsigned int CH>
 class Ncv7729
 {
   
 public:
+  /** \brief Initialize the SPI and timer. */
   void init(void)
   {
     /* Setup I/O */
-    Cs::mode(GPIO_OUTPUT);
-    Cs::high();
+    CS::mode(GPIO_OUTPUT);
+    CS::high();
 
-    En::mode(GPIO_OUTPUT);
-    En::low();
+    EN::mode(GPIO_OUTPUT);
+    EN::low();
     
     /* it appears we have to hold this low in order for the bridge to enable? */
-    Fault::mode(GPIO_OUTPUT);
-    Fault::low();
+    FAULT::mode(GPIO_OUTPUT);
+    FAULT::low();
 
     /* Setup SPIx as follows:
      *  CPOL = 0 : clock is low when idle
@@ -148,13 +141,18 @@ public:
     reinterpret_cast<TIM_TypeDef*>(TIMx)->CR1 |= TIM_CR1_CEN;
     reinterpret_cast<TIM_TypeDef*>(TIMx)->BDTR |= TIM_BDTR_MOE;
 
-    En::high();
+    EN::high();
   }
 
-  /* send ID(2):COMMAND(6):DATA(8) */
+  /**
+   *  \brief Read from the SPI port of the motor driver.
+   *  \param command The command to send to the driver.
+   *  \returns The data read, or -1 if failure.
+   */
   int16_t read(const uint16_t command)
   {
-    Cs::low();
+    /* send ID(2):COMMAND(6):DATA(8) */
+    CS::low();
 
     /* SCS setup time = 100ns minimum */
     delay_ns(100);
@@ -164,17 +162,22 @@ public:
     while (SPI_I2S_GetFlagStatus(reinterpret_cast<SPI_TypeDef*>(SPIx), SPI_I2S_FLAG_RXNE) == RESET);
     uint16_t d = reinterpret_cast<SPI_TypeDef*>(SPIx)->DR;
 
-    Cs::high();
+    CS::high();
 
     if((d & NCV7729_VERIFICATION_MASK) != NCV7729_OK) return -1;
 
     return (d & NCV7729_DATA_MASK);
   }
 
-  /* send ID(2):COMMAND(6):DATA(8) */
+  /**
+   *  \brief Write a command to the SPI port of the motor driver.
+   *  \param command The command to send to the driver.
+   *  \param data The data to send with the command.
+   *  \returns The data read, or -1 if failure.
+   */
   uint16_t write(const uint16_t command, const uint16_t data)
   {
-    Cs::low();
+    CS::low();
   
     /* SCS setup time = 100ns minimum */
     delay_ns(100);
@@ -184,14 +187,17 @@ public:
     while (SPI_I2S_GetFlagStatus(reinterpret_cast<SPI_TypeDef*>(SPIx), SPI_I2S_FLAG_RXNE) == RESET);
     uint16_t d = reinterpret_cast<SPI_TypeDef*>(SPIx)->DR;
   
-    Cs::high();
+    CS::high();
 
     if((d & NCV7729_VERIFICATION_MASK) != NCV7729_OK) return -1;
 
     return (d & NCV7729_DATA_MASK);
   }
 
-  /* set PWM. duty should be -1.0 to 1.0 */
+  /**
+   *  \brief Set the PWM duty cycle.
+   *  \param duty The duty cycle. Valid range is -1.0 to 1.0.
+   */
   void set(float duty)
   {
     int arr = reinterpret_cast<TIM_TypeDef*>(TIMx)->ARR;
