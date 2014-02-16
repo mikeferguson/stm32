@@ -29,7 +29,8 @@
 
 #include <string.h>
 
-/** \brief Copy block of memory
+/**
+ *  \brief Copy block of memory
  *  \param destination Pointer to the destination array where the content is to be copied.
  *  \param source Pointer to the source of data to be copied.
  *  \param num Number of bytes to copy.
@@ -49,7 +50,8 @@ void * memcpy(void * destination, const void * source, size_t num)
   return destination;
 }
 
-/** \brief Fill block of memory
+/**
+ *  \brief Fill block of memory
  *  \param ptr Pointer to the block of memory to fill.
  *  \param value Value to be set.
  *  \param n Number of bytes to be set to the value.
