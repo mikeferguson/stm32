@@ -38,6 +38,7 @@
 /* I2C Device Addresses */
 #define DEVICE_GYRO             0xD6
 #define DEVICE_ACCEL            0x32
+#define DEVICE_MAG              0x3C
 
 /* L3GD20 Register Table */
 #define ADDR_GYRO_WHO_AM_I      0x0F
@@ -75,6 +76,10 @@
 #define ADDR_ACCEL_Y_H_M        0x06
 #define ADDR_ACCEL_Z_L_M        0x07
 #define ADDR_ACCEL_Z_H_M        0x08
+
+#define ADDR_MAG_CRA_REG_M      0x00
+#define ADDR_MAG_CRB_REG_M      0x01
+#define ADDR_MAG_MR_REG_M       0x02
 
 /*
  * This is currently tuned for 168mhz STM32F4 and 100khz I2C,
@@ -120,7 +125,9 @@ class MiniImu9v2
     GYRO_READ_TIMEOUT  = 6,
     GYRO_DELAY_TIME    = 2,
     ACCEL_READ_TIMEOUT = 4,
-    ACCEL_DELAY_TIME   = 2
+    ACCEL_DELAY_TIME   = 2,
+    MAG_READ_TIMEOUT   = 4,
+    MAG_DELAY_TIME     = 2
   };
 
   /** \brief Possible states for the IMU updates */
@@ -134,9 +141,14 @@ class MiniImu9v2
                             //   this state if there is a gyro read error
 
     IMU_DELAY_ACCEL   = 4,  // waiting a bit before starting accelerometer read
-    IMU_READING_ACCEL = 5,  // waiting for accelerometer to read to complet
+    IMU_READING_ACCEL = 5,  // waiting for accelerometer to read to complete
     IMU_RESTART_ACCEL = 6,  // tries to initialize accel, will return to this
                             //   state if there is accel read error
+
+    IMU_DELAY_MAG     = 7,  // waiting a bit before starting magnetometer read
+    IMU_READING_MAG   = 8,  // waiting for magnetometer read to return
+    IMU_RESTART_MAG   = 9   // tries to initialize magnetometer, will return
+                            //   to this state if there is a read error
   };
 
   /** \brief Types of i2c errors */
@@ -178,13 +190,22 @@ public:
     int16_t z;
   };
 
-  // TODO: define magnetometer_data_t
+  /** \brief Data read from magnetometer. */
+  struct mag_data_t
+  {
+    int16_t x;
+    int16_t y;
+    int16_t z;
+  };
 
   /** \brief Accelerometer data read by the DMA */
   accel_data_t accel_data;
 
   /** \brief Gyro data read by the DMA */
   gyro_data_t gyro_data;
+
+  /** \brief Magnetometer data read by the DMA */
+  mag_data_t mag_data;
 
   /**
    *  \brief Initialize the I2C and DMA.
@@ -193,6 +214,7 @@ public:
   void init(uint32_t clock_speed)
   {
     clock_speed_ = clock_speed;
+    use_mag_ = false;  // do not use magnetometer by default
 
     I2C_TypeDef* const I2Cx = (I2C_TypeDef*) I2C;
 
@@ -230,6 +252,15 @@ public:
     I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
     I2C_Init(I2Cx, &I2C_InitStructure);
     I2C_Cmd(I2Cx, ENABLE);
+  }
+
+  /**
+   *  \brief Should we read from the magnetometer.
+   *  \param read_mag Should we read the magnetometer.
+   */
+  void use_magnetometer(bool read_mag)
+  {
+    use_mag_ = read_mag;
   }
 
   /**
@@ -317,7 +348,10 @@ public:
         ++num_gyro_updates_;
         /* Setup next cycle */
         timer_ = clock;
-        state_ = IMU_DELAY_ACCEL;
+        if (use_mag_)
+          state_ = IMU_DELAY_MAG;
+        else
+          state_ = IMU_DELAY_ACCEL;
         return true;
       }
       else if (time_diff(clock, timer_) > GYRO_READ_TIMEOUT)
@@ -332,10 +366,50 @@ public:
       state_ = IMU_DELAY_ACCEL;
       timer_ = clock;
     }
+    else if (state_ == IMU_DELAY_MAG)
+    {
+      /* Wait a bit before starting magnetometer read */
+      if (time_diff(clock, timer_) > MAG_DELAY_TIME)
+      {
+        if (start_mag_read())
+        {
+          state_ = IMU_READING_MAG;
+          timer_ = clock;
+        }
+        else  /* Failed, try to restart */
+          state_ = IMU_RESTART_MAG;
+      }
+    }
+    else if (state_ == IMU_READING_MAG)
+    {
+      if (DMA_GetFlagStatus(DMAy_Streamx, flag_tc))
+      {
+        imu_finish_read();
+        /* Read successful */
+        mag_data = mag_buffer_;
+        ++num_mag_updates_;
+        /* Setup next cycle */
+        timer_ = clock;
+        state_ = IMU_DELAY_ACCEL;
+        return true;
+      }
+      else if (time_diff(clock, timer_) > MAG_READ_TIMEOUT)
+      {
+        state_ = IMU_RESTART_MAG;
+        return imu_timeout_callback(I2C_ERROR_TIMEOUT, IMU_ERROR_READ_DMA);
+      }
+    }
+    else if (state_ == IMU_RESTART_MAG)
+    {
+      configure_magnetometer();
+      state_ = IMU_DELAY_ACCEL;
+      timer_ = clock;
+    }
     else
     {
       configure_accelerometer();
       configure_gyro();
+      configure_magnetometer();
       state_ = IMU_DELAY_GYRO;
       timer_ = clock;
     }
@@ -476,6 +550,17 @@ private:
       return false;
 
     return true;
+  }
+
+  /** \brief Configure the magnetometer. */
+  bool configure_magnetometer(void)
+  {
+    /*
+     * Configure continuous conversion
+     *  bit 1:0  = 00b = continuous conversion
+     */
+    if (!imu_write(DEVICE_MAG, ADDR_MAG_MR_REG_M, 0x00))
+      return false;
   }
 
   /**
@@ -620,16 +705,24 @@ private:
     return imu_start_read(DEVICE_GYRO, ADDR_GYRO_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
   }
 
+  /** \brief Start reading from the magnetometer */
+  bool start_mag_read()
+  {
+    return imu_start_read(DEVICE_MAG, ADDR_ACCEL_X_L_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+  }
+
   /** \brief State of the updates */
   imu_state_t state_;
 
   /** \brief Internal timer used for timeouts */
   uint32_t timer_;
 
-  /* \brief Private copy of accelerometer data for DMA read */
+  /** \brief Private copy of accelerometer data for DMA read */
   accel_data_t accel_buffer_;
-  /* \brief Private copy of gyro data for DMA read */
+  /** \brief Private copy of gyro data for DMA read */
   gyro_data_t gyro_buffer_;
+  /** \brief Private copy of mag data for DMA read */
+  mag_data_t mag_buffer_;
 
   /* internal logging */
   imu_error_op_t last_imu_error_;
@@ -637,9 +730,13 @@ private:
   uint32_t       num_timeouts_;
   uint32_t       num_gyro_updates_;
   uint32_t       num_accel_updates_;
+  uint32_t       num_mag_updates_;
 
   /** \brief Store clock speed for timeout handler */
   uint32_t clock_speed_;
+
+  /** \brief Should we read the magnetometer */
+  bool use_mag_;
 };
 
 #endif  // _STM32_CPP_MINI_IMU9_V2_H_
