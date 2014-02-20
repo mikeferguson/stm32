@@ -98,6 +98,11 @@
  *  \tparam SCL The GPIO used for SCL.
  *  \tparam SDA The GPIO used for SDA.
  *
+ * Settings selected by the driver:
+ *  - Accelerometer is +/- 2g
+ *  - Gyro is full scale, +/-2000degrees/s, or 70millidegrees/digit
+ *  - Magnetometer is max gain, 1100LSB/Gauss
+ *
  * Example:
  * \code
  * // Example definitions for using I2C2, DMA1, Stream 3, Channel 7:
