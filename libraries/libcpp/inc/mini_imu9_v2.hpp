@@ -70,12 +70,13 @@
 #define ADDR_ACCEL_Z_L_A        0x2C
 #define ADDR_ACCEL_Z_H_A        0x2D
 
-#define ADDR_ACCEL_X_L_M        0x03
-#define ADDR_ACCEL_X_H_M        0x04
-#define ADDR_ACCEL_Y_L_M        0x05
-#define ADDR_ACCEL_Y_H_M        0x06
-#define ADDR_ACCEL_Z_L_M        0x07
-#define ADDR_ACCEL_Z_H_M        0x08
+/* Note order: some should probably die for that */
+#define ADDR_ACCEL_X_H_M        0x03
+#define ADDR_ACCEL_X_L_M        0x04
+#define ADDR_ACCEL_Z_H_M        0x05
+#define ADDR_ACCEL_Z_L_M        0x06
+#define ADDR_ACCEL_Y_H_M        0x07
+#define ADDR_ACCEL_Y_L_M        0x08
 
 #define ADDR_MAG_CRA_REG_M      0x00
 #define ADDR_MAG_CRB_REG_M      0x01
@@ -386,7 +387,9 @@ public:
       {
         imu_finish_read();
         /* Read successful */
-        mag_data = mag_buffer_;
+        mag_data.x = mag_buffer_[1] + (mag_buffer_[0]<<8);
+        mag_data.z = mag_buffer_[3] + (mag_buffer_[2]<<8);
+        mag_data.y = mag_buffer_[5] + (mag_buffer_[4]<<8);
         ++num_mag_updates_;
         /* Setup next cycle */
         timer_ = clock;
@@ -708,7 +711,7 @@ private:
   /** \brief Start reading from the magnetometer */
   bool start_mag_read()
   {
-    return imu_start_read(DEVICE_MAG, ADDR_ACCEL_X_L_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    return imu_start_read(DEVICE_MAG, ADDR_ACCEL_X_H_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
   }
 
   /** \brief State of the updates */
@@ -721,8 +724,9 @@ private:
   accel_data_t accel_buffer_;
   /** \brief Private copy of gyro data for DMA read */
   gyro_data_t gyro_buffer_;
-  /** \brief Private copy of mag data for DMA read */
-  mag_data_t mag_buffer_;
+  /** \brief Private copy of mag data for DMA read
+             The magnetometer is H/L byte, whereas everything else is L/H.. ugh */
+  uint8_t mag_buffer_[6];
 
   /* internal logging */
   imu_error_op_t last_imu_error_;
