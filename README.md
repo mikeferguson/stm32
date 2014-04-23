@@ -31,7 +31,7 @@ cd ~/bin
 git clone git://github.com/mikeferguson/openocd.git
 cd openocd
 ./bootstrap
-./configure --enable-ft2232_libftdi
+./configure --enable-legacy-ft2232_libftdi
 make
 echo 'export PATH=$PATH:~/bin/openocd/src' >> ~/.bashrc
 ```
