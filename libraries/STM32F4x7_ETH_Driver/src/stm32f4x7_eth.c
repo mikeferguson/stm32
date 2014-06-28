@@ -271,7 +271,6 @@ void ETH_StructInit(ETH_InitTypeDef* ETH_InitStruct)
 uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct, uint16_t PHYAddress)
 {
   uint32_t RegValue = 0, tmpreg = 0;
-  __IO uint32_t i = 0;
   RCC_ClocksTypeDef  rcc_clocks;
   uint32_t hclk = 60000000;
   __IO uint32_t timeout = 0;
@@ -415,7 +414,7 @@ uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct, uint16_t PHYAddress)
     RegValue = ETH_ReadPHYRegister(PHYAddress, PHY_SR);
   
     /* Configure the MAC with the Duplex Mode fixed by the auto-negotiation process */
-    if((RegValue & PHY_DUPLEX_STATUS) != (uint32_t)RESET)
+    if(IS_PHY_DUPLEX_FULL(RegValue) != 0)
     {
       /* Set Ethernet duplex mode to Full-duplex following the auto-negotiation */
       ETH_InitStruct->ETH_Mode = ETH_Mode_FullDuplex;  
@@ -427,15 +426,15 @@ uint32_t ETH_Init(ETH_InitTypeDef* ETH_InitStruct, uint16_t PHYAddress)
     }
 
     /* Configure the MAC with the speed fixed by the auto-negotiation process */
-    if(RegValue & PHY_SPEED_STATUS)
+    if(IS_PHY_SPEED_100Mbps(RegValue) != 0)
     {  
-      /* Set Ethernet speed to 10M following the auto-negotiation */    
-      ETH_InitStruct->ETH_Speed = ETH_Speed_10M; 
+      /* Set Ethernet speed to 100M following the auto-negotiation */
+      ETH_InitStruct->ETH_Speed = ETH_Speed_100M;
     }
     else
     {   
-      /* Set Ethernet speed to 100M following the auto-negotiation */ 
-      ETH_InitStruct->ETH_Speed = ETH_Speed_100M;      
+      /* Set Ethernet speed to 10M following the auto-negotiation */
+      ETH_InitStruct->ETH_Speed = ETH_Speed_10M;
     }    
   }
   else

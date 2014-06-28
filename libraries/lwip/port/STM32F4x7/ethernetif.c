@@ -77,9 +77,6 @@ extern ETH_DMA_Rx_Frame_infos *DMA_RX_FRAME_infos;
  */
 static void low_level_init(struct netif *netif)
 {
-#ifdef CHECKSUM_BY_HARDWARE
-  int i; 
-#endif
   /* set MAC hardware address length */
   netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
@@ -90,35 +87,12 @@ static void low_level_init(struct netif *netif)
   netif->hwaddr[3] =  MAC_ADDR3;
   netif->hwaddr[4] =  MAC_ADDR4;
   netif->hwaddr[5] =  MAC_ADDR5;
-  
-  /* initialize MAC address in ethernet MAC */ 
-  ETH_MACAddressConfig(ETH_MAC_Address0, netif->hwaddr); 
 
   /* maximum transfer unit */
   netif->mtu = 1500;
 
   /* device capabilities */
-  /* don't set NETIF_FLAG_ETHARP if this device is not an ethernet one */
-  netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_LINK_UP;
-
-  /* Initialize Tx Descriptors list: Chain Mode */
-  ETH_DMATxDescChainInit(DMATxDscrTab, &Tx_Buff[0][0], ETH_TXBUFNB);
-  /* Initialize Rx Descriptors list: Chain Mode  */
-  ETH_DMARxDescChainInit(DMARxDscrTab, &Rx_Buff[0][0], ETH_RXBUFNB);
-  
-#ifdef CHECKSUM_BY_HARDWARE
-  /* Enable the TCP, UDP and ICMP checksum insertion for the Tx frames */
-  for(i=0; i<ETH_TXBUFNB; i++)
-    {
-      ETH_DMATxDescChecksumInsertionConfig(&DMATxDscrTab[i], ETH_DMATxDesc_ChecksumTCPUDPICMPFull);
-    }
-#endif
-
-   /* Note: TCP, UDP, ICMP checksum checking for received frame are enabled in DMA config */
-
-  /* Enable MAC and DMA transmission and reception */
-  ETH_Start();
-
+  netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP; // | NETIF_FLAG_LINK_UP;
 }
 
 /**

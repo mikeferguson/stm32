@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include "stm32f4x7_eth.h"
 #include <string.h>
+#include "netconf.h"
 
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -36,8 +37,27 @@ struct netif netif;
 uint32_t TCPTimer = 0;
 uint32_t ARPTimer = 0;
 
-#define PHY_ADDRESS (1ll)
+/* Ethernet Rx & Tx DMA Descriptors */
+extern ETH_DMADESCTypeDef  DMARxDscrTab[ETH_RXBUFNB], DMATxDscrTab[ETH_TXBUFNB];
 
+/* Ethernet Driver Receive buffers  */
+extern uint8_t Rx_Buff[ETH_RXBUFNB][ETH_RX_BUF_SIZE]; 
+
+/* Ethernet Driver Transmit buffers */
+extern uint8_t Tx_Buff[ETH_TXBUFNB][ETH_TX_BUF_SIZE]; 
+
+/* Global pointers to track current transmit and receive descriptors */
+extern ETH_DMADESCTypeDef  *DMATxDescToSet;
+extern ETH_DMADESCTypeDef  *DMARxDescToGet;
+
+/* Put ethernet related stuff in struct so it causes less namespace pollution 
+ * and is easier to access from debugger   */
+struct 
+{
+  uint8_t connected_;
+  uint16_t lost_links_;
+  uint32_t last_link_up_time_;
+} ethernet_state;
 
 void send_raw_packet()
 {
@@ -50,6 +70,9 @@ void send_raw_packet()
   * @brief  Initializes the lwIP stack
   * @param  None
   * @retval None
+  *
+  * Should only be called once at start-up.  Ethernet interface does not
+  * need to have link for this to be called.
   */
 void LwIP_Init(void)
 {
@@ -87,10 +110,20 @@ void LwIP_Init(void)
   /*  Registers the default network interface.*/
   netif_set_default(&netif);
 
-  /*  When the netif is fully configured this function must be called.*/
-  netif_set_up(&netif);
+  ethernet_state.connected_ = 0;
 }
 
+/** \brief Checks PHY's link status  
+ *  \returns true if there is a link, false if there is an error, or no link
+ */
+uint8_t checkEthernetLink()
+{
+  // PHY_BSR -- defined in stm32f4x7_eth.h  
+  // The basic status register number for the Micrel KSZ8051MLL PHY is 0x1
+  // If MDIO read times out, ETH_ReadPHYRegister returns ETH_ERROR (0) which make link look down
+  uint8_t has_link = (ETH_ReadPHYRegister(PHY_ADDRESS, PHY_BSR) & PHY_Linked_Status) ? 1 : 0;
+  return has_link;
+}
 
 /**
   * @brief  Called when a frame is received
@@ -112,6 +145,41 @@ void LwIP_Pkt_Handle(void)
   */
 void LwIP_Periodic_Handle(uint32_t localtime)
 {
+  if (ethernet_state.connected_)
+  {
+    /* check if any packet received */
+    if (ETH_CheckFrameReceived())
+    {
+      /* process received ethernet packet */
+      LwIP_Pkt_Handle();
+      // if a packet was received, the link must still be up
+      ethernet_state.last_link_up_time_ = localtime;
+    }
+    
+    // if we haven't recieved a packet in the last half second, check to see if link has been lost
+    if ( (uint32_t)(localtime - ethernet_state.last_link_up_time_) > 500)
+    {
+      if (checkEthernetLink())
+      {
+        ethernet_state.last_link_up_time_ = localtime;
+      }
+      else
+      {
+        ++ethernet_state.lost_links_;
+        ethernet_state.connected_ = 0;
+        netif_set_down(&netif);
+      }
+    }
+  }
+  else
+  {
+    if (Ethernet_Init() != ETH_ERROR)
+    {
+      netif_set_up(&netif);
+      ethernet_state.connected_ = 1;
+    }
+  }
+
 #if LWIP_TCP
   /* TCP periodic process every 250 ms */
   if (localtime - TCPTimer >= TCP_TMR_INTERVAL)
@@ -227,10 +295,13 @@ void LwIP_DHCP_Process_Handle()
 /**
   * @brief  Configures the Ethernet Interface
   * @param  None
-  * @retval None
+  * @retval ETH_ERROR on failure, ETH_SUCCESS on success
+  *
+  * Should be called everytime PHY gets a new link (in case link speed or duplex is differnet)
+  * Before being called, ethernet link should be set to "down" with netif_set_down()
+  * This prevents LwIP from attempt to send packets on link
   */
-uint32_t eth_status;
-void Ethernet_Init(void)
+uint32_t Ethernet_Init(void)
 {  
   /* Enable SYSCFG clock */
   RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
@@ -297,13 +368,48 @@ void Ethernet_Init(void)
   ETH_InitStructure.ETH_TxDMABurstLength = ETH_TxDMABurstLength_32Beat;                                                                 
   ETH_InitStructure.ETH_DMAArbitration = ETH_DMAArbitration_RoundRobin_RxTx_2_1;
 
+  /* initialize MAC address in ethernet MAC */ 
+  ETH_MACAddressConfig(ETH_MAC_Address0, netif.hwaddr);
+
   /* Configure Ethernet */
-  eth_status = ETH_Init(&ETH_InitStructure, PHY_ADDRESS);
+  if (ETH_Init(&ETH_InitStructure, PHY_ADDRESS) == ETH_ERROR)
+  {
+    return ETH_ERROR;
+  }
+
+  /* Initialize Tx Descriptors list: Chain Mode */
+  ETH_DMATxDescChainInit(DMATxDscrTab, &Tx_Buff[0][0], ETH_TXBUFNB);
+  /* Initialize Rx Descriptors list: Chain Mode  */
+  ETH_DMARxDescChainInit(DMARxDscrTab, &Rx_Buff[0][0], ETH_RXBUFNB);
+  
+#ifdef CHECKSUM_BY_HARDWARE
+  /* Enable the TCP, UDP and ICMP checksum insertion for the Tx frames */
+  for(int i=0; i<ETH_TXBUFNB; i++)
+  {
+    ETH_DMATxDescChecksumInsertionConfig(&DMATxDscrTab[i], ETH_DMATxDesc_ChecksumTCPUDPICMPFull);
+  }
+#endif
+
+  /* Note: TCP, UDP, ICMP checksum checking for received frame are enabled in DMA config */
+
+  /* Enable MAC and DMA transmission and reception */
+  ETH_Start();
 
   /* Enable the Ethernet Rx Interrupt */
 //  ETH_DMAITConfig(ETH_DMA_IT_NIS | ETH_DMA_IT_R, ENABLE);
 
 //  NVIC_InitTypeDef   NVIC_InitStructure;
+
+  /* MACCR has an errata where writes that occur next to each other can be ignored.
+   * Have MACCR writen after a delay to guarentee that the register write goes through.
+   */
+  {
+    uint32_t i = 28 * 4;  // delay about 4 us
+    while (i-- > 0) {
+      __asm__("nop");
+    }
+  }
+  ETH_MACReceptionCmd(ENABLE);
 
   /* Enable the Ethernet global Interrupt 
   NVIC_InitStructure.NVIC_IRQChannel = ETH_IRQn;
@@ -313,6 +419,8 @@ void Ethernet_Init(void)
   NVIC_Init(&NVIC_InitStructure); */
 //  NVIC_SetPriority(ETH_IRQn, 3);
 //  NVIC_EnableIRQ(ETH_IRQn);
+
+  return ETH_SUCCESS;
 }
 
 

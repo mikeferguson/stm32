@@ -525,8 +525,8 @@ typedef struct  {
 /** @defgroup PHY_Read_write_Timeouts 
   * @{
   */ 
-#define PHY_READ_TO                     ((uint32_t)0x0004FFFF)
-#define PHY_WRITE_TO                    ((uint32_t)0x0004FFFF)
+#define PHY_READ_TO                     ((uint32_t)0x0001FFFF)
+#define PHY_WRITE_TO                    ((uint32_t)0x0001FFFF)
 
 /**
   * @}

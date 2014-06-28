@@ -74,17 +74,20 @@
 //#define PHY_SR   ((uint16_t)0x1F) /* Value for KS8721CL PHY */
 #define PHY_SR     ((uint16_t)0x1E) /* Value for KS8051CL PHY */
 
-/* The Speed and Duplex mask values change from a PHY to another, so the user
-   have to update this value depending on the used external PHY */
-//#define PHY_SPEED_STATUS          ((uint16_t)0x0002) /* Value for DP83848 PHY */
-//#define PHY_DUPLEX_STATUS         ((uint16_t)0x0004) /* Value for DP83848 PHY */
-//#define PHY_SPEED_STATUS          ((uint16_t)0x0004) /* Value for KS8721CL PHY */
-//#define PHY_DUPLEX_STATUS         ((uint16_t)0x0010) /* Value for KS8721CL PHY */
-#define PHY_SPEED_STATUS            ((uint16_t)0x0002) /* Value for KS8051CL PHY */
-#define PHY_DUPLEX_STATUS           ((uint16_t)0x0004) /* Value for KS8051CL PHY */
+/* Different PHY define Speed and Duplex bits differently 
+ * The DP83848, KS8051CL, and KS8721CL all use different registers and different bits to
+ * determine what the speed and duplex setting for the PHY.  
+ *   On the DP83848, a value of 0 for bit 1 of register 16 indicates a speed of 100Mbps
+ *   On the KS8051CL, a value of 1 for bit 2 of register 0x1F indicates a speed of 100Mbps
+ * Define two macros that take the value of PHY_SR to determine whether the PHY is full/half 
+ * duplex and whether the PHY is running 100/10Mbps
+ */
 
-
-   
+/* Return non-zero if PHY is running at 100Mbps */
+#define IS_PHY_SPEED_100Mbps(PHY_SR_register_value) ((PHY_SR_register_value) & 0x2)
+/* Return non-zero if PHY is running in full-duplex mode */ 
+#define IS_PHY_DUPLEX_FULL(PHY_SR_register_value) ((PHY_SR_register_value) & 0x4)
+ 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */  
 

@@ -99,7 +99,6 @@ int main(void)
   NVIC_EnableIRQ(SysTick_IRQn);
   //NVIC_SetPriority(SysTick_IRQn,2);
 
-  Ethernet_Init();
   LwIP_Init();
   if (!netapp_init())
     while(1);
@@ -111,12 +110,6 @@ int main(void)
 
   while(1)
   {
-    /* check if any packet received */
-    if (ETH_CheckFrameReceived())
-    { 
-      /* process received ethernet packet */
-      LwIP_Pkt_Handle();
-    }
     LwIP_Periodic_Handle(sys_time);
 
     /* process packets */
