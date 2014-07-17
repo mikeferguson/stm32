@@ -12,7 +12,7 @@
  *    copyright notice, this list of conditions and the following
  *    disclaimer in the documentation and/or other materials provided
  *    with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -54,29 +54,30 @@
 #define SECTOR_SIZE_128KB       0x00020000
 
 /**
- *  \brief Functions for writing data to flash (basically, eeprom simulation).
+ *  \brief Erases memory page(s).
+ *  \param addr The address to start erasing at.
+ *  \param len The amount of memory to erase, in 32b words. A length
+ *         of -1 indicates to erase to the end of memory.
+ *  \returns 0 if OK, -1 if error.
  */
-namespace flash_storage
-{
+int flash_erase(const uint32_t addr, const int32_t len);
 
 /**
- *  \brief Write data to the flash.
+ *  \brief Write data to the flash. NOTE: you need to erase before calling this.
  *  \param addr The address to write data to (should be on the starting address of a page).
  *  \param data Pointer to data to write to flash.
- *  \param data_len Length of data to write.
- *  \returns True if data successfully written.
+ *  \param data_len Length of data to write, in 32b words.
+ *  \returns 0 if OK, -1 if error.
  */
-bool write(uint32_t addr, uint16_t * data, const uint16_t data_len);
+int flash_write(uint32_t addr, uint32_t * data, const int32_t data_len);
 
 /**
  *  \brief Read data from the flash.
  *  \param addr The address to read data from.
  *  \param data Pointer to where to read flash data to.
- *  \param data_len Length of data to be read.
- *  \returns True if data successfully read.
+ *  \param data_len Length of data to be read, in 32b words.
+ *  \returns 0 if OK, -1 if error.
  */
-bool read(uint32_t addr, uint16_t * data, const uint16_t data_len); 
-
-}  // end namespace flash_storage
+int flash_read(uint32_t addr, uint32_t * data, const int32_t data_len);
 
 #endif  // _STM32_CPP_FLASH_STORAGE_HPP_

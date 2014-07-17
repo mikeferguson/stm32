@@ -27,50 +27,78 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <flash_storage.hpp>
+#include <flash.hpp>
 
-namespace flash_storage
-{
+#define BYTES_PER_WORD	4
 
-bool write(uint32_t addr, uint16_t * data, const uint16_t data_len)
+int get_sector_num(const uint32_t addr)
 {
-  int sector;
+  if (addr >= SECTOR5_START_ADDR)
+  {
+    int sector = 5 + ((addr - SECTOR5_START_ADDR)/SECTOR_SIZE_128KB);
+    if (sector > 11)
+      return 11;
+    return sector;
+  }
+  else if (addr >= SECTOR4_START_ADDR)
+    return 4;
+  else
+    return (addr - SECTOR0_START_ADDR)/SECTOR_SIZE_16KB;
+}
+
+int flash_erase(const uint32_t addr, const int32_t len)
+{
+  int start_sector, end_sector;
 
   /* Check bounds */
-  if ((addr >= (SECTOR11_START_ADDR + SECTOR_SIZE_128KB)) ||
-      (addr < SECTOR0_START_ADDR))
-    return false;
+  if (addr < SECTOR0_START_ADDR)
+    return -1;
 
   /* Need to compute sector to erase */
-  if (addr >= SECTOR5_START_ADDR)
-    sector = 5 + ((addr - SECTOR5_START_ADDR)/SECTOR_SIZE_128KB);
-  else if (addr >= SECTOR4_START_ADDR)
-    sector = 4;
+  start_sector = get_sector_num(addr);
+  if (len == -1)
+    end_sector = 11;
   else
-    sector = (addr - SECTOR0_START_ADDR)/SECTOR_SIZE_16KB;
+    end_sector = get_sector_num(addr+(len*BYTES_PER_WORD)-1);
 
-  /* Unlock flash */
   FLASH_Unlock();
-  FLASH_EraseSector(sector * 0x08, VoltageRange_3);
+  for (int i = start_sector; i <= end_sector; ++i)
+  {
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
+                    FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR|FLASH_FLAG_PGSERR);
+    FLASH_EraseSector(i * 0x08, VoltageRange_3);
+  }
+  FLASH_Lock();
+  return 0;
+}
+
+int flash_write(uint32_t addr, uint32_t * data, const int32_t data_len)
+{
+  FLASH_Unlock();
 
   /* Write data */
-  for (int i = 0; i < data_len; i += 2)
+  uint32_t * d = data;
+  for (int i = 0; i < data_len; ++i)
   {
-    FLASH_ProgramHalfWord(addr, *data);
-    data++; addr += 2; 
+    if (FLASH_ProgramWord(addr+(i*BYTES_PER_WORD), *d) != FLASH_COMPLETE)
+      return -1;
+    /* Confirm success */
+    if (*(uint32_t*)(addr+(i*BYTES_PER_WORD)) != *d)
+      return -1;
+    ++d;
   }
 
-  return true;
+  FLASH_Lock();
+  return 0;
 }
 
-bool read(uint32_t addr, uint16_t * data, const uint16_t data_len)
+int flash_read(uint32_t addr, uint32_t * data, const int32_t data_len)
 {
-  for (int i = 0; i < data_len; i += 2)
+  uint32_t * d = data;
+  for (int i = 0; i < data_len; ++i)
   {
-    *data = *(volatile uint16_t*)(addr + i);
-    data++;
+    *d = *(volatile uint32_t*)(addr+(i*BYTES_PER_WORD));
+    ++d;
   }
-  return true;
+  return 0;
 }
-
-}  // end namespace flash_storage
