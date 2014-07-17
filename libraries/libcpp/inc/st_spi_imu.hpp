@@ -32,7 +32,41 @@
 #include <stm32f4xx_spi.h>
 #include <delay.hpp>
 
-/* Driver for ST LIS3DH & L3GD20 Accelerometer on Same Bus*/
+/**
+ *  \brief Driver for ST LIS3DH & L3GD20 on same SPI bus, each with own CS.
+ *  \tparam SPIx The base address of the SPI device, for instance, SPI1_BASE.
+ *  \tparam GryoCs The gyro chip select IO pin.
+ *  \tparam AccelCs The accelerometer chip select IO pin.
+ *
+ *  Example:
+ *  \code
+ *  typedef Gpio<GPIOA_BASE,5> imu_sck;  // SPI1
+ *  typedef Gpio<GPIOA_BASE,6> imu_miso;
+ *  typedef Gpio<GPIOB_BASE,5> imu_mosi;
+ *  typedef Gpio<GPIOA_BASE,12> gyro_cs;
+ *  typedef Gpio<GPIOC_BASE,9> accel_cs;
+ *
+ *  IMU<SPI1_BASE, gyro_cs, accel_cs> imu;
+ *
+ *  int main(void)
+ *  {
+ *       // Setup IMU
+ *       RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
+ *       imu_sck::mode(GPIO_ALTERNATE | GPIO_AF_SPI1);
+ *       imu_miso::mode(GPIO_ALTERNATE | GPIO_AF_SPI1);
+ *       imu_mosi::mode(GPIO_ALTERNATE | GPIO_AF_SPI1);
+ *       imu.init();
+ *
+ *       // Enable the gyro and accelerometer
+ *       imu.startGyro();
+ *       imu.startAccel();
+ *
+ *       // Use IMU
+ *       uint16_t x, y, z;
+ *       imu.readAccel(&x, &y, &z);
+ *  }
+ *  \endcode
+ */
 template<unsigned int SPIx, typename GyroCs, typename AccelCs>
 class IMU
 {
