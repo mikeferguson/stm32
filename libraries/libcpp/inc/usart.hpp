@@ -73,8 +73,8 @@
 template <unsigned int USARTx, unsigned int SIZE>
 class Usart
 {
-  uint8_t head;
-  uint8_t tail;
+  uint16_t head;
+  uint16_t tail;
   uint16_t buffer[SIZE];
 
 public:
