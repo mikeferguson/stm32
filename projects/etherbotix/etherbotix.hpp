@@ -45,11 +45,11 @@ typedef Gpio<GPIOE_BASE, 7> phy_rst;
 typedef Gpio<GPIOA_BASE, 1> eth_rmii_ref_clk;
 typedef Gpio<GPIOA_BASE, 7> eth_rmii_crs_dv;
 
-typedef Gpio<GPIOB_BASE, 11> eth_mii_tx_en;
-typedef Gpio<GPIOB_BASE, 12> eth_mii_txd0;
-typedef Gpio<GPIOB_BASE, 13> eth_mii_txd1;
-typedef Gpio<GPIOC_BASE, 4> eth_mii_rxd0;
-typedef Gpio<GPIOC_BASE, 5> eth_mii_rxd1;
+typedef Gpio<GPIOB_BASE, 11> eth_rmii_tx_en;
+typedef Gpio<GPIOB_BASE, 12> eth_rmii_txd0;
+typedef Gpio<GPIOB_BASE, 13> eth_rmii_txd1;
+typedef Gpio<GPIOC_BASE, 4> eth_rmii_rxd0;
+typedef Gpio<GPIOC_BASE, 5> eth_rmii_rxd1;
 
 // Analog
 typedef Gpio<GPIOA_BASE, 0> servo_sense;    // servo current: ADC123_IN0
@@ -84,8 +84,8 @@ typedef Gpio<GPIOB_BASE, 14> m2_en;         // motor2 EN = tim8_ch2N/tim12_CH1
 //typedef Gpio<GPIOC_BASE, 8> m2_en;        // motor2 EN = tim8_ch3 (alternate routing)
 
 // M1 encoder - tim4
-typedef Gpio<GPIOD_BASE, 12> m2_enc_a;      // tim4_ch1
-typedef Gpio<GPIOD_BASE, 13> m2_enc_b;      // tim4_ch2
+typedef Gpio<GPIOD_BASE, 12> m1_enc_a;      // tim4_ch1
+typedef Gpio<GPIOD_BASE, 13> m1_enc_b;      // tim4_ch2
 
 // M2 encoder - tim3
 typedef Gpio<GPIOA_BASE, 6> m2_enc_a;       // tim3_ch1
