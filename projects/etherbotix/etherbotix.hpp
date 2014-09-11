@@ -63,7 +63,7 @@ typedef Gpio<GPIOB_BASE, 0> a0_sense;       // a0: ADC12_IN8
 typedef Gpio<GPIOB_BASE, 1> aux_sense;      // aux. current: ADC12_IN9
 #define AUX_CURRENT_ANALOG_CHANNEL      9
 typedef Gpio<GPIOC_BASE, 0> voltage_sense;  // voltage: ADC123_IN10
-#define AUX_CURRENT_ANALOG_CHANNEL      10
+#define VOLTAGE_ANALOG_CHANNEL          10
 typedef Gpio<GPIOC_BASE, 2> a1_sense;       // a1: ADC123_IN12 (also SPI2_MISO)
 #define A1_ANALOG_CHANNEL               12
 typedef Gpio<GPIOC_BASE, 3> a2_sense;       // a2: ADC123_IN13 (also SPI2_MOSI)
