@@ -28,6 +28,7 @@
  */
 
 #include "etherbotix.hpp"
+#include "netconf.h"
 #include "stm32f4x7_eth.h"
 
 int main(void)
@@ -62,6 +63,11 @@ int main(void)
   // setup systick
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
+
+
+  LwIP_Init();
+  //if (!netapp_init())
+  //  while(1);
 
   __enable_irq();
 
