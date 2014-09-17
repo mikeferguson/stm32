@@ -33,6 +33,58 @@
 #include "stm32f4xx.h"
 #include "gpio.hpp"
 
+// Etherbotix Register table
+#define REG_MODEL_NUMBER    0   // 16-bit model number
+#define REG_VERSION         2
+#define REG_ID              3   // Always 253 (same as arbotix)
+#define REG_BAUD_RATE       4   // Applied to serial bus
+#define REG_DELAY_TIME      5   // Part of serial bus timeout calculation
+
+#define REG_DIGITAL_IN      6   // Corresponds to A0-D7 as digital input
+#define REG_DIGITAL_DIR     7   // Digital A0-D7, low for input, high for output
+#define REG_DIGITAL_OUT     8   // Digital A0-D7, sets high/low for output pins
+#define REG_A0              10  // Read analog value from A0 (raw 12-bit value)
+#define REG_A1              12  // Read analog value from A1
+#define REG_A2              14  // Read analog value from A2
+
+#define REG_ALARM_LED       17  // Turns on error led
+#define REG_SYSTEM_TIME     20  // 32-bit unsigned system clock
+#define REG_AUX_CURRENT     24  // 16-bit signed current in mA
+#define REG_SERVO_CURRENT   26  // 16-bit signed current in mA
+#define REG_MOTOR_PERIOD    31  // 8-bit motor cycle period (1-100mS, 0 deactives driver)
+
+#define REG_MOTOR1_VEL      32  // 16-bit motor velocity (ticks/cycle, read-write)
+#define REG_MOTOR2_VEL      34  // 16-bit motor velocity (ticks/cycle, read-write)
+#define REG_MOTOR1_POS      36  // 32-bit signed position (ticks, read-only)
+#define REG_MOTOR2_POS      40  // 32-bit signed position (ticks, read-only)
+#define REG_MOTOR1_CURRENT  44  // 16-bit unsigned (raw 12-bit value from ADC)
+#define REG_MOTOR2_CURRENT  46  // 16-bit unsigned (raw 12-bit value from ADC)
+
+#define REG_MOTOR1_KP       48  // 32-bit float kp
+#define REG_MOTOR1_KD       52  // 32-bit float kd
+#define REG_MOTOR1_KI       56  // 32-bit float ki
+#define REG_MOTOR1_WINDUP   60  // 32-bit float windup limit
+
+#define REG_MOTOR2_KP       64  // 32-bit float kp
+#define REG_MOTOR2_KD       68  // 32-bit float kd
+#define REG_MOTOR2_KI       72  // 32-bit float ki
+#define REG_MOTOR2_WINDUP   76  // 32-bit float windup limit
+
+#define REG_ACC_X           80  // All these are int16
+#define REG_ACC_Y           82
+#define REG_ACC_Z           84
+#define REG_GYRO_X          86
+#define REG_GYRO_Y          88
+#define REG_GYRO_Z          90
+#define REG_MAG_X           92
+#define REG_MAG_Y           94
+#define REG_MAG_Z           96
+
+#define DEVICE_USART3_BAUD  128
+#define DEVICE_USART3_DATA  129
+#define DEVICE_SPI2_BAUD    130
+#define DEVICE_SPI2_DATA    131
+
 // Activity and error LEDs
 typedef Gpio<GPIOC_BASE, 14> error;
 typedef Gpio<GPIOC_BASE, 15> act;
