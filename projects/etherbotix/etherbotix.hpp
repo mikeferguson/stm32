@@ -33,6 +33,8 @@
 #include "stm32f4xx.h"
 #include "gpio.hpp"
 
+#define ETHERBOTIX_ID       253
+
 // Etherbotix Register table
 #define REG_MODEL_NUMBER    0   // 16-bit model number
 #define REG_VERSION         2
@@ -79,11 +81,14 @@
 #define REG_MAG_X           92
 #define REG_MAG_Y           94
 #define REG_MAG_Z           96
+#define REG_USART3_BAUD     98
+#define REG_SPI2_BAUD       99
 
-#define DEVICE_USART3_BAUD  128
-#define DEVICE_USART3_DATA  129
-#define DEVICE_SPI2_BAUD    130
-#define DEVICE_SPI2_DATA    131
+#define REG_PACKETS_RECV    120
+#define REG_PACKETS_BAD     124
+
+#define DEVICE_USART3_DATA  128
+#define DEVICE_SPI2_DATA    129
 
 // Activity and error LEDs
 typedef Gpio<GPIOC_BASE, 14> error;
@@ -163,5 +168,70 @@ typedef Gpio<GPIOC_BASE,11> d4;  // also           USART3_RX
 typedef Gpio<GPIOB_BASE,15> d5;  // also TIM12_CH2
 typedef Gpio<GPIOE_BASE,5> d6;   // also TIM9_CH1
 typedef Gpio<GPIOE_BASE,6> d7;   // also TIM9_CH2
+
+// Storage of register data
+typedef struct
+{
+  uint16_t model_number;
+  uint8_t version;
+  uint8_t id;
+  uint8_t baud_rate;
+  uint8_t delay_time;
+  uint8_t digital_in;
+  uint8_t digital_dir;
+  uint8_t digital_out;
+  uint8_t unused_9;
+  uint16_t a0;
+  uint16_t a1;
+  uint16_t a2;
+
+  uint8_t unused_16;
+  uint8_t alarm_led;
+  uint16_t unused_18;
+  uint32_t system_time;
+  int16_t aux_current;
+  int16_t servo_current;
+  uint16_t unused_28;
+  uint8_t unused_30;
+  uint8_t motor_period;
+
+  int16_t motor1_vel;
+  int16_t motor2_vel;
+  int32_t motor1_pos;
+  int32_t motor2_pos;
+  int16_t motor1_current;
+  int16_t motor2_current;
+
+  float motor1_kp;
+  float motor1_kd;
+  float motor1_ki;
+  float motor1_windup;
+
+  float motor2_kp;
+  float motor2_kd;
+  float motor2_ki;
+  float motor2_windup;
+
+  int16_t accel_x;
+  int16_t accel_y;
+  int16_t accel_z;
+  int16_t gyro_x;
+  int16_t gyro_y;
+  int16_t gyro_z;
+  int16_t mag_x;
+  int16_t mag_y;
+  int16_t mag_z;
+
+  uint8_t usart3_baud;
+  uint8_t spi2_baud;
+  uint32_t unused_100;
+  uint32_t unused_104;
+  uint32_t unused_108;
+
+  uint32_t unused_112;
+  uint32_t unused_116;
+  uint32_t packets_recv;
+  uint32_t packets_bad;
+} registers_t;
 
 #endif // __ETHERBOTIX_HPP__
