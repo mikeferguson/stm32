@@ -32,6 +32,7 @@
 
 #include "stm32f4xx.h"
 #include "gpio.hpp"
+#include "usart_dma.hpp"
 
 #define ETHERBOTIX_ID       253
 
@@ -49,6 +50,7 @@
 #define REG_A1              12  // Read analog value from A1
 #define REG_A2              14  // Read analog value from A2
 
+#define REG_SYSTEM_VOLTAGE  16  // Voltage in 0.1V increments
 #define REG_ALARM_LED       17  // Turns on error led
 #define REG_SYSTEM_TIME     20  // 32-bit unsigned system clock
 #define REG_AUX_CURRENT     24  // 16-bit signed current in mA
@@ -152,11 +154,17 @@ typedef Gpio<GPIOB_BASE, 5> m2_enc_b;       // tim3_ch2
 typedef Gpio<GPIOA_BASE, 9> usart1_tx;
 typedef Gpio<GPIOA_BASE, 10> usart1_rx;
 typedef Gpio<GPIOD_BASE, 15> usart1_en;
+typedef PeriphReadDMA<uint16_t, DMA2_Stream2_BASE, DMA_FLAG_TCIF2, 4, USART1_BASE+4, 256> usart1_read_dma;
+typedef PeriphWriteDMA<uint16_t, DMA2_Stream7_BASE, DMA_FLAG_TCIF7, 4, USART1_BASE+4, 256> usart1_write_dma;
+typedef UsartDMAWithEnable<USART1_BASE, usart1_en, usart1_read_dma, usart1_write_dma> usart1_t;
 
 // Usart2 - ax/mx bus
 typedef Gpio<GPIOD_BASE, 5> usart2_tx;
 typedef Gpio<GPIOD_BASE, 6> usart2_rx;
 typedef Gpio<GPIOD_BASE, 7> usart2_en;
+typedef PeriphReadDMA<uint16_t, DMA1_Stream5_BASE, DMA_FLAG_TCIF5, 4, USART2_BASE+4, 256> usart2_read_dma;
+typedef PeriphWriteDMA<uint16_t, DMA1_Stream6_BASE, DMA_FLAG_TCIF6, 4, USART2_BASE+4, 256> usart2_write_dma;
+typedef UsartDMAWithEnable<USART2_BASE, usart2_en, usart2_read_dma, usart2_write_dma> usart2_t;
 
 // IMU - i2c1
 typedef Gpio<GPIOB_BASE,6> imu_scl;
@@ -185,7 +193,7 @@ typedef struct
   uint16_t a1;
   uint16_t a2;
 
-  uint8_t unused_16;
+  uint8_t system_voltage;
   uint8_t alarm_led;
   uint16_t unused_18;
   uint32_t system_time;
