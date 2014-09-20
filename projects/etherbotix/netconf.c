@@ -305,7 +305,6 @@ uint32_t Ethernet_Init(void)
 {  
   /* Enable SYSCFG clock */
   RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-  //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);  
 
   /* Enable ETHERNET clock  */
   //RCC_AHBPeriphClockCmd(RCC_AHBPeriph_ETH_MAC | RCC_AHBPeriph_ETH_MAC_Tx |
@@ -315,9 +314,7 @@ uint32_t Ethernet_Init(void)
   ETH_InitTypeDef ETH_InitStructure;
 
   /* Configure MII_RMII selection bit */ 
-  //*(__IO uint32_t *) PMC_MII_RMII_SEL_BB = 0;   // 1 for RMII 
-  //SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_MII);
-  //GPIO_ETH_MediaInterfaceConfig(GPIO_ETH_MediaInterface_MII);
+  SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_RMII);
 
   /* Reset ETHERNET on AHB Bus */
   ETH_DeInit();
