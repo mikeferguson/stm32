@@ -50,11 +50,11 @@
 #define REG_A1              12  // Read analog value from A1
 #define REG_A2              14  // Read analog value from A2
 
-#define REG_SYSTEM_VOLTAGE  16  // Voltage in 0.1V increments
-#define REG_ALARM_LED       17  // Turns on error led
-#define REG_SYSTEM_TIME     20  // 32-bit unsigned system clock
-#define REG_AUX_CURRENT     24  // 16-bit signed current in mA
-#define REG_SERVO_CURRENT   26  // 16-bit signed current in mA
+#define REG_SYSTEM_TIME     16  // 32-bit unsigned system clock
+#define REG_SERVO_CURRENT   20  // 16-bit signed current in mA
+#define REG_AUX_CURRENT     22  // 16-bit signed current in mA
+#define REG_SYSTEM_VOLTAGE  24  // Voltage in 0.1V increments
+#define REG_LED             25  // Turns on error led
 #define REG_MOTOR_PERIOD    31  // 8-bit motor cycle period (1-100mS, 0 deactives driver)
 
 #define REG_MOTOR1_VEL      32  // 16-bit motor velocity (ticks/cycle, read-write)
@@ -212,12 +212,12 @@ typedef struct
   uint16_t a1;
   uint16_t a2;
 
-  uint8_t system_voltage;
-  uint8_t alarm_led;
-  uint16_t unused_18;
   uint32_t system_time;
-  int16_t aux_current;
   int16_t servo_current;
+  int16_t aux_current;
+  uint8_t system_voltage;
+  uint8_t led;
+  uint16_t unused_26;
   uint16_t unused_28;
   uint8_t unused_30;
   uint8_t motor_period;

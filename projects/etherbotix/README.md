@@ -41,8 +41,8 @@ parts of the register table are as follows:
     ID                  3       // Always 253, currently not writable
     BAUD_RATE           4       // Standard values from MX-64T datasheet
     RETURN_DELAY        5
-    PRESENT_VOLTAGE     16      // Voltage in 100mV increments
-    ALARM_LED           17
+    PRESENT_VOLTAGE     24      // Voltage in 100mV increments
+    LED                 25
 
 Note that PRESENT_VOLTAGE is usually at address 42 on MX-64T devices. In
 addition to the "standard" register table entries above, the Etherbotix

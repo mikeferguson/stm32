@@ -168,7 +168,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // TODO
             }
-            else if (write_addr + j == REG_ALARM_LED)
+            else if (write_addr + j == REG_LED)
             {
               if (data[i+6+j] > 0)
                 error::high();
