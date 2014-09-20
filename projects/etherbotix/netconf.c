@@ -18,7 +18,6 @@
   * <h2><center>&copy; COPYRIGHT 2009 STMicroelectronics</center></h2>
   */
 
-/* Includes ------------------------------------------------------------------*/
 #include "lwip/memp.h"
 #include "lwip/tcp.h"
 #include "lwip/udp.h"
@@ -30,9 +29,6 @@
 #include <string.h>
 #include "netconf.h"
 
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
 struct netif netif;
 uint32_t TCPTimer = 0;
 uint32_t ARPTimer = 0;
@@ -41,18 +37,18 @@ uint32_t ARPTimer = 0;
 extern ETH_DMADESCTypeDef  DMARxDscrTab[ETH_RXBUFNB], DMATxDscrTab[ETH_TXBUFNB];
 
 /* Ethernet Driver Receive buffers  */
-extern uint8_t Rx_Buff[ETH_RXBUFNB][ETH_RX_BUF_SIZE]; 
+extern uint8_t Rx_Buff[ETH_RXBUFNB][ETH_RX_BUF_SIZE];
 
 /* Ethernet Driver Transmit buffers */
-extern uint8_t Tx_Buff[ETH_TXBUFNB][ETH_TX_BUF_SIZE]; 
+extern uint8_t Tx_Buff[ETH_TXBUFNB][ETH_TX_BUF_SIZE];
 
 /* Global pointers to track current transmit and receive descriptors */
 extern ETH_DMADESCTypeDef  *DMATxDescToSet;
 extern ETH_DMADESCTypeDef  *DMARxDescToGet;
 
-/* Put ethernet related stuff in struct so it causes less namespace pollution 
+/* Put ethernet related stuff in struct so it causes less namespace pollution
  * and is easier to access from debugger   */
-struct 
+struct
 {
   uint8_t connected_;
   uint16_t lost_links_;
@@ -63,8 +59,6 @@ void send_raw_packet()
 {
   //ETH_TxPkt_ChainMode(l);
 }
-
-
 
 /**
   * @brief  Initializes the lwIP stack
@@ -97,7 +91,7 @@ void LwIP_Init(void)
             struct ip_addr *netmask, struct ip_addr *gw,
             void *state, err_t (* init)(struct netif *netif),
             err_t (* input)(struct pbuf *p, struct netif *netif))
-    
+
    Adds your network interface to the netif_list. Allocate a struct
   netif and pass a pointer to this structure as the first argument.
   Give pointers to cleared ip_addr structures when using DHCP,
@@ -113,12 +107,12 @@ void LwIP_Init(void)
   ethernet_state.connected_ = 0;
 }
 
-/** \brief Checks PHY's link status  
+/** \brief Checks PHY's link status
  *  \returns true if there is a link, false if there is an error, or no link
  */
 uint8_t checkEthernetLink()
 {
-  // PHY_BSR -- defined in stm32f4x7_eth.h  
+  // PHY_BSR -- defined in stm32f4x7_eth.h
   // The basic status register number for the Micrel KSZ8051MLL PHY is 0x1
   // If MDIO read times out, ETH_ReadPHYRegister returns ETH_ERROR (0) which make link look down
   uint8_t has_link = (ETH_ReadPHYRegister(PHY_ADDRESS, PHY_BSR) & PHY_Linked_Status) ? 1 : 0;
@@ -135,8 +129,6 @@ void LwIP_Pkt_Handle(void)
   /* Read a received packet from the Ethernet buffers and send it to the lwIP for handling */
   ethernetif_input(&netif);
 }
-
-
 
 /**
   * @brief  LwIP periodic tasks
@@ -155,7 +147,7 @@ void LwIP_Periodic_Handle(uint32_t localtime)
       // if a packet was received, the link must still be up
       ethernet_state.last_link_up_time_ = localtime;
     }
-    
+
     // if we haven't recieved a packet in the last half second, check to see if link has been lost
     if ( (uint32_t)(localtime - ethernet_state.last_link_up_time_) > 500)
     {
@@ -203,12 +195,12 @@ void LwIP_Periodic_Handle(uint32_t localtime)
     DHCPfineTimer =  localtime;
     dhcp_fine_tmr();
     if ((DHCP_state != DHCP_ADDRESS_ASSIGNED)&&(DHCP_state != DHCP_TIMEOUT))
-    { 
+    {
       /* toggle LED1 to indicate DHCP on-going process */
       STM_EVAL_LEDToggle(LED1);
-      
+
       /* process DHCP state machine */
-      LwIP_DHCP_Process_Handle();    
+      LwIP_DHCP_Process_Handle();
     }
   }
 
@@ -217,7 +209,7 @@ void LwIP_Periodic_Handle(uint32_t localtime)
   {
     DHCPcoarseTimer =  localtime;
     dhcp_coarse_tmr();
-  }  
+  }
 #endif
 }
 
@@ -250,9 +242,9 @@ void LwIP_DHCP_Process_Handle()
       /* Read the new IP address */
       IPaddress = netif.ip_addr.addr;
 
-      if (IPaddress!=0) 
+      if (IPaddress!=0)
       {
-        DHCP_state = DHCP_ADDRESS_ASSIGNED;	
+        DHCP_state = DHCP_ADDRESS_ASSIGNED;
 
         /* Stop DHCP */
         dhcp_stop(&netif);
@@ -279,12 +271,12 @@ void LwIP_DHCP_Process_Handle()
     default: break;
   }
 }
-#endif      
+#endif
 
 /*void ETH_IRQHandler(void)
 {
-  while(ETH_GetRxPktSize() != 0) 
-  {		
+  while(ETH_GetRxPktSize() != 0)
+  {
     LwIP_Pkt_Handle();
   }
 
@@ -302,7 +294,7 @@ void LwIP_DHCP_Process_Handle()
   * This prevents LwIP from attempt to send packets on link
   */
 uint32_t Ethernet_Init(void)
-{  
+{
   /* Enable SYSCFG clock */
   RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
 
@@ -313,7 +305,7 @@ uint32_t Ethernet_Init(void)
 
   ETH_InitTypeDef ETH_InitStructure;
 
-  /* Configure MII_RMII selection bit */ 
+  /* Configure MII_RMII selection bit */
   SYSCFG_ETH_MediaInterfaceConfig(SYSCFG_ETH_MediaInterface_RMII);
 
   /* Reset ETHERNET on AHB Bus */
@@ -346,26 +338,25 @@ uint32_t Ethernet_Init(void)
   ETH_InitStructure.ETH_ChecksumOffload = ETH_ChecksumOffload_Enable;
 #endif
 
+  /*------------------------   DMA   -----------------------------------*/
 
-  /*------------------------   DMA   -----------------------------------*/  
-  
-  /* When we use the Checksum offload feature, we need to enable the Store and Forward mode: 
-  the store and forward guarantee that a whole frame is stored in the FIFO, so the MAC can insert/verify the checksum, 
+  /* When we use the Checksum offload feature, we need to enable the Store and Forward mode:
+  the store and forward guarantee that a whole frame is stored in the FIFO, so the MAC can insert/verify the checksum,
   if the checksum is OK the DMA can handle the frame otherwise the frame is dropped */
-  ETH_InitStructure.ETH_DropTCPIPChecksumErrorFrame = ETH_DropTCPIPChecksumErrorFrame_Enable; 
-  ETH_InitStructure.ETH_ReceiveStoreForward = ETH_ReceiveStoreForward_Enable;         
-  ETH_InitStructure.ETH_TransmitStoreForward = ETH_TransmitStoreForward_Enable;     
- 
-  ETH_InitStructure.ETH_ForwardErrorFrames = ETH_ForwardErrorFrames_Disable;       
-  ETH_InitStructure.ETH_ForwardUndersizedGoodFrames = ETH_ForwardUndersizedGoodFrames_Disable;   
-  ETH_InitStructure.ETH_SecondFrameOperate = ETH_SecondFrameOperate_Enable;                                                          
-  ETH_InitStructure.ETH_AddressAlignedBeats = ETH_AddressAlignedBeats_Enable;      
-  ETH_InitStructure.ETH_FixedBurst = ETH_FixedBurst_Enable;                
-  ETH_InitStructure.ETH_RxDMABurstLength = ETH_RxDMABurstLength_32Beat;          
-  ETH_InitStructure.ETH_TxDMABurstLength = ETH_TxDMABurstLength_32Beat;                                                                 
+  ETH_InitStructure.ETH_DropTCPIPChecksumErrorFrame = ETH_DropTCPIPChecksumErrorFrame_Enable;
+  ETH_InitStructure.ETH_ReceiveStoreForward = ETH_ReceiveStoreForward_Enable;
+  ETH_InitStructure.ETH_TransmitStoreForward = ETH_TransmitStoreForward_Enable;
+
+  ETH_InitStructure.ETH_ForwardErrorFrames = ETH_ForwardErrorFrames_Disable;
+  ETH_InitStructure.ETH_ForwardUndersizedGoodFrames = ETH_ForwardUndersizedGoodFrames_Disable;
+  ETH_InitStructure.ETH_SecondFrameOperate = ETH_SecondFrameOperate_Enable;
+  ETH_InitStructure.ETH_AddressAlignedBeats = ETH_AddressAlignedBeats_Enable;
+  ETH_InitStructure.ETH_FixedBurst = ETH_FixedBurst_Enable;
+  ETH_InitStructure.ETH_RxDMABurstLength = ETH_RxDMABurstLength_32Beat;
+  ETH_InitStructure.ETH_TxDMABurstLength = ETH_TxDMABurstLength_32Beat;
   ETH_InitStructure.ETH_DMAArbitration = ETH_DMAArbitration_RoundRobin_RxTx_2_1;
 
-  /* initialize MAC address in ethernet MAC */ 
+  /* initialize MAC address in ethernet MAC */
   ETH_MACAddressConfig(ETH_MAC_Address0, netif.hwaddr);
 
   /* Configure Ethernet */
@@ -378,7 +369,7 @@ uint32_t Ethernet_Init(void)
   ETH_DMATxDescChainInit(DMATxDscrTab, &Tx_Buff[0][0], ETH_TXBUFNB);
   /* Initialize Rx Descriptors list: Chain Mode  */
   ETH_DMARxDescChainInit(DMARxDscrTab, &Rx_Buff[0][0], ETH_RXBUFNB);
-  
+
 #ifdef CHECKSUM_BY_HARDWARE
   /* Enable the TCP, UDP and ICMP checksum insertion for the Tx frames */
   for(int i=0; i<ETH_TXBUFNB; i++)
@@ -408,7 +399,7 @@ uint32_t Ethernet_Init(void)
   }
   ETH_MACReceptionCmd(ENABLE);
 
-  /* Enable the Ethernet global Interrupt 
+  /* Enable the Ethernet global Interrupt
   NVIC_InitStructure.NVIC_IRQChannel = ETH_IRQn;
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
@@ -419,7 +410,3 @@ uint32_t Ethernet_Init(void)
 
   return ETH_SUCCESS;
 }
-
-
-
-/******************* (C) COPYRIGHT 2009 STMicroelectronics *****END OF FILE****/
