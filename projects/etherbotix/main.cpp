@@ -28,13 +28,20 @@
  */
 
 #include "etherbotix.hpp"
+#include "dynamixel.hpp"
 
 #include "netconf.h"
 #include "lwip/memp.h"
 #include "lwip/udp.h"
 #include "stm32f4x7_eth.h"
 
+#include "usart_dma.hpp"
 #include "analog_sampler.hpp"
+
+usart1_t usart1;
+usart2_t usart2;
+DynamixelParser<usart1_t> usart1_parser;
+DynamixelParser<usart2_t> usart2_parser;
 
 struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
@@ -75,7 +82,286 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
     return;
   }
 
-  // TODO
+  // Update return data
+  last_packet = registers.system_time;
+  return_ipaddr = *addr;
+  return_port = port;
+
+  // For each packet
+  size_t i = 4;
+  while (i < p->len)
+  {
+    if ((data[i] != 0xff) || (data[i+1] != 0xff))
+    {
+      // Packet has become corrupted?
+      ++registers.packets_bad;
+      pbuf_free(p);
+      return;
+    }
+
+    uint8_t id = data[i+2];
+    uint8_t len = data[i+3];
+    uint8_t instruction = data[i+4];
+
+    if (id == ETHERBOTIX_ID)
+    {
+      // Process packets for self
+      if (instruction == DYN_READ_DATA)
+      {
+        uint8_t read_addr = data[i+5];
+        uint8_t read_len = data[i+6];
+
+        uint8_t packet[256];
+        packet[0] = 0xff;
+        packet[1] = 0xff;
+        packet[2] = ETHERBOTIX_ID;
+        packet[3] = read_len;
+        packet[4] = 0;  // No error
+        packet[5+read_len] = 0;  // Init checksum to 0
+
+        // Copy packet data
+        uint8_t * reg_data = (uint8_t *) &registers;
+        reg_data += read_addr;
+        for (int j = 0; j < read_len; ++j)
+        {
+          packet[5+j] = *(reg_data++);
+          packet[5+read_len] += packet[5+j];
+        }
+
+        packet[5+read_len] = 255 - packet[5+read_len];  // Compute checksum
+        udp_send_packet(packet, read_len + 6, port);
+      }
+      else if (instruction == DYN_WRITE_DATA)
+      {
+        uint8_t write_addr = data[i+5];
+        if (write_addr >= 128)
+        {
+          // This is a device, write all data to single place
+          if (write_addr == DEVICE_USART3_DATA)
+          {
+            // TODO Start USART3 if not already operational
+            // TODO Send data
+          }
+          else if (write_addr == DEVICE_SPI2_DATA)
+          {
+            // TODO
+          }
+        }
+        else
+        {
+          int j = 0;
+          while (j < len -3)
+          {
+            if (write_addr + j == REG_BAUD_RATE)
+            {
+              // TODO Set baud rate of USART1/2
+            }
+            else if (write_addr + j == REG_DELAY_TIME)
+            {
+              // TODO
+            }
+            else if (write_addr + j == REG_DIGITAL_DIR)
+            {
+              // TODO
+            }
+            else if (write_addr + j == REG_DIGITAL_OUT)
+            {
+              // TODO
+            }
+            else if (write_addr + j == REG_ALARM_LED)
+            {
+              if (data[i+6+j] > 0)
+                error::high();
+              else
+                error::low();
+            }
+            else if (write_addr + j == REG_USART3_BAUD)
+            {
+              // TODO Set baud rate of USART3
+            }
+            else if (write_addr + j == REG_SPI2_BAUD)
+            {
+              // TODO Set baud rate of SPI2
+            }
+            else
+            {
+              // INSTRUCTION ERROR on invalid write?
+            }
+            ++j;
+          }
+        }
+      }
+    }
+    else  // Pass through to servos
+    {
+      // Make sure any previous packets are done sending
+      while (!(usart1.done() && usart2.done()))
+        ;
+
+      // Serial bus deals in 16-bit data, need to copy packet
+      uint16_t packet[256];
+      for (int j = 0; j < len+4; ++j)
+        packet[j] = data[i+j];
+
+      // Reset parsers
+      usart1_parser.reset();
+      usart2_parser.reset();
+
+      if (instruction == DYN_READ_DATA)
+      {
+        // Blast packet to each bus
+        usart1.write(packet, len+4);
+        usart2.write(packet, len+4);
+
+        // Wait for send to complete
+        while (!(usart1.done() && usart2.done()))
+          ;
+
+        // Wait for response on at least one bus
+        while (true)
+        {
+          uint8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
+          if (p1 > 0)
+          {
+            // Got a packet
+            uint8_t packet[256];
+            packet[0] = 0xff;
+            packet[1] = 0xff;
+            packet[2] = usart1_parser.packet.id;
+            packet[3] = usart1_parser.packet.length;
+            packet[4] = usart1_parser.packet.error;
+            for (int j = 0; j < usart1_parser.packet.length-2; ++j)
+              packet[5+j] = usart1_parser.packet.parameters[j];
+            packet[3+usart1_parser.packet.length] = usart1_parser.packet.checksum;
+            udp_send_packet(packet, usart1_parser.packet.length + 4, port);
+            break;
+          }
+
+          uint8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
+          if (p2 > 0)
+          {
+            // Got a packet
+            uint8_t packet[256];
+            packet[0] = 0xff;
+            packet[1] = 0xff;
+            packet[2] = usart2_parser.packet.id;
+            packet[3] = usart2_parser.packet.length;
+            packet[4] = usart2_parser.packet.error;
+            for (int j = 0; j < usart2_parser.packet.length-2; ++j)
+              packet[5+j] = usart2_parser.packet.parameters[j];
+            packet[3+usart2_parser.packet.length] = usart2_parser.packet.checksum;
+            udp_send_packet(packet, usart2_parser.packet.length + 4, port);
+            break;
+          }
+
+          if (p1 < 0 && p2 < 0)
+          {
+            // Timeout or other error
+            break;
+          }
+        }
+      }
+      else if (instruction == DYN_SYNC_READ)
+      {
+        // What to read
+        uint8_t read_addr = data[i+5];  // First parameter is the read address
+        uint8_t read_len = data[i+6];   // Second parameter is # of bytes to read
+
+        // Single response packet to send back to PC from several servo packets
+        uint8_t packet[256];
+        packet[0] = 0xff;
+        packet[1] = 0xff;
+        packet[2] = 0xfe;  // broadcast
+        packet[3] = 2 + (read_len*(len-4));
+        packet[4] = 0;  // No error
+        uint8_t packet_idx = 5;
+        uint8_t packet_chk = 0xfe + packet[3];
+
+        // Read data from each servo
+        for (int j = 2; j < len-2; ++j)
+        {
+          uint16_t pkt[256];
+          pkt[0] = 0xff;
+          pkt[1] = 0xff;
+          pkt[2] = data[i+5+j];  // ID of this servo
+          pkt[3] = 4;  // len remaining
+          pkt[4] = DYN_READ_DATA;
+          pkt[5] = read_addr;
+          pkt[6] = read_len;
+          pkt[7] = 0;// TODO
+
+          // Reset parsers
+          usart1_parser.reset();
+          usart2_parser.reset();
+
+          // Send read to each bus
+          usart1.write(pkt, 8);
+          usart2.write(pkt, 8);
+
+          // Wait for send to complete
+          while (!(usart1.done() && usart2.done()))
+            ;
+
+          // Wait for response on at least one bus
+          while (true)
+          {
+            uint8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
+            if (p1 > 0)
+            {
+              // Got a packet
+              for (uint8_t k = 0; k < read_len; ++k)
+              {
+                packet[packet_idx++] += usart1_parser.packet.parameters[k];
+                packet_chk += usart1_parser.packet.parameters[k];
+              }
+              break;
+            }
+
+            uint8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
+            if (p2 > 0)
+            {
+              // Got a packet
+              for (uint8_t k = 0; k < read_len; ++k)
+              {
+                packet[packet_idx++] += usart2_parser.packet.parameters[k];
+                packet_chk += usart2_parser.packet.parameters[k];
+              }
+              break;
+            }
+
+            if (p1 < 0 && p2 < 0)
+            {
+              // Timeout or other error
+              for (uint8_t k = 0; k < read_len; ++k)
+              {
+                packet[packet_idx++] += 0xff;  // 0xffff is not a valid servo position
+                packet_chk += 0xff;
+              }
+              break;
+            }
+          }  // end while wait for packet
+        }  // end for each servo
+
+        packet[packet_idx++] = 255-packet_chk;
+        udp_send_packet(packet, packet_idx, port);
+      }
+      else if (instruction == DYN_WRITE_DATA ||
+               instruction == DYN_SYNC_WRITE)
+      {
+        // Blast packet to each bus
+        usart1.write(packet, len+4);
+        usart2.write(packet, len+4);
+
+        // Wait for send to complete
+        while (!(usart1.done() && usart2.done()))
+          ;
+
+        // No need to wait for response
+      }
+    }
+
+    i += len + 6;
+  }
 
   // Free buffer
   pbuf_free(p);
@@ -128,6 +414,21 @@ int main(void)
 
   // Setup ethernet
   setup_gpio_ethernet();
+
+  // Setup serial
+  RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN | RCC_AHB1ENR_DMA2EN;
+  RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+  usart1_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART1);
+  usart1_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART1);
+  usart1.init(1000000, 8);  // TODO: baud should be configurable
+  NVIC_SetPriority(USART1_IRQn, 1);
+  NVIC_EnableIRQ(USART1_IRQn);
+  RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+  usart2_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART2);
+  usart2_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART2);
+  usart2.init(1000000, 8);  // TODO: baud should be configurable
+  NVIC_SetPriority(USART2_IRQn, 1);
+  NVIC_EnableIRQ(USART2_IRQn);
 
   // Setup analog
   RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN | RCC_APB2ENR_ADC3EN;
@@ -187,18 +488,38 @@ void SysTick_Handler(void)
   registers.a1 = adc2.get_channel3();
   registers.a2 = adc2.get_channel4();
 
+  // Motor current sense channels
+  registers.motor1_current = adc2.get_channel1();
+  registers.motor2_current = adc2.get_channel2();
+
   // Toggle LED
-  if (1) //registers.system_time - last_packet < 500)
+  if (registers.system_time - last_packet < 500)
   {
     if (registers.system_time % 200 == 0)
       act::high();
     else if (registers.system_time % 100 == 0)
       act::low();
   }
+  else
+  {
+    act::low();
+  }
 
   // Start next conversion of voltage/current
   adc1.convert();
   adc2.convert();
+}
+
+// Turn around the rs-485 bus
+void USART1_IRQHandler(void)
+{
+  usart1.usartIrqHandler();
+}
+
+// Turn around the ax/mx bus
+void USART2_IRQHandler(void)
+{
+  usart2.usartIrqHandler();
 }
 
 }
