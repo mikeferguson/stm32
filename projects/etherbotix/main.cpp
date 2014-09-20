@@ -34,6 +34,8 @@
 #include "lwip/udp.h"
 #include "stm32f4x7_eth.h"
 
+#include "analog_sampler.hpp"
+
 struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
@@ -127,6 +129,25 @@ int main(void)
   // Setup ethernet
   setup_gpio_ethernet();
 
+  // Setup analog
+  RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN | RCC_APB2ENR_ADC3EN;
+  adc1.init(VOLTAGE_ANALOG_CHANNEL,
+            SERVO_CURRENT_ANALOG_CHANNEL,
+            AUX_CURRENT_ANALOG_CHANNEL,
+            A0_ANALOG_CHANNEL);
+  adc2.init(M1_CURRENT_ANALOG_CHANNEL,
+            M2_CURRENT_ANALOG_CHANNEL,
+            A2_ANALOG_CHANNEL,
+            A2_ANALOG_CHANNEL);  // TODO: set trigger on motor timer
+  voltage_sense::mode(GPIO_INPUT_ANALOG);  // TODO: set sample times
+  servo_sense::mode(GPIO_INPUT_ANALOG);
+  aux_sense::mode(GPIO_INPUT_ANALOG);
+  a0_sense::mode(GPIO_INPUT_ANALOG);
+  m1_sense::mode(GPIO_INPUT_ANALOG);
+  m2_sense::mode(GPIO_INPUT_ANALOG);
+  a1_sense::mode(GPIO_INPUT_ANALOG);
+  a2_sense::mode(GPIO_INPUT_ANALOG);
+
   // Setup systick
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
@@ -151,6 +172,21 @@ void SysTick_Handler(void)
 {
   ++registers.system_time;
 
+  // Get system voltage in 0.1V increment:
+  //   adc is 12 bit (4096 count) spread over 3.3V
+  //   voltage divider is 15k/1k
+  registers.system_voltage = (adc1.get_channel1()/4096.0f) * 3.3f * 16 * 10;
+
+  // Get aux/servo currents:
+  //   ACS711: vcc/2 = 0A, 55mV/A
+  registers.servo_current = ((adc1.get_channel2()-2048)/4096.0f) * 3.3f * 0.055f;
+  registers.aux_current = ((adc1.get_channel3()-2048)/4096.0f) * 3.3f * 0.055f;
+
+  // Analog channels
+  registers.a0 = adc1.get_channel4();
+  registers.a1 = adc2.get_channel3();
+  registers.a2 = adc2.get_channel4();
+
   // Toggle LED
   if (1) //registers.system_time - last_packet < 500)
   {
@@ -159,6 +195,10 @@ void SysTick_Handler(void)
     else if (registers.system_time % 100 == 0)
       act::low();
   }
+
+  // Start next conversion of voltage/current
+  adc1.convert();
+  adc2.convert();
 }
 
 }
