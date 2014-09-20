@@ -35,9 +35,13 @@
 #include "lwip/udp.h"
 #include "stm32f4x7_eth.h"
 
+#include "mini_imu9_v2.hpp"
 #include "usart_dma.hpp"
 #include "analog_sampler.hpp"
 
+MiniImu9v2<I2C1_BASE,
+           DMA1_Stream0_BASE, 0 /* stream */, 1 /* channel */,
+           imu_scl, imu_sda> imu;
 usart1_t usart1;
 usart2_t usart2;
 DynamixelParser<usart1_t> usart1_parser;
@@ -430,6 +434,10 @@ int main(void)
   NVIC_SetPriority(USART2_IRQn, 1);
   NVIC_EnableIRQ(USART2_IRQn);
 
+  // Setup IMU
+  imu.init(100000);
+  imu.use_magnetometer(true);
+
   // Setup analog
   RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN | RCC_APB2ENR_ADC3EN;
   adc1.init(VOLTAGE_ANALOG_CHANNEL,
@@ -463,6 +471,21 @@ int main(void)
   while(1)
   {
     LwIP_Periodic_Handle(registers.system_time);
+
+    if (imu.update(registers.system_time))
+    {
+      registers.accel_x = imu.accel_data.x;
+      registers.accel_y = imu.accel_data.y;
+      registers.accel_z = imu.accel_data.z;
+
+      registers.gyro_x = imu.gyro_data.x;
+      registers.gyro_y = imu.gyro_data.y;
+      registers.gyro_z = imu.gyro_data.z;
+
+      registers.mag_x = imu.mag_data.x;
+      registers.mag_y = imu.mag_data.y;
+      registers.mag_z = imu.mag_data.z;
+    }
   }
 }
 
