@@ -177,6 +177,25 @@ typedef Gpio<GPIOB_BASE,15> d5;  // also TIM12_CH2
 typedef Gpio<GPIOE_BASE,5> d6;   // also TIM9_CH1
 typedef Gpio<GPIOE_BASE,6> d7;   // also TIM9_CH2
 
+// Init function for ethernet GPIO
+inline void setup_gpio_ethernet()
+{
+  phy_rst::mode(GPIO_OUTPUT_2MHz);
+  phy_rst::high();  // release reset line
+
+  eth_rmii_ref_clk::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+  eth_rmii_crs_dv::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+
+  eth_rmii_tx_en::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+  eth_rmii_txd0::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+  eth_rmii_txd1::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+  eth_rmii_rxd0::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+  eth_rmii_rxd1::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+
+  eth_mdio::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+  eth_mdc::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
+}
+
 // Storage of register data
 typedef struct
 {
