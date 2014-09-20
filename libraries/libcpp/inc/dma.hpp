@@ -38,9 +38,18 @@
 
 #include "stm32f4xx_dma.h"
 
-
 /**
  *  \brief Generic templated class for reading to memory to a device.
+ *  \tparam T The type of data being transmitted, usually uint8_t or uint16_t.
+ *  \tparam DMA The DMA stream base, for instance DMA1_Stream5_BASE.
+ *  \tparam STREAM_FLAG The stream flag, for instance DMA_FLAG_TCIF5.
+ *  \tparam CHANNEL The channel, fo rinstance DMA_Channel_4.
+ *  \tparam PERIPH_ADDR The address of the peripherial to read from.
+ *  \tparam BUFFER_SIZE Size of internal buffer to read into.
+ *
+ *  DMA, STREAM_FLAG, CHANNEL should all be something defined in stm32f4xx_dma.h,
+ *  these are all register mappings (for instance, "4" is not a valid channel
+ *  option, but DMA_Channel_4 is).
  */
 template <typename T, uint32_t DMA, uint32_t STREAM_FLAG, uint32_t CHANNEL, uint32_t PERIPH_ADDR, int BUFFER_SIZE>
 class PeriphReadDMA
@@ -123,7 +132,6 @@ public:
     tail_ = 0;
     reinterpret_cast<DMA_Stream_TypeDef*>(DMA)->CR |= (uint32_t)DMA_SxCR_EN;   // Enable
   }
- 
 
 private:
   T buffer_[BUFFER_SIZE];
@@ -133,6 +141,16 @@ private:
 
 /**
  *  \brief Generic templated class for writing a buffer from memory to a device.
+ *  \tparam T The type of data being transmitted, usually uint8_t or uint16_t.
+ *  \tparam DMA The DMA stream base, for instance DMA1_Stream5_BASE.
+ *  \tparam STREAM_FLAG The stream flag, for instance DMA_FLAG_TCIF5.
+ *  \tparam CHANNEL The channel, fo rinstance DMA_Channel_4.
+ *  \tparam PERIPH_ADDR The address of the peripherial to write to.
+ *  \tparam BUFFER_SIZE Size of internal buffer to write from.
+ *
+ *  DMA, STREAM_FLAG, CHANNEL should all be something defined in stm32f4xx_dma.h,
+ *  these are all register mappings (for instance, "4" is not a valid channel
+ *  option, but DMA_Channel_4 is).
  */
 template <typename T, uint32_t DMA, uint32_t STREAM_FLAG, uint32_t CHANNEL, uint32_t PERIPH_ADDR, uint32_t BUFFER_SIZE>
 class PeriphWriteDMA
@@ -178,7 +196,6 @@ public:
     DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
     DMA_Init(reinterpret_cast<DMA_Stream_TypeDef*>(DMA), &DMA_InitStructure);
   }
-
 
   /**
    *  \brief Start write of data stored in internal buffer to a peripherial, using this DMA.
