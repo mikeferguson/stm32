@@ -151,6 +151,7 @@ public:
     reinterpret_cast<USART_TypeDef*>(USARTx)->SR &= ~USART_FLAG_TC;
     /* Enable TC interrupt (to allow quick turn-around of RS485 write enable signal) */
     USART_ITConfig(reinterpret_cast<USART_TypeDef*>(USARTx), USART_IT_TC, ENABLE);
+    write_complete_ = true;
   }
 
   inline void setTX()
@@ -189,7 +190,7 @@ public:
    */
   inline bool done()
   {
-    return write_complete_;
+    return this->write_dma.done() && write_complete_;
   }
 
 protected:
