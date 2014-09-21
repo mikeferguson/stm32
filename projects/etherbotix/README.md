@@ -64,3 +64,14 @@ This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
    * DMA2, Stream2, Ch4 = USART1_RX
    * DMA2, Stream7, Ch4 = USART1_TX
 
+## Status
+
+This is a work in progress. Overview:
+ * Dynamixel read/write work, have not yet tested sync write or sync read.
+ * IMU code is identical to eth_bridge, but is untested.
+ * Motor control via UDP is untested.
+ * Motor current sense is unimplemented (maybe need to sync tim1/8, certainly
+   need to trigger adc2 with the PWM)
+ * Baud rate for MX/RX busses is not implemented
+ * Usart3 support is not implemented
+ * SPI2 support is not implemented
