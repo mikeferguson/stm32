@@ -262,8 +262,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         packet[j] = data[i+j];
 
       // Reset parsers
-      usart1_parser.reset();
-      usart2_parser.reset();
+      usart1_parser.reset(&usart1);
+      usart2_parser.reset(&usart2);
 
       if (instruction == DYN_READ_DATA)
       {
@@ -349,8 +349,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           pkt[7] = 0;// TODO
 
           // Reset parsers
-          usart1_parser.reset();
-          usart2_parser.reset();
+          usart1_parser.reset(&usart1);
+          usart2_parser.reset(&usart2);
 
           // Send read to each bus
           usart1.write(pkt, 8);

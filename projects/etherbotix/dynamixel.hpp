@@ -70,7 +70,7 @@ class DynamixelParser
 public:
   DynamixelParser()
   {
-    reset();
+    state_ = BUS_IDLE;
     timeout_ = 10;  // TODO: 2ms?
   }
 
@@ -170,8 +170,11 @@ public:
   }
 
   /** @brief Reset the state of the parser */
-  void reset()
+  void reset(T* bus)
   {
+    // Get rid of any remaining data in DMA, reset to IDLE
+    while (bus->read() >= 0)
+      ;
     state_ = BUS_IDLE;
   }
 
