@@ -55,7 +55,8 @@
 #define REG_AUX_CURRENT     22  // 16-bit signed current in mA
 #define REG_SYSTEM_VOLTAGE  24  // Voltage in 0.1V increments
 #define REG_LED             25  // Turns on error led
-#define REG_MOTOR_PERIOD    31  // 8-bit motor cycle period (1-100mS, 0 deactives driver)
+#define REG_MOTOR_PERIOD    29  // 8-bit motor cycle period (1-100mS, 0 deactives driver)
+#define REG_MOTOR_MAX_STEP  30  // Max amount of change in PID setpoint per motor period
 
 #define REG_MOTOR1_VEL      32  // 16-bit motor velocity (ticks/cycle, read-write)
 #define REG_MOTOR2_VEL      34  // 16-bit motor velocity (ticks/cycle, read-write)
@@ -218,9 +219,9 @@ typedef struct
   uint8_t system_voltage;
   uint8_t led;
   uint16_t unused_26;
-  uint16_t unused_28;
-  uint8_t unused_30;
+  uint8_t unused_28;
   uint8_t motor_period;
+  uint16_t motor_max_step;
 
   int16_t motor1_vel;
   int16_t motor2_vel;
