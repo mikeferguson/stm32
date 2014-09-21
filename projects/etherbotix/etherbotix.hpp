@@ -31,6 +31,7 @@
 #define __ETHERBOTIX_HPP__
 
 #include "stm32f4xx.h"
+#include "delay.hpp"
 #include "gpio.hpp"
 #include "usart_dma.hpp"
 
@@ -181,8 +182,12 @@ typedef Gpio<GPIOE_BASE,6> d7;   // also TIM9_CH2
 // Init function for ethernet GPIO
 inline void setup_gpio_ethernet()
 {
+  // Setup reset pin, hold low then release. Without this, several
+  // of the boards would end up in 10Mbit mode when the proc was reset.
   phy_rst::mode(GPIO_OUTPUT_2MHz);
-  phy_rst::high();  // release reset line
+  phy_rst::low();
+  delay_us(5);  // TLK110 specifies minimum 1uS low
+  phy_rst::high();
 
   eth_rmii_ref_clk::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
   eth_rmii_crs_dv::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
