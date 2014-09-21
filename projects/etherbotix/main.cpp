@@ -29,6 +29,7 @@
 
 #include "etherbotix.hpp"
 #include "dynamixel.hpp"
+#include "pid.hpp"
 
 #include "netconf.h"
 #include "lwip/memp.h"
@@ -36,12 +37,18 @@
 #include "stm32f4x7_eth.h"
 
 #include "mini_imu9_v2.hpp"
+#include "md01.hpp"
+#include "encoder.hpp"
 #include "usart_dma.hpp"
 #include "analog_sampler.hpp"
 
 MiniImu9v2<I2C1_BASE,
            DMA1_Stream0_BASE, 0 /* stream */, 1 /* channel */,
            imu_scl, imu_sda> imu;
+Md01<TIM1_BASE, m1_a, m1_b, m1_en> m1;
+Md01<TIM8_BASE, m2_a, m2_b, m2_en> m2;
+Encoder<TIM4_BASE> m1_enc;
+Encoder<TIM3_BASE> m2_enc;
 usart1_t usart1;
 usart2_t usart2;
 DynamixelParser<usart1_t> usart1_parser;
@@ -154,6 +161,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         else
         {
           int j = 0;
+          bool update_gains = false;
           while (j < len -3)
           {
             if (write_addr + j == REG_BAUD_RATE)
@@ -179,6 +187,40 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               else
                 error::low();
             }
+            else if (write_addr + j == REG_MOTOR_PERIOD)
+            {
+              if (data[i+6+j] > 0 && data[i+6+j] < 100)
+                registers.motor_period = data[i+6+j];
+            }
+            else if (write_addr + j == REG_MOTOR_MAX_STEP)
+            {
+              int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              m1_pid.set_max_step(v);
+              m2_pid.set_max_step(v);
+              ++j;  // uses 2 bytes
+            }
+            else if (write_addr + j == REG_MOTOR1_VEL)
+            {
+              // Write 16-bit setpoint
+              int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              m1_pid.update_setpoint(v);
+              ++j;  // uses 2 bytes
+            }
+            else if (write_addr + j == REG_MOTOR2_VEL)
+            {
+              // Write 16-bit setpoint
+              int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              m2_pid.update_setpoint(v);
+              ++j;  // uses 2 bytes
+            }
+            else if (write_addr + j >= REG_MOTOR1_KP &&
+                     write_addr + j < REG_ACC_X)
+            {
+              // Updating gains
+              uint8_t * reg_data = (uint8_t *) &registers;
+              reg_data[write_addr + j] = data[i+6+j];
+              update_gains = true;
+            }
             else if (write_addr + j == REG_USART3_BAUD)
             {
               // TODO Set baud rate of USART3
@@ -192,6 +234,18 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // INSTRUCTION ERROR on invalid write?
             }
             ++j;
+          }
+          if (update_gains)
+          {
+            // Stop motors
+            m1_pid.reset();
+            m2_pid.reset();
+
+            // Actually update gains
+            m1_pid.set_gains(registers.motor1_kp, registers.motor1_kd,
+                             registers.motor1_ki, registers.motor1_windup);
+            m2_pid.set_gains(registers.motor2_kp, registers.motor2_kd,
+                             registers.motor2_ki, registers.motor2_windup);
           }
         }
       }
@@ -396,12 +450,20 @@ int main(void)
   registers.digital_out = 0;
   registers.system_time = last_packet = 0;
   registers.motor_period = 10;  // 10mS period = 100hz
-  registers.motor1_kp = registers.motor2_kp = 0;
+  registers.motor_max_step = 10;
+  registers.motor1_kp = registers.motor2_kp = 1.0;
   registers.motor1_kd = registers.motor2_kd = 0;
-  registers.motor1_ki = registers.motor2_ki = 0;
-  registers.motor1_windup = registers.motor2_windup = 0;
+  registers.motor1_ki = registers.motor2_ki = 0.1;
+  registers.motor1_windup = registers.motor2_windup = 400;
   registers.usart3_baud = 34;  // 56700
   registers.packets_recv = registers.packets_bad = 0;
+
+  m1_pid.set_max_step(registers.motor_max_step);
+  m1_pid.set_gains(registers.motor1_kp, registers.motor1_kd,
+                   registers.motor1_ki, registers.motor1_windup);
+  m2_pid.set_max_step(registers.motor_max_step);
+  m2_pid.set_gains(registers.motor2_kp, registers.motor2_kd,
+                   registers.motor2_ki, registers.motor2_windup);
 
   NVIC_SetPriorityGrouping(3);
 
@@ -433,6 +495,22 @@ int main(void)
   usart2.init(1000000, 8);  // TODO: baud should be configurable
   NVIC_SetPriority(USART2_IRQn, 1);
   NVIC_EnableIRQ(USART2_IRQn);
+
+  // Setup motors
+  RCC->APB2ENR |= RCC_APB2ENR_TIM1EN | RCC_APB2ENR_TIM8EN;
+  m1_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM1);
+  m2_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM8);
+  m1.init(17, 1024);  // actually 16.7kHz, 10-bit resolution
+  m2.init(17, 1024);
+
+  // Setup encoders
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN | RCC_APB1ENR_TIM4EN;
+  m1_enc_a::mode(GPIO_ALTERNATE | GPIO_AF_TIM4);
+  m1_enc_b::mode(GPIO_ALTERNATE | GPIO_AF_TIM4);
+  m2_enc_a::mode(GPIO_ALTERNATE | GPIO_AF_TIM3);
+  m2_enc_b::mode(GPIO_ALTERNATE | GPIO_AF_TIM3);
+  m1_enc.init();
+  m2_enc.init();
 
   // Setup IMU
   imu.init(100000);
@@ -514,6 +592,20 @@ void SysTick_Handler(void)
   // Motor current sense channels
   registers.motor1_current = adc2.get_channel1();
   registers.motor2_current = adc2.get_channel2();
+
+  // Update motors
+  if (registers.system_time % registers.motor_period == 0)
+  {
+    // Update table with position/velocity
+    registers.motor1_pos = m1_enc.read();
+    registers.motor2_pos = m2_enc.read();
+    registers.motor1_vel = m1_enc.read_speed();
+    registers.motor2_vel = m2_enc.read_speed();
+
+    // Update PID and set motor commands
+    m1.set(m1_pid.update_pid(registers.motor1_vel));
+    m2.set(m2_pid.update_pid(registers.motor2_vel));
+  }
 
   // Toggle LED
   if (registers.system_time - last_packet < 500)
