@@ -215,7 +215,7 @@ public:
    *  \param data Pointer to buffer to write.
    *  \param len Length of buffer.
    */
-  bool write(uint16_t * data, uint8_t len)
+  bool write(T * data, uint8_t len)
   {
     writing_ = true;
     for (int i = 0; i < len; ++i)
