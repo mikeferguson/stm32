@@ -72,6 +72,6 @@ This is a work in progress. Overview:
  * Motor control via UDP is untested.
  * Motor current sense is unimplemented (maybe need to sync tim1/8, certainly
    need to trigger adc2 with the PWM)
- * Baud rate for MX/RX busses is not implemented
+ * Digital/Analog IO is not implemented
  * Usart3 support is not implemented
  * SPI2 support is not implemented

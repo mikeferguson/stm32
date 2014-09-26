@@ -54,12 +54,38 @@ usart2_t usart2;
 DynamixelParser<usart1_t> usart1_parser;
 DynamixelParser<usart2_t> usart2_parser;
 
+registers_t registers;  // Register data
+uint32_t last_packet;  // Timestamp of last packet
+
+// Setup the baud rate of dynamixel ports
+int set_dynamixel_baud(uint8_t value)
+{
+  uint32_t baud = 0;
+  if (value == 1)
+    baud = 1000000;
+  else if (value == 3)
+    baud = 500000;
+  else if (value == 34)
+    baud = 57600;
+  else if (value == 250)
+    baud = 2250000;
+  else if (value == 251)
+    baud = 2500000;
+  else if (value == 252)
+    baud = 3000000;
+  else
+    return -1;  // Unsupported baud rate
+
+  usart1.init(baud, 8);
+  usart2.init(baud, 8);
+  registers.baud_rate = value;
+  return 1;
+}
+
 struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
 
-registers_t registers;  // Register data
-uint32_t last_packet;  // Timestamp of last packet
 
 void udp_send_packet(uint8_t * packet, uint8_t len, uint16_t port)
 {
@@ -166,7 +192,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           {
             if (write_addr + j == REG_BAUD_RATE)
             {
-              // TODO Set baud rate of USART1/2
+              // Update baud rate
+              uint8_t baud = data[i+6+j];
+              set_dynamixel_baud(baud);
             }
             else if (write_addr + j == REG_DELAY_TIME)
             {
@@ -441,11 +469,13 @@ int udp_interface_init()
 
 int main(void)
 {
+  // TODO save/load register table from flash
+
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
   registers.version = 0;
   registers.id = 253;
-  registers.baud_rate = 34;  // 56700
+  registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
   registers.digital_out = 0;
   registers.system_time = last_packet = 0;
@@ -486,15 +516,14 @@ int main(void)
   RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
   usart1_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART1);
   usart1_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART1);
-  usart1.init(1000000, 8);  // TODO: baud should be configurable
   NVIC_SetPriority(USART1_IRQn, 1);
   NVIC_EnableIRQ(USART1_IRQn);
   RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
   usart2_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART2);
   usart2_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART2);
-  usart2.init(1000000, 8);  // TODO: baud should be configurable
   NVIC_SetPriority(USART2_IRQn, 1);
   NVIC_EnableIRQ(USART2_IRQn);
+  set_dynamixel_baud(registers.baud_rate);
 
   // Setup motors
   RCC->APB2ENR |= RCC_APB2ENR_TIM1EN | RCC_APB2ENR_TIM8EN;
