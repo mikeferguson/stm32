@@ -374,7 +374,10 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           pkt[4] = DYN_READ_DATA;
           pkt[5] = read_addr;
           pkt[6] = read_len;
-          pkt[7] = 0;// TODO
+          uint8_t chk = 0;
+          for (int p = 2; p < 7;p++)
+            chk += pkt[p];
+          pkt[7] = 255 - chk;
 
           // Reset parsers
           usart1_parser.reset(&usart1);
@@ -397,7 +400,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // Got a packet
               for (uint8_t k = 0; k < read_len; ++k)
               {
-                packet[packet_idx++] += usart1_parser.packet.parameters[k];
+                packet[packet_idx++] = usart1_parser.packet.parameters[k];
                 packet_chk += usart1_parser.packet.parameters[k];
               }
               break;
@@ -409,7 +412,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // Got a packet
               for (uint8_t k = 0; k < read_len; ++k)
               {
-                packet[packet_idx++] += usart2_parser.packet.parameters[k];
+                packet[packet_idx++] = usart2_parser.packet.parameters[k];
                 packet_chk += usart2_parser.packet.parameters[k];
               }
               break;

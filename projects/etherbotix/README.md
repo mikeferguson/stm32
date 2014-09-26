@@ -67,7 +67,6 @@ This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
 ## Status
 
 This is a work in progress. Overview:
- * Dynamixel read/write work, have not yet tested sync write or sync read.
  * IMU code is identical to eth_bridge, but is untested.
  * Motor control via UDP is untested.
  * Motor current sense is unimplemented (maybe need to sync tim1/8, certainly
