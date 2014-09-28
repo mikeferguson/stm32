@@ -105,7 +105,8 @@ public:
 
     /* Get data to return */
     T data = (T) -1;
-    if(head_ != tail_){
+    if (head_ != tail_)
+    {
       data = buffer_[tail_];
       tail_ = (tail_+1)%BUFFER_SIZE;
     }
@@ -113,18 +114,14 @@ public:
     return data;
   }
 
-  /** 
-   * \brief Returns true if there is curretly no data in the read buffer
-   */
+  /** \brief Returns true if there is curretly no data in the read buffer. */
   bool isEmpty()
   {
     uint32_t head = (BUFFER_SIZE - (uint16_t)(reinterpret_cast<DMA_Stream_TypeDef*>(DMA)->NDTR))%BUFFER_SIZE;
     return (head == tail_);
   }
 
-  /** 
-   * \brief Clear data in buffer (resetting buffer)
-   */
+  /** \brief Clear data in buffer (resetting buffer). */
   void clearReadBuffer()
   {
     reinterpret_cast<DMA_Stream_TypeDef*>(DMA)->CR &= ~(uint32_t)DMA_SxCR_EN;  // Disable    
@@ -241,17 +238,13 @@ public:
     return !writing_;
   }
 
-  /**
-   * \brief returns number of T objects buffer can hold (as opposed to bytes) 
-   */
+  /** \brief returns number of T objects buffer can hold (as opposed to bytes). */
   inline uint32_t bufferSize()
   {
     return BUFFER_SIZE;
   }
 
-  /** 
-   * \brief returns a pointer to internal buffer that data is sent from
-   */
+  /** \brief returns a pointer to internal buffer that data is sent from. */
   T* getBuffer()
   {
     return buffer_;
