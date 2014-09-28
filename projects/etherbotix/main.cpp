@@ -210,6 +210,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             }
             else if (write_addr + j == REG_LED)
             {
+              registers.led = data[i+6+j];
               if (data[i+6+j] > 0)
                 error::high();
               else
@@ -306,7 +307,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         // Wait for response on at least one bus
         while (true)
         {
-          uint8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
+          int8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
           if (p1 > 0)
           {
             // Got a packet
@@ -323,7 +324,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             break;
           }
 
-          uint8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
+          int8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
           if (p2 > 0)
           {
             // Got a packet
@@ -394,7 +395,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           // Wait for response on at least one bus
           while (true)
           {
-            uint8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
+            int8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
             if (p1 > 0)
             {
               // Got a packet
@@ -406,7 +407,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               break;
             }
 
-            uint8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
+            int8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
             if (p2 > 0)
             {
               // Got a packet

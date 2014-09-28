@@ -64,7 +64,8 @@ class DynamixelParser
     BUS_READING_LENGTH,
     BUS_READING_ERROR,
     BUS_READING_PARAMS,
-    BUS_READING_CHECKSUM
+    BUS_READING_CHECKSUM,
+    BUS_ERROR
   };
 
 public:
@@ -72,6 +73,7 @@ public:
   {
     state_ = BUS_IDLE;
     timeout_ = 10;  // TODO: 2ms?
+    packets_ = errors_ = timeouts_ = 0;
   }
 
   /**
@@ -80,7 +82,7 @@ public:
    * @param ms Current system time, for timeouts
    * @returns Length of packet parsed, 0 if no packet, -1 if timeout/error
    */
-  uint8_t parse(T* bus, uint32_t ms)
+  int8_t parse(T* bus, uint32_t ms)
   {
     if (state_ == BUS_IDLE)
     {
@@ -137,21 +139,26 @@ public:
       else if (state_ == BUS_READING_ERROR)
       {
         packet.error = b;
-        checksum_ += packet.id + packet.length + b;
+        checksum_ = packet.id + packet.length + b;
         param_ = 0;
         state_ = BUS_READING_PARAMS;
       }
       else if (state_ == BUS_READING_CHECKSUM)
       {
+        state_ = BUS_IDLE;
         packet.checksum = b;
         checksum_ += b;
         if (checksum_ == 255)
         {
           // Packet is good
+          packets_++;
           return packet.length + 4;
         }
         else
         {
+          // Packet is bad
+          state_ = BUS_ERROR;
+          errors_++;
           return -1;
         }
       }
@@ -161,7 +168,11 @@ public:
     // If we got here, no packet this time around, should we timeout?
     if (ms > last_byte_ + timeout_)
     {
-      state_ = BUS_READING_FF;
+      if (state_ != BUS_ERROR)
+      {
+        state_ = BUS_ERROR;
+        timeouts_++;
+      }
       return -1;
     }
 
@@ -175,6 +186,8 @@ public:
     // Get rid of any remaining data in DMA, reset to IDLE
     while (bus->read() >= 0)
       ;
+
+    // Go idle, on next parse last_byte will be reinitialized to current time
     state_ = BUS_IDLE;
   }
 
@@ -187,6 +200,10 @@ private:
 
   uint32_t last_byte_;  // Timestamp of last byte
   uint32_t timeout_;  // Timeout after which we abort packet
+
+  uint32_t packets_;  // Error counters for debugging
+  uint32_t timeouts_;
+  uint32_t errors_;
 };
 
 #endif // __ETHERBOTIX_DYNAMIXEL_HPP__
