@@ -154,7 +154,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         packet[2] = ETHERBOTIX_ID;
         packet[3] = read_len;
         packet[4] = 0;  // No error
-        packet[5+read_len] = 0;  // Init checksum to 0
+        packet[5+read_len] = ETHERBOTIX_ID + read_len;  // Init checksum
 
         // Copy packet data
         uint8_t * reg_data = (uint8_t *) &registers;
