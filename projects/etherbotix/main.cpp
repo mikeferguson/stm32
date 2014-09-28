@@ -424,7 +424,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // Timeout or other error
               for (uint8_t k = 0; k < read_len; ++k)
               {
-                packet[packet_idx++] += 0xff;  // 0xffff is not a valid servo position
+                packet[packet_idx++] = 0xff;  // 0xffff is not a valid servo position
                 packet_chk += 0xff;
               }
               break;
