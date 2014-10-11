@@ -87,6 +87,10 @@
 #define REG_MAG_Z           96
 #define REG_USART3_BAUD     98
 #define REG_SPI2_BAUD       99
+#define REG_TIM9_MODE       100
+#define REG_TIM9_COUNT      102
+#define REG_TIM12_MODE      104
+#define REG_TIM12_COUNT     106
 
 #define REG_PACKETS_RECV    120
 #define REG_PACKETS_BAD     124
@@ -179,6 +183,10 @@ typedef Gpio<GPIOB_BASE,15> d5;  // also TIM12_CH2
 typedef Gpio<GPIOE_BASE,5> d6;   // also TIM9_CH1
 typedef Gpio<GPIOE_BASE,6> d7;   // also TIM9_CH2
 
+typedef PeriphReadDMA<uint16_t, DMA1_Stream1_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART3_BASE+4, 1024> usart3_read_dma;
+typedef PeriphWriteDMA<uint16_t, DMA1_Stream3_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART3_BASE+4, 1024> usart3_write_dma;
+typedef UsartDMA<USART3_BASE, usart3_read_dma, usart3_write_dma> usart3_t;
+
 // Init function for ethernet GPIO
 inline void setup_gpio_ethernet()
 {
@@ -188,6 +196,8 @@ inline void setup_gpio_ethernet()
   phy_rst::low();
   delay_us(5);  // TLK110 specifies minimum 1uS low
   phy_rst::high();
+
+  delay_ms(300);  // Based on 9.7.1
 
   eth_rmii_ref_clk::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
   eth_rmii_crs_dv::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
@@ -210,7 +220,7 @@ typedef struct
   uint8_t id;
   uint8_t baud_rate;
   uint8_t delay_time;
-  uint8_t digital_in;
+  uint8_t digital_in;  // Read only, acts as mask when written
   uint8_t digital_dir;
   uint8_t digital_out;
   uint8_t unused_9;
@@ -257,8 +267,10 @@ typedef struct
 
   uint8_t usart3_baud;
   uint8_t spi2_baud;
-  uint32_t unused_100;
-  uint32_t unused_104;
+  uint16_t tim9_mode;
+  uint16_t tim9_count;
+  uint16_t tim12_mode;
+  uint16_t tim12_count;
   uint32_t unused_108;
 
   uint32_t unused_112;

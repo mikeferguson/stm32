@@ -57,6 +57,8 @@ DynamixelParser<usart2_t> usart2_parser;
 registers_t registers;  // Register data
 uint32_t last_packet;  // Timestamp of last packet
 
+#include "user_io.hpp"
+
 // Setup the baud rate of dynamixel ports
 int set_dynamixel_baud(uint8_t value)
 {
@@ -148,6 +150,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         uint8_t read_addr = data[i+5];
         uint8_t read_len = data[i+6];
 
+        // Update anything that isn't periodically updated
+        user_io_update();
+
         uint8_t packet[256];
         packet[0] = 0xff;
         packet[1] = 0xff;
@@ -176,8 +181,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           // This is a device, write all data to single place
           if (write_addr == DEVICE_USART3_DATA)
           {
-            // TODO Start USART3 if not already operational
-            // TODO Send data
+            user_io_usart_write(&data[i+6], len-3);
           }
           else if (write_addr == DEVICE_SPI2_DATA)
           {
@@ -200,13 +204,17 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // TODO
             }
-            else if (write_addr + j == REG_DIGITAL_DIR)
+            else if (write_addr + j == REG_DIGITAL_IN)
             {
-              // TODO
+              user_io_update_mask(data[i+6+j]);
             }
             else if (write_addr + j == REG_DIGITAL_OUT)
             {
-              // TODO
+              user_io_set_output(data[i+6+j]);
+            }
+            else if (write_addr + j == REG_DIGITAL_DIR)
+            {
+              user_io_set_direction(data[i+6+j]);
             }
             else if (write_addr + j == REG_LED)
             {
@@ -252,11 +260,17 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             }
             else if (write_addr + j == REG_USART3_BAUD)
             {
-              // TODO Set baud rate of USART3
+              // Set baud, start usart
+              registers.usart3_baud = data[i+6+j];
+              user_io_usart_init();
             }
             else if (write_addr + j == REG_SPI2_BAUD)
             {
               // TODO Set baud rate of SPI2
+            }
+            else if (write_addr + j == REG_TIM12_MODE)
+            {
+              user_io_tim12_init(data[i+6+j]);
             }
             else
             {

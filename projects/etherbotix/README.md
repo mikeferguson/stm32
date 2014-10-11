@@ -69,6 +69,7 @@ This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
 This is a work in progress. Overview:
  * Motor current sense is unimplemented (maybe need to sync tim1/8, certainly
    need to trigger adc2 with the PWM)
- * Digital/Analog IO is not implemented
- * Usart3 support is not implemented
+ * Digital input is not implemented
+ * Usart3 support is not tested
  * SPI2 support is not implemented
+ * Tim12 has only external trigger mode, Tim9 is not implemented
