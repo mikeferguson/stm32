@@ -67,8 +67,6 @@ This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
 ## Status
 
 This is a work in progress. Overview:
- * IMU code is identical to eth_bridge, but is untested.
- * Motor control via UDP is untested.
  * Motor current sense is unimplemented (maybe need to sync tim1/8, certainly
    need to trigger adc2 with the PWM)
  * Digital/Analog IO is not implemented
