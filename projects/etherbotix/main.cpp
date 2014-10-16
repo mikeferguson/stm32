@@ -56,6 +56,7 @@ DynamixelParser<usart2_t> usart2_parser;
 
 registers_t registers;  // Register data
 uint32_t last_packet;  // Timestamp of last packet
+uint32_t last_motor_cmd;  // Timestamp of last motor command
 
 #include "user_io.hpp"
 
@@ -241,6 +242,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // Write 16-bit setpoint
               int16_t v = data[i+6+j] + (data[i+7+j]<<8);
               m1_pid.update_setpoint(v);
+              last_motor_cmd = registers.system_time;
               ++j;  // uses 2 bytes
             }
             else if (write_addr + j == REG_MOTOR2_VEL)
@@ -248,6 +250,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // Write 16-bit setpoint
               int16_t v = data[i+6+j] + (data[i+7+j]<<8);
               m2_pid.update_setpoint(v);
+              last_motor_cmd = registers.system_time;
               ++j;  // uses 2 bytes
             }
             else if (write_addr + j >= REG_MOTOR1_KP &&
@@ -496,7 +499,7 @@ int main(void)
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
   registers.digital_out = 0;
-  registers.system_time = last_packet = 0;
+  registers.system_time = last_packet = last_motor_cmd = 0;
   registers.motor_period = 10;  // 10mS period = 100hz
   registers.motor_max_step = 10;
   registers.motor1_kp = registers.motor2_kp = 1.0;
@@ -641,17 +644,28 @@ void SysTick_Handler(void)
   registers.motor2_current = adc2.get_channel2();
 
   // Update motors
-  if (registers.system_time % registers.motor_period == 0)
+  if (registers.system_time - last_motor_cmd < 250)
   {
-    // Update table with position/velocity
-    registers.motor1_pos = m1_enc.read();
-    registers.motor2_pos = m2_enc.read();
-    registers.motor1_vel = m1_enc.read_speed();
-    registers.motor2_vel = m2_enc.read_speed();
+    if (registers.system_time % registers.motor_period == 0)
+    {
+      // Update table with position/velocity
+      registers.motor1_pos = m1_enc.read();
+      registers.motor2_pos = m2_enc.read();
+      registers.motor1_vel = m1_enc.read_speed();
+      registers.motor2_vel = m2_enc.read_speed();
 
-    // Update PID and set motor commands
-    m1.set(m1_pid.update_pid(registers.motor1_vel));
-    m2.set(m2_pid.update_pid(registers.motor2_vel));
+      // Update PID and set motor commands
+      m1.set(m1_pid.update_pid(registers.motor1_vel));
+      m2.set(m2_pid.update_pid(registers.motor2_vel));
+    }
+  }
+  else
+  {
+    // Motor commands have timed out
+    m1.set(0);
+    m2.set(0);
+    m1_pid.reset();
+    m2_pid.reset();
   }
 
   // Toggle LED
