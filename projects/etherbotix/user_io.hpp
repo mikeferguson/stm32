@@ -33,11 +33,11 @@
 usart3_t usart3;
 
 // State of user IO
-static uint8_t user_io_usart3_active_;
-static uint8_t user_io_spi2_active_;
-static uint8_t user_io_tim9_active_;
-static uint8_t user_io_tim12_active_;
-static uint8_t user_io_mask_;
+uint8_t user_io_usart3_active_;
+uint8_t user_io_spi2_active_;
+uint8_t user_io_tim9_active_;
+uint8_t user_io_tim12_active_;
+uint8_t user_io_mask_;
 
 inline void user_io_init()
 {

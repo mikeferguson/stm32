@@ -88,7 +88,9 @@ int set_dynamixel_baud(uint8_t value)
 struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
-
+uint16_t usart3_port;  // Port to return usart3 packets to (if usart3_char != 255)
+uint8_t usart3_string[256];
+uint8_t usart3_len;
 
 void udp_send_packet(uint8_t * packet, uint8_t len, uint16_t port)
 {
@@ -267,13 +269,20 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               registers.usart3_baud = data[i+6+j];
               user_io_usart_init();
             }
-            else if (write_addr + j == REG_SPI2_BAUD)
+            else if (write_addr + j == REG_USART3_CHAR)
             {
-              // TODO Set baud rate of SPI2
+              // Set terminating character & return port, reset length of string
+              registers.usart3_char = data[i+6+j];
+              usart3_len = 0;
+              usart3_port = port;
             }
             else if (write_addr + j == REG_TIM12_MODE)
             {
               user_io_tim12_init(data[i+6+j]);
+            }
+            else if (write_addr + j == REG_SPI2_BAUD)
+            {
+              // TODO Set baud rate of SPI2
             }
             else
             {
@@ -507,6 +516,7 @@ int main(void)
   registers.motor1_ki = registers.motor2_ki = 0.1;
   registers.motor1_windup = registers.motor2_windup = 400;
   registers.usart3_baud = 34;  // 56700
+  registers.usart3_char = 255;  // No terminating character
   registers.packets_recv = registers.packets_bad = 0;
 
   m1_pid.set_max_step(registers.motor_max_step);
@@ -613,6 +623,38 @@ int main(void)
       registers.mag_x = imu.mag_data.x;
       registers.mag_y = imu.mag_data.y;
       registers.mag_z = imu.mag_data.z;
+    }
+
+    if (user_io_usart3_active_ && registers.usart3_char != 255)
+    {
+      while (1)
+      {
+        // Attempt to read from usart3 and forward packet
+        int16_t c = usart3.read();
+
+        if (c >= 0)
+          usart3_string[usart3_len+5] = c;
+        else
+          break;
+
+        usart3_len++;
+
+        if (c == registers.usart3_char)
+        {
+          // Send return string
+          usart3_string[0] = 0xff;
+          usart3_string[1] = 0xff;
+          usart3_string[2] = 253; // id
+          usart3_string[3] = usart3_len+2; // len
+          usart3_string[4] = 0;  // error
+          uint8_t checksum = 0;
+          for (int i = 2; i < usart3_len+5; i++)
+            checksum += usart3_string[i];
+          usart3_string[5+usart3_len] = 255 - checksum;
+          udp_send_packet(usart3_string, usart3_len+6, usart3_port);
+          usart3_len = 0;
+        }
+      }
     }
   }
 }

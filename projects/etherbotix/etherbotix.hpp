@@ -86,11 +86,12 @@
 #define REG_MAG_Y           94
 #define REG_MAG_Z           96
 #define REG_USART3_BAUD     98
-#define REG_SPI2_BAUD       99
+#define REG_USART3_CHAR     99
 #define REG_TIM9_MODE       100
 #define REG_TIM9_COUNT      102
 #define REG_TIM12_MODE      104
 #define REG_TIM12_COUNT     106
+#define REG_SPI2_BAUD       108
 
 #define REG_PACKETS_RECV    120
 #define REG_PACKETS_BAD     124
@@ -266,12 +267,14 @@ typedef struct
   int16_t mag_z;
 
   uint8_t usart3_baud;
-  uint8_t spi2_baud;
+  uint8_t usart3_char;
   uint16_t tim9_mode;
   uint16_t tim9_count;
   uint16_t tim12_mode;
   uint16_t tim12_count;
-  uint32_t unused_108;
+  uint8_t spi2_baud;
+  uint8_t unused_109;
+  uint16_t unused_110;
 
   uint32_t unused_112;
   uint32_t unused_116;
