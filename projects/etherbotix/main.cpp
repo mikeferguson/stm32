@@ -92,6 +92,9 @@ uint16_t usart3_port;  // Port to return usart3 packets to (if usart3_char != 25
 uint8_t usart3_string[256];
 uint8_t usart3_len;
 
+// From IAP app note
+typedef  void (*pFunction)(void);
+
 void udp_send_packet(uint8_t * packet, uint8_t len, uint16_t port)
 {
   struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
@@ -190,12 +193,28 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           {
             // TODO
           }
+          else if (write_addr == DEVICE_BOOTLOADER)
+          {
+            if (len == 7 &&
+                data[i+6] == 'B' &&
+                data[i+7] == 'O' &&
+                data[i+8] == 'O' &&
+                data[i+9] == 'T')
+            {
+              force_bootloader::mode(GPIO_OUTPUT);
+              force_bootloader::low();
+              uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
+              pFunction Jump_To_Application = (pFunction) JumpAddress;
+              __set_MSP(*(__IO uint32_t*)0x08000000);
+              Jump_To_Application();
+            }
+          }
         }
         else
         {
           int j = 0;
           bool update_gains = false;
-          while (j < len -3)
+          while (j < len-3)
           {
             if (write_addr + j == REG_BAUD_RATE)
             {

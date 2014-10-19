@@ -7,7 +7,13 @@ MCU_FLAGS   += -DARM_MATH_CM4 -D__FPU_PRESENT
 # Library location
 LIB_PATH    := ../../libraries
 # Linker Script
+# Comment/Uncomment the USE_BOOTLOADER line to set the address of the build
+USE_BOOTLOADER := 1
+ifdef USE_BOOTLOADER
+LD_SCRIPT   := STM32F407VET6_sector4_plus512.ld
+else
 LD_SCRIPT   := STM32F407VET6.ld
+endif
 
 # tools
 CC          := arm-none-eabi-gcc
@@ -22,6 +28,9 @@ SIZE        := arm-none-eabi-size
 # Flags
 INCLUDES    := -I. -I$(LIB_PATH)/CMSIS/Include -I$(LIB_PATH)/ST/inc
 CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections
+ifdef USE_BOOTLOADER
+CFLAGS      += -DUSE_BOOTLOADER
+endif
 CXXFLAGS    := $(CFLAGS) -fno-exceptions
 LDFLAGS     := -L$(LIB_PATH)/ST/ld -T$(LD_SCRIPT) --gc-sections -v
 CPFLAGS     := -Obinary -v
