@@ -19,22 +19,15 @@
   ******************************************************************************
   */
 
-/* Includes ------------------------------------------------------------------*/
 #include "tftpserver.h"
 #include "flash_if.h"
 #include <string.h>
 #include <stdio.h>
 #include "main.h"
 
-#ifdef USE_IAP_TFTP
-
-/* Private variables ---------------------------------------------------------*/
 static uint32_t Flash_Write_Address;
 static struct udp_pcb *UDPpcb;
 static __IO uint32_t total_count=0;
-
-
-/* Private function prototypes -----------------------------------------------*/
 
 static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf *pkt_buf,
                         struct ip_addr *addr, u16_t port);
@@ -50,9 +43,6 @@ static u16_t IAP_tftp_extract_block(char *buf);
 static void IAP_tftp_set_opcode(char *buffer, tftp_opcode opcode);
 static void IAP_tftp_set_block(char* packet, u16_t block);
 static err_t IAP_tftp_send_ack_packet(struct udp_pcb *upcb, struct ip_addr *to, int to_port, int block);
-
-/* Private functions ---------------------------------------------------------*/
-
 
 /**
   * @brief Returns the TFTP opcode
@@ -131,10 +121,6 @@ static err_t IAP_tftp_send_ack_packet(struct udp_pcb *upcb, struct ip_addr *to, 
 
   if (!pkt_buf)      /*if the packet pbuf == NULL exit and EndTransfertransmission */
   {
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Can not allocate pbuf");
-#endif
     return ERR_MEM;
   }
 
@@ -165,16 +151,8 @@ static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf
   uint32_t data_buffer[128];
   u16 count=0;
 
-#ifdef USE_LCD
-  char message[40];
-#endif
-
   if (pkt_buf->len != pkt_buf->tot_len)
   {
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Invalid data length");
-#endif
     return;
   }
 
@@ -221,21 +199,9 @@ static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf
   {
     IAP_tftp_cleanup_wr(upcb, args);
     pbuf_free(pkt_buf);
-
-#ifdef USE_LCD
-    LCD_SetTextColor(White);
-    LCD_DisplayStringLine(Line5, (uint8_t*)"Tot bytes Received:");
-    sprintf(message, "%d bytes ",total_count);
-    LCD_DisplayStringLine(Line6, (uint8_t*)message);
-    LCD_DisplayStringLine(Line8, (uint8_t*)"State: Prog Finished ");
-#endif
   }
   else
   {
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"   Reset the board  ");
-#endif
     pbuf_free(pkt_buf);
     return;
   }
@@ -257,10 +223,6 @@ static int IAP_tftp_process_write(struct udp_pcb *upcb, struct ip_addr *to, int 
   args = mem_malloc(sizeof *args);
   if (!args)
   {
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Memory error");
-#endif
     IAP_tftp_cleanup_wr(upcb, args);
     return 0;
   }
@@ -286,9 +248,6 @@ static int IAP_tftp_process_write(struct udp_pcb *upcb, struct ip_addr *to, int 
   Flash_Write_Address = USER_FLASH_FIRST_PAGE_ADDRESS;
   /* initiate the write transaction by sending the first ack */
   IAP_tftp_send_ack_packet(upcb, to, to_port, args->block);
-#ifdef USE_LCD
-  LCD_DisplayStringLine(Line8, (uint8_t*)"State: Programming..");
-#endif
   return 0;
 }
 
@@ -309,20 +268,11 @@ static void IAP_tftp_recv_callback(void *arg, struct udp_pcb *upcb, struct pbuf 
   struct udp_pcb *upcb_tftp_data;
   err_t err;
 
-#ifdef USE_LCD
-  uint32_t i;
-  char filename[40],message[40], *ptr;
-#endif
-
   /* create new UDP PCB structure */
   upcb_tftp_data = udp_new();
   if (!upcb_tftp_data)
   {
     /* Error creating PCB. Out of Memory  */
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Can not create pcb");
-#endif
     return;
   }
 
@@ -334,10 +284,6 @@ static void IAP_tftp_recv_callback(void *arg, struct udp_pcb *upcb, struct pbuf 
   if (err != ERR_OK)
   {
     /* Unable to bind to port */
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Can not bind pcb");
-#endif
     return;
   }
 
@@ -345,38 +291,10 @@ static void IAP_tftp_recv_callback(void *arg, struct udp_pcb *upcb, struct pbuf 
   if (op != TFTP_WRQ)
   {
     /* remove PCB */
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Bad TFTP opcode ");
-#endif
     udp_remove(upcb_tftp_data);
   }
   else
   {
-
-#ifdef USE_LCD
-    ptr = pkt_buf->payload;
-    ptr = ptr +2;
-    /*extract file name info */
-    i= 0;
-    while (*(ptr+i)!=0x0)
-    {
-      i++;
-    }
-    strncpy(filename, ptr, i+1);
-
-    /* Set the LCD Text Color */
-    LCD_SetTextColor(White);
-    LCD_Clear(Black);
-
-    LCD_DisplayStringLine(Line0, (uint8_t*)"  IAP using TFTP  ");
-    sprintf(message, "File: %s",filename);
-    LCD_DisplayStringLine(Line3, (uint8_t*)message);
-    /* Set the LCD Text Color */
-    LCD_DisplayStringLine(Line8, (uint8_t*)"State: Erasing...");
-
-#endif
-
     /* Start the TFTP write mode*/
     IAP_tftp_process_write(upcb_tftp_data, addr, port);
   }
@@ -423,10 +341,6 @@ void IAP_tftpd_init(void)
   if (!UDPpcb)
   {
     /* Error creating PCB. Out of Memory  */
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Can not create pcb");
-#endif
     return ;
   }
 
@@ -437,15 +351,6 @@ void IAP_tftpd_init(void)
     /* Initialize receive callback function  */
     udp_recv(UDPpcb, IAP_tftp_recv_callback, NULL);
   }
-  else
-  {
-#ifdef USE_LCD
-    LCD_SetTextColor(Red);
-    LCD_DisplayStringLine(Line9, (uint8_t*)"Can not bind pcb");
-#endif
-  }
 }
-
-#endif /* USE_IAP_TFTP */
 
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/

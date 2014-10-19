@@ -1,11 +1,8 @@
-
 #ifndef __TFTPSERVER_H_
 #define __TFTPSERVER_H_
 
 #include "lwip/mem.h"
 #include "lwip/udp.h"
-
-
 
 #define TFTP_OPCODE_LEN         2
 #define TFTP_BLKNUM_LEN         2
@@ -16,7 +13,6 @@
 #define TFTP_DATA_PKT_LEN_MAX   (TFTP_DATA_PKT_HDR_LEN + TFTP_DATA_LEN_MAX)
 #define TFTP_MAX_RETRIES        3
 #define TFTP_TIMEOUT_INTERVAL   5
-
 
 typedef struct
 {
@@ -37,7 +33,6 @@ typedef struct
 
 }tftp_connection_args;
 
-
 /* TFTP opcodes as specified in RFC1350   */
 typedef enum {
   TFTP_RRQ = 1,
@@ -46,7 +41,6 @@ typedef enum {
   TFTP_ACK = 4,
   TFTP_ERROR = 5
 } tftp_opcode;
-
 
 /* TFTP error codes as specified in RFC1350  */
 typedef enum {
@@ -60,9 +54,6 @@ typedef enum {
   TFTP_ERR_NO_SUCH_USER,
 } tftp_errorcode;
 
-
 void IAP_tftpd_init(void);
 
-
-#endif
-
+#endif  // __TFTPSERVER_H_
