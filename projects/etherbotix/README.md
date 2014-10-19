@@ -72,3 +72,10 @@ This is a work in progress. Overview:
  * Digital input is not implemented
  * SPI2 support is not implemented
  * Tim12 has only external trigger mode, Tim9 is not implemented
+
+## Networking Notes
+
+I'm connecting through an IOGEAR GWU627 Ethernet-to-Wifi adapter (sometimes).
+My wifi is setup for 192.168.0.1/24. I then configure my ethernet adapter for
+192.168.0.33/28 when I want to bypass the wifi and directly connect to the
+board. The board is always 192.168.0.42/24 (static, no DHCP).
