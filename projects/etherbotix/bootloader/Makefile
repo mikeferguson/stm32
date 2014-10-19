@@ -33,7 +33,8 @@ BUILDDIRS   := $(BUILD_PATH)
 
 # Build main stuff
 TGT_BIN     := $(BUILD_PATH)/main.o $(BUILD_PATH)/startup_f4.o $(BUILD_PATH)/system_stm32f4xx.o
-TGT_BIN 	+= $(BUILD_PATH)/netconf.o # This is the setup for stm32 ethernet + lwip
+TGT_BIN     += $(BUILD_PATH)/netconf.o # This is the setup for stm32 ethernet + lwip
+TGT_BIN     += $(BUILD_PATH)/tftpserver.o # This is the actual bootloader tftp code
 
 all: $(BUILD_PATH)/$(PRG).bin
 clean:
@@ -42,7 +43,7 @@ clean:
 # Build STM32_CPP
 INCLUDES    += -I$(LIB_PATH)/libcpp/inc
 BUILDDIRS   += $(BUILD_PATH)/stm32_cpp
-TGT_BIN     += $(BUILD_PATH)/stm32_cpp/analog_sampler.o
+TGT_BIN     += $(BUILD_PATH)/stm32_cpp/flash.o
 TGT_BIN     += $(BUILD_PATH)/stm32_cpp/delay.o
 TGT_BIN     += $(BUILD_PATH)/stm32_cpp/string.o
 
@@ -177,5 +178,10 @@ $(BUILDDIRS):
 	echo "" >> .gdbinit
 	echo "def reset" >> .gdbinit
 	echo " mon reset halt" >> .gdbinit
+	echo " mon reset init" >> .gdbinit
+	echo "end" >> .gdbinit
+	echo "def erase_all" >> .gdbinit
+	echo " mon reset halt" >> .gdbinit
+	echo " mon stm32f2x mass_erase 0" >> .gdbinit
 	echo " mon reset init" >> .gdbinit
 	echo "end" >> .gdbinit

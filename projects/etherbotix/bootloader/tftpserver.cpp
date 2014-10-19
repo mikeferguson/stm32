@@ -20,10 +20,10 @@
   */
 
 #include "tftpserver.h"
-#include "flash_if.h"
 #include <string.h>
 #include <stdio.h>
 #include "main.h"
+#include "flash.hpp"
 
 static uint32_t Flash_Write_Address;
 static struct udp_pcb *UDPpcb;
@@ -158,7 +158,7 @@ static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf
 
   /* Does this packet have any valid data to write? */
   if ((pkt_buf->len > TFTP_DATA_PKT_HDR_LEN) &&
-      (IAP_tftp_extract_block(pkt_buf->payload) == (args->block + 1)))
+      (IAP_tftp_extract_block((char*)pkt_buf->payload) == (args->block + 1)))
   {
     /* copy packet payload to data_buffer */
     pbuf_copy_partial(pkt_buf, data_buffer, pkt_buf->len - TFTP_DATA_PKT_HDR_LEN,
@@ -171,7 +171,8 @@ static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf
     count++;
 
     /* Write received data in Flash */
-    FLASH_If_Write(&Flash_Write_Address, data_buffer ,count);
+    flash_write(Flash_Write_Address, data_buffer, count);
+    Flash_Write_Address += 512;
 
     /* update our block number to match the block number just received */
     args->block++;
@@ -182,7 +183,7 @@ static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf
        written is an exact multiple of 512 bytes.  In this case, the args->block
        value must still be updated, but we can skip everything else.    */
   }
-  else if (IAP_tftp_extract_block(pkt_buf->payload) == (args->block + 1))
+  else if (IAP_tftp_extract_block((char*)pkt_buf->payload) == (args->block + 1))
   {
     /* update our block number to match the block number just received  */
     args->block++;
@@ -198,6 +199,7 @@ static void IAP_wrq_recv_callback(void *_args, struct udp_pcb *upcb, struct pbuf
   if (pkt_buf->len < TFTP_DATA_PKT_LEN_MAX)
   {
     IAP_tftp_cleanup_wr(upcb, args);
+    bootloader_status |= BOOTLOADER_TRY_AGAIN;
     pbuf_free(pkt_buf);
   }
   else
@@ -220,7 +222,7 @@ static int IAP_tftp_process_write(struct udp_pcb *upcb, struct ip_addr *to, int 
   /* This function is called from a callback,
   * therefore interrupts are disabled,
   * therefore we can use regular malloc   */
-  args = mem_malloc(sizeof *args);
+  args = (tftp_connection_args*) mem_malloc(sizeof *args);
   if (!args)
   {
     IAP_tftp_cleanup_wr(upcb, args);
@@ -239,11 +241,8 @@ static int IAP_tftp_process_write(struct udp_pcb *upcb, struct ip_addr *to, int 
 
   total_count =0;
 
-  /* init flash */
-  FLASH_If_Init();
-
   /* erase user flash area */
-  FLASH_If_Erase(USER_FLASH_FIRST_PAGE_ADDRESS);
+  flash_erase(USER_FLASH_FIRST_PAGE_ADDRESS, -1);
 
   Flash_Write_Address = USER_FLASH_FIRST_PAGE_ADDRESS;
   /* initiate the write transaction by sending the first ack */
@@ -287,7 +286,7 @@ static void IAP_tftp_recv_callback(void *arg, struct udp_pcb *upcb, struct pbuf 
     return;
   }
 
-  op = IAP_tftp_decode_op(pkt_buf->payload);
+  op = IAP_tftp_decode_op((char*)pkt_buf->payload);
   if (op != TFTP_WRQ)
   {
     /* remove PCB */

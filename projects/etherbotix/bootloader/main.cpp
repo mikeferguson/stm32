@@ -27,30 +27,69 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "main.h"
 #include "etherbotix.hpp"
 #include "netconf.h"
 #include "lwip/memp.h"
 #include "lwip/udp.h"
 #include "stm32f4x7_eth.h"
+#include "tftpserver.h"
 
-/*int udp_interface_init()
-{
-  eth_udp = udp_new();
-  if (eth_udp == NULL)
-    return 0;
+// From IAP app note
+pFunction Jump_To_Application;
+uint32_t JumpAddress;
 
-  if (udp_bind(eth_udp, IP_ADDR_ANY, 6707) != ERR_OK)
-    return 0;
-
-  udp_recv(eth_udp, udp_callback, NULL);
-  return 1;
-}*/
-
+// Global status
 uint32_t system_time;
+uint8_t bootloader_status;
+
+// 512 bytes of metadata in front of actual firmware
+typedef struct
+{
+  uint32_t crc32;   // crc32 of firmware
+  uint32_t length;  // length in 32-bit words
+  uint8_t version_string[504];
+} metadata_t;
+#define METADATA_LEN    512
+
+// Check the firmware
+uint32_t crc32;
+uint8_t check_firmware()
+{
+  metadata_t * meta = (metadata_t*) USER_FLASH_FIRST_PAGE_ADDRESS;
+  uint32_t * firmware = (uint32_t*) (USER_FLASH_FIRST_PAGE_ADDRESS+METADATA_LEN);
+
+  // Check length is reasonable
+  if (meta->length > (USER_FLASH_END_ADDRESS - USER_FLASH_FIRST_PAGE_ADDRESS))
+    return BOOTLOADER_BAD_LENGTH;
+
+  // Enable & Reset CRC
+  RCC->AHB1ENR |= RCC_AHB1ENR_CRCEN;
+  CRC->CR = 1;
+
+  // Compute CRC
+  // Note: __RBIT funkiness is so that CRC will match standard calculation
+  // See http://forum.chibios.org/phpbb/viewtopic.php?f=2&t=1475 for details
+  for (uint32_t i = 0; i < meta->length; i++)
+    CRC->DR = __RBIT(*(firmware+i));
+  crc32 = __RBIT(CRC->DR) ^ 0xFFFFFFFF;
+
+  // Disable CRC
+  RCC->AHB1ENR &= ~RCC_AHB1ENR_CRCEN;
+
+  // Check CRC
+  if (crc32 != meta->crc32)
+    return BOOTLOADER_BAD_CRC32;
+
+  // Firmware is OK
+  return 0;
+}
+
 int main(void)
 {
   NVIC_SetPriorityGrouping(3);
   system_time = 0;
+  bootloader_status = 0;
 
   // Enable GPIO
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -70,17 +109,59 @@ int main(void)
   SysTick_Config(SystemCoreClock/1000);
   NVIC_EnableIRQ(SysTick_IRQn);
 
-  LwIP_Init();
-  //if (!udp_interface_init())
-  //  while(1);
-
-  __enable_irq();
-  error::low();  // Done with setup
-
-  while(1)
+  // Is bootloader forced either by external pulldown or
+  // by firmware setting to output and low
+  force_bootloader::pullup();
+  delay_ms(1);
+  if (force_bootloader::value() == 0)
   {
-    LwIP_Periodic_Handle(system_time);
+    bootloader_status = BOOTLOADER_FORCED;
   }
+
+  // Check firmware status
+  if (bootloader_status == 0)
+  {
+    bootloader_status = check_firmware();
+  }
+
+  if (bootloader_status != 0)
+  {
+    LwIP_Init();
+    IAP_tftpd_init();
+
+    __enable_irq();
+    error::low();  // Done with setup
+
+    while (true)
+    {
+      LwIP_Periodic_Handle(system_time);
+
+      // If we have new firmware, check firmware again
+      if (bootloader_status & BOOTLOADER_TRY_AGAIN)
+      {
+        bootloader_status = check_firmware();
+        if (bootloader_status == 0)
+          break;
+      }
+
+      // If we were forced into bootloader, but 10s has passed, try to boot
+      if (bootloader_status == BOOTLOADER_FORCED &&
+          system_time > 10000)
+      {
+        bootloader_status = check_firmware();
+        if (bootloader_status == 0)
+          break;
+      }
+    }
+  }
+
+  // Be sure interrupts disabled
+  __disable_irq();
+
+  JumpAddress = *(__IO uint32_t*) (USER_FLASH_FIRST_PAGE_ADDRESS + METADATA_LEN + 4);
+  Jump_To_Application = (pFunction) JumpAddress;
+  __set_MSP(*(__IO uint32_t*) (USER_FLASH_FIRST_PAGE_ADDRESS + METADATA_LEN));
+  Jump_To_Application();
 }
 
 extern "C"

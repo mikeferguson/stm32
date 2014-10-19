@@ -99,6 +99,8 @@
 #define DEVICE_USART3_DATA  128
 #define DEVICE_SPI2_DATA    129
 
+#define DEVICE_BOOTLOADER   192
+
 // Activity and error LEDs
 typedef Gpio<GPIOC_BASE, 14> error;
 typedef Gpio<GPIOC_BASE, 15> act;
@@ -176,6 +178,9 @@ typedef UsartDMAWithEnable<USART2_BASE, usart2_en, usart2_read_dma, usart2_write
 // IMU - i2c1
 typedef Gpio<GPIOB_BASE,6> imu_scl;
 typedef Gpio<GPIOB_BASE,7> imu_sda;
+
+// Force bootloader pin
+typedef Gpio<GPIOE_BASE, 14> force_bootloader;
 
 // Expandable IO
 typedef Gpio<GPIOB_BASE,10> d3;  // also SPI2_SCK, USART3_TX, TIM2_CH3
