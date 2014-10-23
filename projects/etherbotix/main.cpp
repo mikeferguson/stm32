@@ -612,9 +612,11 @@ int main(void)
             M2_CURRENT_ANALOG_CHANNEL,
             A2_ANALOG_CHANNEL,
             A2_ANALOG_CHANNEL);  // TODO: set trigger on motor timer
-  voltage_sense::mode(GPIO_INPUT_ANALOG);  // TODO: set sample times
+  voltage_sense::mode(GPIO_INPUT_ANALOG);
   servo_sense::mode(GPIO_INPUT_ANALOG);
+  adc1.setSampleTime(SERVO_CURRENT_ANALOG_CHANNEL, ADC_SampleTime_84Cycles);
   aux_sense::mode(GPIO_INPUT_ANALOG);
+  adc1.setSampleTime(AUX_CURRENT_ANALOG_CHANNEL, ADC_SampleTime_84Cycles);
   a0_sense::mode(GPIO_INPUT_ANALOG);
   m1_sense::mode(GPIO_INPUT_ANALOG);
   m2_sense::mode(GPIO_INPUT_ANALOG);
@@ -697,10 +699,10 @@ void SysTick_Handler(void)
   //   voltage divider is 15k/1k
   registers.system_voltage = (adc1.get_channel1()/4096.0f) * 3.3f * 16 * 10;
 
-  // Get aux/servo currents:
+  // Get aux/servo currents in mA:
   //   ACS711: vcc/2 = 0A, 55mV/A
-  registers.servo_current = ((adc1.get_channel2()-2048)/4096.0f) * 3.3f * 0.055f;
-  registers.aux_current = ((adc1.get_channel3()-2048)/4096.0f) * 3.3f * 0.055f;
+  registers.servo_current = ((adc1.get_channel2()-2048.0f)/4096.0f) * 3.3f / 0.055f * 1000;
+  registers.aux_current = ((adc1.get_channel3()-2048.0f)/4096.0f) * 3.3f / 0.055f * 1000;
 
   // Analog channels
   registers.a0 = adc1.get_channel4();
