@@ -176,18 +176,18 @@ typedef PeriphWriteDMA<uint16_t, DMA1_Stream6_BASE, DMA_FLAG_TCIF6, DMA_Channel_
 typedef UsartDMAWithEnable<USART2_BASE, usart2_en, usart2_read_dma, usart2_write_dma> usart2_t;
 
 // IMU - i2c1
-typedef Gpio<GPIOB_BASE,6> imu_scl;
-typedef Gpio<GPIOB_BASE,7> imu_sda;
+typedef Gpio<GPIOB_BASE, 6> imu_scl;
+typedef Gpio<GPIOB_BASE, 7> imu_sda;
 
 // Force bootloader pin
 typedef Gpio<GPIOE_BASE, 14> force_bootloader;
 
 // Expandable IO
-typedef Gpio<GPIOB_BASE,10> d3;  // also SPI2_SCK, USART3_TX, TIM2_CH3
-typedef Gpio<GPIOC_BASE,11> d4;  // also           USART3_RX
-typedef Gpio<GPIOB_BASE,15> d5;  // also TIM12_CH2
-typedef Gpio<GPIOE_BASE,5> d6;   // also TIM9_CH1
-typedef Gpio<GPIOE_BASE,6> d7;   // also TIM9_CH2
+typedef Gpio<GPIOB_BASE, 10> d3;  // also SPI2_SCK, USART3_TX, TIM2_CH3
+typedef Gpio<GPIOC_BASE, 11> d4;  // also           USART3_RX
+typedef Gpio<GPIOB_BASE, 15> d5;  // also TIM12_CH2
+typedef Gpio<GPIOE_BASE, 5> d6;   // also TIM9_CH1
+typedef Gpio<GPIOE_BASE, 6> d7;   // also TIM9_CH2
 
 typedef PeriphReadDMA<uint16_t, DMA1_Stream1_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART3_BASE+4, 1024> usart3_read_dma;
 typedef PeriphWriteDMA<uint16_t, DMA1_Stream3_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART3_BASE+4, 1024> usart3_write_dma;
