@@ -100,6 +100,7 @@
 #define DEVICE_SPI2_DATA    129
 
 #define DEVICE_BOOTLOADER   192
+#define DEVICE_UNIQUE_ID    193
 
 // Activity and error LEDs
 typedef Gpio<GPIOC_BASE, 14> error;

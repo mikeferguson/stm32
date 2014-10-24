@@ -167,13 +167,29 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         packet[4] = 0;  // No error
         packet[5+read_len] = ETHERBOTIX_ID + read_len;  // Init checksum
 
-        // Copy packet data
-        uint8_t * reg_data = (uint8_t *) &registers;
-        reg_data += read_addr;
-        for (int j = 0; j < read_len; ++j)
+        if (read_addr >= 128)
         {
-          packet[5+j] = *(reg_data++);
-          packet[5+read_len] += packet[5+j];
+          if (read_addr == DEVICE_UNIQUE_ID)
+          {
+            // Read the unique ID of the chip (See RM0090 39.1)
+            uint8_t * id_data = (uint8_t *) 0x1fff7a10;
+            for (int j = 0; j < read_len; ++j)
+            {
+              packet[5+j] = *(id_data++);
+              packet[5+read_len] += packet[5+j];
+            }
+          }
+        }
+        else
+        {
+          // Copy packet data
+          uint8_t * reg_data = (uint8_t *) &registers;
+          reg_data += read_addr;
+          for (int j = 0; j < read_len; ++j)
+          {
+            packet[5+j] = *(reg_data++);
+            packet[5+read_len] += packet[5+j];
+          }
         }
 
         packet[5+read_len] = 255 - packet[5+read_len];  // Compute checksum
