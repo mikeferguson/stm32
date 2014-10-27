@@ -276,9 +276,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             }
             else if (write_addr + j == REG_MOTOR_MAX_STEP)
             {
-              int16_t v = data[i+6+j] + (data[i+7+j]<<8);
-              m1_pid.set_max_step(v);
-              m2_pid.set_max_step(v);
+              registers.motor_max_step = data[i+6+j] + (data[i+7+j]<<8);
+              m1_pid.set_max_step(registers.motor_max_step);
+              m2_pid.set_max_step(registers.motor_max_step);
               ++j;  // uses 2 bytes
             }
             else if (write_addr + j == REG_MOTOR1_VEL)
