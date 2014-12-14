@@ -107,7 +107,6 @@ int main(void)
 
   // Setup systick
   SysTick_Config(SystemCoreClock/1000);
-  NVIC_EnableIRQ(SysTick_IRQn);
 
   // Is bootloader forced either by external pulldown or
   // by firmware setting to output and low

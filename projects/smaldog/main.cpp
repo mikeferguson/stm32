@@ -97,8 +97,6 @@ int main(void)
 
   /* setup systick */
   SysTick_Config(SystemCoreClock/1000);
-  NVIC_SetPriority(SysTick_IRQn,2);
-  NVIC_EnableIRQ(SysTick_IRQn);
 
   Ethernet_Init();
   LwIP_Init();

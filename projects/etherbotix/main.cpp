@@ -641,7 +641,6 @@ int main(void)
 
   // Setup systick
   SysTick_Config(SystemCoreClock/1000);
-  NVIC_EnableIRQ(SysTick_IRQn);
 
   LwIP_Init();
   if (!udp_interface_init())

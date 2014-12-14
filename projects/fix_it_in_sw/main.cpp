@@ -153,7 +153,6 @@ int main(void)
 
   // setup systick
   SysTick_Config(SystemCoreClock/1000);
-  NVIC_EnableIRQ(SysTick_IRQn);
   system_clock = 0;
   __enable_irq();
   
