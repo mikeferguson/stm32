@@ -169,6 +169,12 @@ extern "C"
 void SysTick_Handler(void)
 {
   ++system_time;
+
+  // Toggle LED
+  if (system_time % 200 == 0)
+    error::high();
+  else if (system_time % 100 == 0)
+    error::low();
 }
 
 }
