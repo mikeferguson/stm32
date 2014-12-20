@@ -15,7 +15,8 @@ The Etherbotix has 2 leds:
  * ACT - green - indicates system activity, blinks at 5hz when packets are
    being properly recieved
  * ERROR - red - similar to the LED on the back of a dynamixel servo, can be
-   controlled via register table.
+   controlled via register table. ERROR led also flashes when the board is
+   in the bootloader.
 
 ## Ethernet Protocol
 
