@@ -179,13 +179,13 @@ public:
     if (channel > 18) return -1;
     if (channel > 9)
     {
-      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR1 &= (0xffffffff - (0x7 << ((channel-9)*3)));
-      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR1 |= time << ((channel-9)*3);
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR1 &= ~(0x7u << ((channel-10)*3));
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR1 |= (time << ((channel-10)*3));
     }
     else
     {
-      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR2 &= (0xffffffff - (0x7 << (channel*3)));
-      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR2 |= time << (channel*3);
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR2 &= ~(0x7u << (channel*3));
+      reinterpret_cast<ADC_TypeDef*>(ADCx)->SMPR2 |= (time << (channel*3));
     }
     return 0;
   }
