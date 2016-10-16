@@ -89,6 +89,7 @@
    * Protocol References:
      * https://developer.mbed.org/users/Digixx/notebook/futaba-s-bus-controlled-by-mbed/
      * http://forum.arduino.cc/index.php/topic,99708.0.html
+ * [D-tap power cable](https://www.amazon.com/gp/product/B00D0HPTRO)
 
 ## Network Setup
  * Etherbotix - 192.168.0.42
