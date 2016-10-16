@@ -61,6 +61,34 @@
  * Dynamixel Servo
    * Connects to servo headers
    * Servo current sense = servo power usage
+ * DJI Ronin-M
+   * Uses "d.bus", which is an "open" version of Futaba S-Bus
+   * Protocol:
+     * Inverted 8E2 (signal is big endian, but each byte is little endian)
+     * 25 Bytes long, sent every 14ms (analog mode) or 7ms (highspeed mode)
+     * One byte = 1 startbit + 8 data bits + 1 parity bit + 2 stopbits
+     * Baud rate = 100kbit/sec
+     * Highest bit is sent first
+     * Each packet:
+       * startbyte = 0xF0
+       * data 1-22 = channel data, the data is actually split across bytes:
+         * ch1 (11bit) = 8 bits from byte1 and 3 bits from byte2
+         * ch2 (11bit) = 5 bits from byte2 and 6 bits from byte3
+         * ...
+         * ch16 (11bit) = ...
+       * flags
+         * bit7 = digital channel 17
+         * bit6 = digital channel 16
+         * bit5 = frame lost (equiv. to red LED on receiver)
+         * bit4 = failsafe activated
+         * bit3 = n/a
+         * bit2 = n/a
+         * bit1 = n/a
+         * bit0 = n/a
+       * endbyte = 0x00
+   * Protocol References:
+     * https://developer.mbed.org/users/Digixx/notebook/futaba-s-bus-controlled-by-mbed/
+     * http://forum.arduino.cc/index.php/topic,99708.0.html
 
 ## Network Setup
  * Etherbotix - 192.168.0.42
