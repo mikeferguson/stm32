@@ -1,4 +1,4 @@
-#STM32 Sandbox
+# STM32 Sandbox
 This is a sandbox full of stuff/garbage for the STM32, specifically the STM32F4 series.
 
 This repository is currently using:
@@ -10,7 +10,7 @@ Things to keep in mind if adapting to STM32F1, F2, or F3:
  * Much of libcpp has been tested with F1 series. Notably, the gpio.h will not
    work with F2 or F3 processors right now.
 
-#Setup of development environment (14.04)
+# Setup of development environment (14.04)
 
 I'm using the 4.7-2014-q2-update revision from the official GCC ARM launchpad
 repository:  https://launchpad.net/gcc-arm-embedded
