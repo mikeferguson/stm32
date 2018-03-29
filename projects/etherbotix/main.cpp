@@ -626,7 +626,7 @@ int main(void)
             A0_ANALOG_CHANNEL);
   adc2.init(M1_CURRENT_ANALOG_CHANNEL,
             M2_CURRENT_ANALOG_CHANNEL,
-            A2_ANALOG_CHANNEL,
+            A1_ANALOG_CHANNEL,
             A2_ANALOG_CHANNEL);  // TODO: set trigger on motor timer
   voltage_sense::mode(GPIO_INPUT_ANALOG);
   servo_sense::mode(GPIO_INPUT_ANALOG);
