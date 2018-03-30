@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Michael E. Ferguson
+ * Copyright (c) 2014-2018, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,6 @@ uint8_t user_io_usart3_active_;
 uint8_t user_io_spi2_active_;
 uint8_t user_io_tim9_active_;
 uint8_t user_io_tim12_active_;
-uint8_t user_io_mask_;
 
 inline void user_io_init()
 {
@@ -45,173 +44,137 @@ inline void user_io_init()
   user_io_spi2_active_ = 0;
   user_io_tim9_active_ = 0;
   user_io_tim12_active_ = 0;
-  user_io_mask_ = 0;
 }
 
-inline void user_io_update_mask(uint8_t value)
+inline void user_io_set_output()
 {
-  user_io_mask_ = value;
-}
+  if (registers.digital_out & 0x01)
+    a0_sense::high();
+  else
+    a0_sense::low();
 
-inline void user_io_set_output(uint8_t value)
-{
-  if (user_io_mask_ & 0x01)
+  if (user_io_spi2_active_ == 0)
   {
-    if (value & 0x01)
-      a0_sense::high();
-    else
-      a0_sense::low();
-  }
-  if (user_io_mask_ & 0x02)
-  {
-    if (value & 0x02)
+    // A1 is also SPI2_MISO
+    if (registers.digital_out & 0x02)
       a1_sense::high();
     else
       a1_sense::low();
-  }
-  if (user_io_mask_ & 0x04)
-  {
-    if (value & 0x04)
+
+    // A2 is also SPI2_MOSI
+    if (registers.digital_out & 0x04)
       a2_sense::high();
     else
       a2_sense::low();
   }
-  if ((user_io_mask_ & 0x08) &&
-      (user_io_usart3_active_ == 0) &&
-      (user_io_spi2_active_ == 0))
+
+  if ((user_io_spi2_active_ == 0) &&
+      (user_io_usart3_active_ == 0))
   {
-    // D3 is also USART3_TX, TIM2_CH3, SPI2_SCK
-    if (value & 0x08)
+    // D3 is also USART3_TX, SPI2_SCK
+    if (registers.digital_out & 0x08)
       d3::high();
     else
       d3::low();
   }
-  if ((user_io_mask_ & 0x10) &&
-      (user_io_usart3_active_ == 0))
+
+  if (user_io_usart3_active_ == 0)
   {
     // D4 is also USART3_RX
-    if (value & 0x10)
+    if (registers.digital_out & 0x10)
       d4::high();
     else
       d4::low();
   }
-  if ((user_io_mask_ & 0x20) &&
-      (user_io_tim12_active_ == 0))
+
+  if (user_io_tim12_active_ == 0)
   {
     // D5 is also TIM12_CH2
-    if (value & 0x20)
+    if (registers.digital_out & 0x20)
       d5::high();
     else
       d5::low();
   }
-  if ((user_io_mask_ & 0x40) &&
-      (user_io_tim9_active_ == 0))
+
+  if (user_io_tim9_active_ == 0)
   {
     // D6 is also TIM9_CH1
-    if (value & 0x40)
+    if (registers.digital_out & 0x40)
       d6::high();
     else
       d6::low();
-  }
-  if ((user_io_mask_ & 0x80) &&
-      (user_io_tim9_active_ == 0))
-  {
+
     // D7 is also TIM9_CH2
-    if (value & 0x80)
+    if (registers.digital_out & 0x80)
       d7::high();
     else
       d7::low();
-
   }
 }
 
-inline void user_io_set_direction(uint8_t value)
+inline void user_io_set_direction()
 {
-  if (user_io_mask_ & 0x01)
+  if (registers.digital_dir & 0x01)
+    a0_sense::mode(GPIO_OUTPUT);
+  else
+    a0_sense::mode(GPIO_INPUT_ANALOG);
+
+  if (user_io_spi2_active_ == 0)
   {
-    if (value & 0x01)
-      a0_sense::mode(GPIO_OUTPUT);
-    else
-      a0_sense::mode(GPIO_INPUT_ANALOG);
-  }
-  if (user_io_mask_ & 0x02)
-  {
-    if (value & 0x02)
+    // A1 is also SPI2_MISO
+    if (registers.digital_dir & 0x02)
       a1_sense::mode(GPIO_OUTPUT);
     else
-    {
       a1_sense::mode(GPIO_INPUT_ANALOG);
-      // If made input, cancel SPI2 as A1 is also SPI2_MISO
-      user_io_spi2_active_ = 0;
-    }
-  }
-  if (user_io_mask_ & 0x04)
-  {
-    if (value & 0x04)
+
+    // A2 is also SPI2_MOSI
+    if (registers.digital_dir & 0x04)
       a2_sense::mode(GPIO_OUTPUT);
     else
-    {
       a2_sense::mode(GPIO_INPUT_ANALOG);
-      // If made input, cancel SPI2 as A2 is also SPI2_MOSI
-      user_io_spi2_active_ = 0;
-    }
   }
-  if (user_io_mask_ & 0x08)
+
+  if ((user_io_spi2_active_ == 0) &&
+      (user_io_usart3_active_ == 0))
   {
-    if (value & 0x08)
+    // D3 is also SPI2_SCK, USART3_TX
+    if (registers.digital_dir & 0x08)
       d3::mode(GPIO_OUTPUT);
     else
-    {
       d3::mode(GPIO_INPUT);
-      // If made input, cancel USART3 as D3 is also USART3_TX
-      user_io_usart3_active_ = 0;
-      // If made input, cancel SPI2 as D3 is also SPI2_SCK
-      user_io_spi2_active_ = 0;
-    }
   }
-  if (user_io_mask_ & 0x10)
+
+  if (user_io_usart3_active_ == 0)
   {
-    if (value & 0x10)
+    // D4 is also USART3_TX
+    if (registers.digital_dir & 0x10)
       d4::mode(GPIO_OUTPUT);
     else
-    {
       d4::mode(GPIO_INPUT);
-      // If made input, cancel USART3 as D4 is also USART3_RX
-      user_io_usart3_active_ = 0;
-    }
   }
-  if (user_io_mask_ & 0x20)
+
+  if (user_io_tim12_active_ == 0)
   {
-    if (value & 0x20)
+    // D5 is also TIM12_CH2
+    if (registers.digital_dir & 0x20)
       d5::mode(GPIO_OUTPUT);
     else
-    {
       d5::mode(GPIO_INPUT);
-      // If made input, cancel TIM12 as D5 is also TIM12_CH2
-      user_io_tim12_active_ = 0;
-    }
   }
-  if (user_io_mask_ & 0x40)
+
+  if (user_io_tim9_active_ == 0)
   {
-    if (value & 0x40)
+    // D6 is also TIM9_CH1
+    if (registers.digital_dir & 0x40)
       d6::mode(GPIO_OUTPUT);
     else
-    {
       d6::mode(GPIO_INPUT);
-      // If made input, cancel TIM9 as D6 is also TIM9_CH1
-      user_io_tim9_active_ = 0;
-    }
-  }
-  if (user_io_mask_ & 0x80)
-  {
-    if (value & 0x80)
+
+    // D7 is also TIM9_CH2
+    if (registers.digital_dir & 0x80)
       d7::mode(GPIO_OUTPUT);
     else
-    {
       d7::mode(GPIO_INPUT);
-      // If made input, cancel TIM9 as D7 is also TIM9_CH2
-      user_io_tim9_active_ = 0;
-    }
   }
 }
 
@@ -220,12 +183,8 @@ inline void user_io_set_direction(uint8_t value)
  */
 
 /** @brief Start the USART */
-inline void user_io_usart_init()
+inline bool user_io_usart3_init()
 {
-  RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
-  d3::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  d4::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  
   // Use dynamixel defs of baud
   uint32_t baud = 0;
   if (registers.usart3_baud == 1)
@@ -248,33 +207,37 @@ inline void user_io_usart_init()
     baud = 3000000;
   else
   {
-    // Unsupported baud, set default
-    baud = 9600;
-    registers.usart3_baud = 207;
+    // Unsupported baud, turn off usart3
+    registers.usart3_baud = 0;
+    d3::mode(GPIO_INPUT);
+    d4::mode(GPIO_INPUT);
+    user_io_usart3_active_ = 0;
+    return false;
   }
 
+  RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
+  d3::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
+  d4::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
   usart3.init(baud, 8);
   user_io_usart3_active_ = 1;
+  return true;
 }
 
 /** @brief Write a buffer of data to the USART3 */
-inline void user_io_usart_write(uint8_t * data, uint8_t len)
+inline void user_io_usart3_write(uint8_t * data, uint8_t len)
 {
   if (user_io_usart3_active_ == 0)
-  {
-    // Need to configure usart3
-    user_io_usart_init();
-  }
+    return;
 
   uint16_t d[len];
   for (int i = 0; i < len; ++i)
     d[i] = data[i];
 
-  usart3.write(d, len); 
+  usart3.write(d, len);
 }
 
 /** @brief Read a buffer of data from the USART3 */
-inline uint8_t user_io_usart_read(uint8_t * data, uint8_t max_len)
+inline uint8_t user_io_usart3_read(uint8_t * data, uint8_t max_len)
 {
   if (user_io_usart3_active_ == 0)
     return 0;
@@ -297,16 +260,13 @@ inline uint8_t user_io_usart_read(uint8_t * data, uint8_t max_len)
  * USER TIMER 12
  */
 
-inline void user_io_tim12_init(uint16_t mode)
+inline bool user_io_tim12_init()
 {
-  // Turn on clock
-  RCC->APB1ENR |= RCC_APB1ENR_TIM12EN;
-  if (mode == 0)
+  if (registers.tim12_mode == 1)  // Count on external clock
   {
-    // TODO disable
-  }
-  else if (mode == 1)  // Count on external clock
-  {
+    // Turn on clock
+    RCC->APB1ENR |= RCC_APB1ENR_TIM12EN;
+
     d5::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
     TIM12->CR1 &= (uint16_t) ~TIM_CR1_CEN;
     TIM12->ARR = 65535;  // Max range
@@ -315,8 +275,14 @@ inline void user_io_tim12_init(uint16_t mode)
     // TODO Filtering with IC2F
     TIM12->CR1 |= TIM_CR1_CEN;
   }
-  user_io_tim12_active_ = mode;
-  registers.tim12_mode = mode;
+  else
+  {
+    // Disable
+    registers.tim12_mode = 0;
+    d5::mode(GPIO_INPUT);
+  }
+  user_io_tim12_active_ = registers.tim12_mode;
+  return true;
 }
 
 inline uint16_t user_io_tim12_get_count()
@@ -334,7 +300,16 @@ inline uint16_t user_io_tim12_get_count()
 
 inline void user_io_update()
 {
-  //registers.digital_in = ?? TODO
+  registers.digital_in =
+    (a0_sense::value() ? (1<<0) : 0) +
+    (a1_sense::value() ? (1<<1) : 0) +
+    (a2_sense::value() ? (1<<2) : 0) +
+    (d3::value() ? (1<<3) : 0) +
+    (d4::value() ? (1<<4) : 0) +
+    (d5::value() ? (1<<5) : 0) +
+    (d6::value() ? (1<<6) : 0) +
+    (d7::value() ? (1<<7) : 0);
+
   registers.tim12_count = user_io_tim12_get_count();
 }
 

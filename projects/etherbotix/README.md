@@ -43,7 +43,7 @@ parts of the register table are as follows:
     BAUD_RATE           4       // Standard values from MX-64T datasheet
     RETURN_DELAY        5
     PRESENT_VOLTAGE     24      // Voltage in 100mV increments
-    LED                 25
+    LED                 25      // Controls error LED
 
 Note that PRESENT_VOLTAGE is usually at address 42 on MX-64T devices. In
 addition to the "standard" register table entries above, the Etherbotix
@@ -70,7 +70,6 @@ This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
 This is a work in progress. Overview:
  * Motor current sense is unimplemented (maybe need to sync tim1/8, certainly
    need to trigger adc2 with the PWM)
- * Digital input is not implemented
  * SPI2 support is not implemented
  * Tim12 has only external trigger mode, Tim9 is not implemented
 

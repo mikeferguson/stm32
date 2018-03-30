@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014, Michael E. Ferguson
+ * Copyright (c) 2012-2018, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -203,7 +203,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           // This is a device, write all data to single place
           if (write_addr == DEVICE_USART3_DATA)
           {
-            user_io_usart_write(&data[i+6], len-3);
+            user_io_usart3_write(&data[i+6], len-3);
           }
           else if (write_addr == DEVICE_SPI2_DATA)
           {
@@ -249,17 +249,15 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // TODO
             }
-            else if (write_addr + j == REG_DIGITAL_IN)
-            {
-              user_io_update_mask(data[i+6+j]);
-            }
             else if (write_addr + j == REG_DIGITAL_OUT)
             {
-              user_io_set_output(data[i+6+j]);
+              registers.digital_out = data[i+6+j];
+              user_io_set_output();
             }
             else if (write_addr + j == REG_DIGITAL_DIR)
             {
-              user_io_set_direction(data[i+6+j]);
+              registers.digital_dir = data[i+6+j];
+              user_io_set_direction();
             }
             else if (write_addr + j == REG_LED)
             {
@@ -309,7 +307,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // Set baud, start usart
               registers.usart3_baud = data[i+6+j];
-              user_io_usart_init();
+              user_io_usart3_init();
             }
             else if (write_addr + j == REG_USART3_CHAR)
             {
@@ -320,7 +318,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             }
             else if (write_addr + j == REG_TIM12_MODE)
             {
-              user_io_tim12_init(data[i+6+j]);
+              registers.tim12_mode = data[i+6+j];
+              user_io_tim12_init();
             }
             else if (write_addr + j == REG_SPI2_BAUD)
             {
@@ -545,7 +544,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 0;
+  registers.version = 1;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
