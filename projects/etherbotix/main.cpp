@@ -727,29 +727,29 @@ void SysTick_Handler(void)
   registers.motor1_current = adc2.get_channel1();
   registers.motor2_current = adc2.get_channel2();
 
-  // Update table with position/velocity
-  registers.motor1_pos = m1_enc.read();
-  registers.motor2_pos = m2_enc.read();
-  registers.motor1_vel = m1_enc.read_speed();
-  registers.motor2_vel = m2_enc.read_speed();
-
   // Update motors
-  if (registers.system_time - last_motor_cmd < 250)
+  if (registers.system_time % registers.motor_period == 0)
   {
-    if (registers.system_time % registers.motor_period == 0)
+    // Update table with position/velocity
+    registers.motor1_pos = m1_enc.read();
+    registers.motor2_pos = m2_enc.read();
+    registers.motor1_vel = m1_enc.read_speed();
+    registers.motor2_vel = m2_enc.read_speed();
+
+    if (registers.system_time - last_motor_cmd < 250)
     {
       // Update PID and set motor commands
       m1.set(m1_pid.update_pid(registers.motor1_vel));
       m2.set(m2_pid.update_pid(registers.motor2_vel));
     }
-  }
-  else
-  {
-    // Motor commands have timed out
-    m1.set(0);
-    m2.set(0);
-    m1_pid.reset();
-    m2_pid.reset();
+    else
+    {
+      // Motor commands have timed out
+      m1.set(0);
+      m2.set(0);
+      m1_pid.reset();
+      m2_pid.reset();
+    }
   }
 
   // Toggle LED
