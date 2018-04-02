@@ -30,6 +30,9 @@
 #ifndef _ETHERBOTIX_USER_IO_HPP_
 #define _ETHERBOTIX_USER_IO_HPP_
 
+// user_io stuff is only called from the main while() loop, so
+// we don't have to worry about the register table changing.
+
 usart3_t usart3;
 
 // State of user IO
@@ -40,10 +43,40 @@ uint8_t user_io_tim12_active_;
 
 inline void user_io_init()
 {
+  // Disable everything
   user_io_usart3_active_ = 0;
   user_io_spi2_active_ = 0;
   user_io_tim9_active_ = 0;
   user_io_tim12_active_ = 0;
+
+  // Set all IO to inputs
+  a0_sense::mode(GPIO_INPUT); a0_sense::low();
+  a1_sense::mode(GPIO_INPUT); a1_sense::low();
+  a2_sense::mode(GPIO_INPUT); a2_sense::low();
+  d3::mode(GPIO_INPUT); d3::low();
+  d4::mode(GPIO_INPUT); d4::low();
+  d5::mode(GPIO_INPUT); d5::low();
+  d6::mode(GPIO_INPUT); d6::low();
+  d7::mode(GPIO_INPUT); d7::low();
+}
+
+inline void user_io_deinit()
+{
+  // Disable everything
+  user_io_usart3_active_ = 0;
+  user_io_spi2_active_ = 0;
+  user_io_tim9_active_ = 0;
+  user_io_tim12_active_ = 0;
+
+  // Set all IO to inputs
+  a0_sense::mode(GPIO_INPUT); a0_sense::low();
+  a1_sense::mode(GPIO_INPUT); a1_sense::low();
+  a2_sense::mode(GPIO_INPUT); a2_sense::low();
+  d3::mode(GPIO_INPUT); d3::low();
+  d4::mode(GPIO_INPUT); d4::low();
+  d5::mode(GPIO_INPUT); d5::low();
+  d6::mode(GPIO_INPUT); d6::low();
+  d7::mode(GPIO_INPUT); d7::low();
 }
 
 inline void user_io_set_output()

@@ -182,6 +182,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         }
         else
         {
+          // Disable interrupts so we don't slice things like encoder values
+          __disable_irq();
           // Copy packet data
           uint8_t * reg_data = (uint8_t *) &registers;
           reg_data += read_addr;
@@ -190,6 +192,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             packet[5+j] = *(reg_data++);
             packet[5+read_len] += packet[5+j];
           }
+          __enable_irq();
         }
 
         packet[5+read_len] = 255 - packet[5+read_len];  // Compute checksum
@@ -217,11 +220,17 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
                 data[i+8] == 'O' &&
                 data[i+9] == 'T')
             {
+              // Disable interrupts before jumping
+              __disable_irq();
+
               // Disable motor driver
               m1_pwm::mode(GPIO_INPUT);
               m2_pwm::mode(GPIO_INPUT);
               m1_en::mode(GPIO_INPUT);
               m2_en::mode(GPIO_INPUT);
+
+              // Set all IO low/input
+              user_io_deinit();
 
               // Jump into bootloader
               force_bootloader::mode(GPIO_OUTPUT);
@@ -275,15 +284,19 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             else if (write_addr + j == REG_MOTOR_MAX_STEP)
             {
               registers.motor_max_step = data[i+6+j] + (data[i+7+j]<<8);
+              __disable_irq();
               m1_pid.set_max_step(registers.motor_max_step);
               m2_pid.set_max_step(registers.motor_max_step);
+              __enable_irq();
               ++j;  // uses 2 bytes
             }
             else if (write_addr + j == REG_MOTOR1_VEL)
             {
               // Write 16-bit setpoint
               int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              __disable_irq();
               m1_pid.update_setpoint(v);
+              __enable_irq();
               last_motor_cmd = registers.system_time;
               ++j;  // uses 2 bytes
             }
@@ -291,7 +304,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // Write 16-bit setpoint
               int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              __disable_irq();
               m2_pid.update_setpoint(v);
+              __enable_irq();
               last_motor_cmd = registers.system_time;
               ++j;  // uses 2 bytes
             }
