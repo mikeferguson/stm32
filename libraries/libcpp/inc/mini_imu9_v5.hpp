@@ -27,60 +27,67 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _STM32_CPP_MINI_IMU9_V2_H_
-#define	_STM32_CPP_MINI_IMU9_V2_H_
+#ifndef _STM32_CPP_MINI_IMU9_V5_H_
+#define _STM32_CPP_MINI_IMU9_V5_H_
 
 #include "stm32f4xx.h"
 #include "stm32f4xx_i2c.h"
 #include "stm32f4xx_dma.h"
 #include "delay.hpp"
 
-/* I2C Device Addresses */
-#define DEVICE_GYRO             0xD6
-#define DEVICE_ACCEL            0x32
-#define DEVICE_MAG              0x3C
+/* LSM6DS33 Configuration Information */
+enum LSM6DS33_CONFIG
+{
+  LSM6DS33_DEVICE_ID =          0xD6,
+  LSM6DS33_WHO_AM_I =           0x0F,  // Returns 0x69
 
-/* L3GD20 Register Table */
-#define ADDR_GYRO_WHO_AM_I      0x0F
+  LSM6DS33_CTRL1_XL =           0x10,
+  LSM6DS33_CTRL2_G =            0x11,
+  LSM6DS33_CTRL3_C =            0x12,
+  LSM6DS33_CTRL4_C =            0x13,
+  LSM6DS33_CTRL5_C =            0x14,
+  LSM6DS33_CTRL6_C =            0x15,
+  LSM6DS33_CTRL7_G =            0x16,
+  LSM6DS33_CTRL8_XL =           0x17,
+  LSM6DS33_CTRL9_XL =           0x18,
+  LSM6DS33_CTRL10_C =           0x19,
 
-#define ADDR_GYRO_CTRL_REG1     0x20
-#define ADDR_GYRO_CTRL_REG2     0x21
-#define ADDR_GYRO_CTRL_REG3     0x22
-#define ADDR_GYRO_CTRL_REG4     0x23
-#define ADDR_GYRO_CTRL_REG5     0x24
-#define ADDR_GYRO_REFERENCE     0x25
-#define ADDR_GYRO_TEMP_OUT      0x26
-#define ADDR_GYRO_STATUS_REG    0x27
+  LSM6DS33_OUT_TEMP_L =         0x20,
+  LSM6DS33_OUT_TEMP_H =         0x21,
+  LSM6DS33_OUTX_L_G =           0x22,
+  LSM6DS33_OUTX_H_G =           0x23,
+  LSM6DS33_OUTY_L_G =           0x24,
+  LSM6DS33_OUTY_H_G =           0x25,
+  LSM6DS33_OUTZ_L_G =           0x26,
+  LSM6DS33_OUTZ_H_G =           0x27,
+  LSM6DS33_OUTX_L_XL =          0x28,
+  LSM6DS33_OUTX_H_XL =          0x29,
+  LSM6DS33_OUTY_L_XL =          0x2A,
+  LSM6DS33_OUTY_H_XL =          0x2B,
+  LSM6DS33_OUTZ_L_XL =          0x2C,
+  LSM6DS33_OUTZ_H_XL =          0x2D,
+};
 
-#define ADDR_GYRO_XOUT_L        0x28
-#define ADDR_GYRO_XOUT_H        0x29
-#define ADDR_GYRO_YOUT_L        0x2A
-#define ADDR_GYRO_YOUT_H        0x2B
-#define ADDR_GYRO_ZOUT_L        0x2C
-#define ADDR_GYRO_ZOUT_H        0x2D
+enum LIS3MDL_CONFIG
+{
+  LIS3MDL_DEVICE_ID =           0x3C,
+  LIS3MDL_WHO_AM_I =            0x0F,  // Returns 0x4d
 
-/* LSM303 Register Table */
-#define ADDR_ACCEL_CTRL_REG1_A  0x20
-#define ADDR_ACCEL_STAT_REG_A   0x27
+  LIS3MDL_CTRL_REG1 =           0x20,
+  LIS3MDL_CTRL_REG2 =           0x21,
+  LIS3MDL_CTRL_REG3 =           0x22,
+  LIS3MDL_CTRL_REG4 =           0x23,
+  LIS3MDL_CTRL_REG5 =           0x24,
 
-#define ADDR_ACCEL_X_L_A        0x28
-#define ADDR_ACCEL_X_H_A        0x29
-#define ADDR_ACCEL_Y_L_A        0x2A
-#define ADDR_ACCEL_Y_H_A        0x2B
-#define ADDR_ACCEL_Z_L_A        0x2C
-#define ADDR_ACCEL_Z_H_A        0x2D
-
-/* Note order: some should probably die for that */
-#define ADDR_ACCEL_X_H_M        0x03
-#define ADDR_ACCEL_X_L_M        0x04
-#define ADDR_ACCEL_Z_H_M        0x05
-#define ADDR_ACCEL_Z_L_M        0x06
-#define ADDR_ACCEL_Y_H_M        0x07
-#define ADDR_ACCEL_Y_L_M        0x08
-
-#define ADDR_MAG_CRA_REG_M      0x00
-#define ADDR_MAG_CRB_REG_M      0x01
-#define ADDR_MAG_MR_REG_M       0x02
+  LIS3MDL_OUT_X_L =             0x28,
+  LIS3MDL_OUT_X_H =             0x29,
+  LIS3MDL_OUT_Y_L =             0x2A,
+  LIS3MDL_OUT_Y_H =             0x2B,
+  LIS3MDL_OUT_Z_L =             0x2C,
+  LIS3MDL_OUT_Z_H =             0x2D,
+  LIS3MDL_TEMP_OUT_L =          0x2E,
+  LIS3MDL_TEMP_OUT_H =          0x2F,
+};
 
 /*
  * This is currently tuned for 168mhz STM32F4 and 100khz I2C,
@@ -90,7 +97,7 @@
 #define IMU_FLAG_TIMEOUT        ((uint32_t)0x80*6)
 
 /**
- *  \brief Driver for Pololu MiniIMU-9 v2, with ST L3GD20 and LSM303DLHC.
+ *  \brief Driver for Pololu MiniIMU-9 v5, with ST LSM6DS33 and LIS3MDL.
  *  \tparam I2C The I2C device, for instance I2C1.
  *  \tparam DMA The stream device, for instance DMA1_Stream3_BASE.
  *  \tparam STREAM The stream number (3 for DMA1_Stream3_BASE).
@@ -108,7 +115,7 @@
  * // Example definitions for using I2C2, DMA1, Stream 3, Channel 7:
  * typedef Gpio<GPIOB_BASE,11> SDA;
  * typedef Gpio<GPIOB_BASE,10> SCL;
- * MiniImu9v2<I2C2_BASE,
+ * MiniImu9v5<I2C2_BASE,
  *            DMA1_Stream3_BASE,
  *            3, // DMA STREAM
  *            7, // DMA_CHANNEL
@@ -123,7 +130,7 @@
  * \endcode
  */
 template<int I2C, int DMA, int STREAM, int CHANNEL, typename SCL, typename SDA>
-class MiniImu9v2
+class MiniImu9v5
 {
   /** \brief Timeouts, in milliseconds */
   enum
@@ -172,7 +179,7 @@ class MiniImu9v2
   enum imu_error_op_t
   {
     IMU_ERROR_WRITE_REG  = 1,  // error occurred while writing byte to register
-    IMU_ERROR_WRITE_ADDR = 2,  // error occurred while wrtting register address
+    IMU_ERROR_WRITE_ADDR = 2,  // error occurred while writing register address
     IMU_ERROR_READ_REG   = 3,  // error occurred while reading register data
     IMU_ERROR_READ_DMA   = 4   // error occurred while reading register data DMA
   };
@@ -239,6 +246,11 @@ public:
       SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
       SDA::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
     }
+    // Technically, the MINI-IMU9 has pull up resistors --
+    // but they are connected to VIN, not VDD, so they aren't
+    // pulling anything up
+    SCL::pullup();
+    SDA::pullup();
 
     /* Enable the proper DMA */
     if (DMA < DMA2_BASE)
@@ -415,10 +427,10 @@ public:
     }
     else
     {
-      configure_accelerometer();
-      configure_gyro();
-      configure_magnetometer();
-      state_ = IMU_DELAY_GYRO;
+      if (configure_accelerometer() &&
+          configure_gyro() &&
+          configure_magnetometer())
+        state_ = IMU_DELAY_GYRO;
       timer_ = clock;
     }
     return false;
@@ -529,32 +541,31 @@ private:
   {
     /*
      * Enable Accelerometer via Control Register 1
-     * bits 7:4 = data rate = 0111b (Normal / low-power mode (400hz))
-     * bit  3   = power on = 0b
-     * bits 2:0 = Z/Y/X on = 111b
+     * bits 7:4 = output data rate = 0110b (high performance (416hz))
+     * bit  3:2 = full scale = 10b = +/-4g
+     * bits 1:0 = anti-aliasing filter = 00b = 400hz
      */
-    return imu_write(DEVICE_ACCEL, ADDR_ACCEL_CTRL_REG1_A, 0x77);
+    if (!imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL1_XL, 0x68))
+      return false;
+
+    return true;
   }
 
   /** \brief Configure the gyro. */
   bool configure_gyro(void)
   {
-    /* Enable Gyro via Control Register 1
-     *  bits 7:6 = data rate = 10b (380hz update rate)
-     *  bits 5:4 = bandwidth = 11b (100hz cutoff)
-     *  bit  3   = power on = 1b
-     *  bits 2:0 = Z/Y/X on = 111b
+    /* Enable Gyro via Control Register 2
+     *  bits 7:4 = output data rate = 0110b (416hz update rate)
+     *  bits 3:2 = full scale = 01b = 500dps
      */
-    if (!imu_write(DEVICE_GYRO, ADDR_GYRO_CTRL_REG1, 0xBF))
+    if (!imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL2_G, 0x64))
       return false;
 
-    /* Change Full Scale Selection
-     *  bit  7   = block update (default: 0)
-     *  bit  6   = lsb (0)
-     *  bit  5:4 = full scale = 11b (2000dps)
-     *                              (=70mdps/digit)
+    /* Configure Control Register 3
+     *  bit  6   = block update (default: 0)
+     *  bit  2   = register address updated automatically (default: 1)
      */
-    if (!imu_write(DEVICE_GYRO, ADDR_GYRO_CTRL_REG4, 0xE0))
+    if (!imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL3_C, 0x44))
       return false;
 
     return true;
@@ -567,8 +578,17 @@ private:
      * Configure continuous conversion
      *  bit 1:0  = 00b = continuous conversion
      */
-    if (!imu_write(DEVICE_MAG, ADDR_MAG_MR_REG_M, 0x00))
+    if (!imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG3, 0x00))
       return false;
+
+    /*
+     * Configure BDU
+     *  bit 6   = 1b = enable BDU
+     */
+    if (!imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG5, 0x40))
+      return false;
+
+    return true;
   }
 
   /**
@@ -702,21 +722,20 @@ private:
   /** \brief Start reading from the accelerometer */
   bool start_accel_read()
   {
-    /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
-    return imu_start_read(DEVICE_ACCEL, ADDR_ACCEL_X_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
+    return imu_start_read(LSM6DS33_DEVICE_ID, LSM6DS33_OUTX_L_XL, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
   }
 
   /** \brief Start reading from the gyro */
   bool start_gyro_read()
   {
-    /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
-    return imu_start_read(DEVICE_GYRO, ADDR_GYRO_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
+    return imu_start_read(LSM6DS33_DEVICE_ID, LSM6DS33_OUT_TEMP_L, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
   }
 
   /** \brief Start reading from the magnetometer */
   bool start_mag_read()
   {
-    return imu_start_read(DEVICE_MAG, ADDR_ACCEL_X_H_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+    return imu_start_read(LIS3MDL_DEVICE_ID, LIS3MDL_OUT_X_L | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
   }
 
   /** \brief State of the updates */
@@ -748,4 +767,4 @@ private:
   bool use_mag_;
 };
 
-#endif  // _STM32_CPP_MINI_IMU9_V2_H_
+#endif  // _STM32_CPP_MINI_IMU9_V5_H_
