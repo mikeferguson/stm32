@@ -554,7 +554,7 @@ private:
      *  bit  5:4 = full scale = 11b (2000dps)
      *                              (=70mdps/digit)
      */
-    if (!imu_write(DEVICE_GYRO, ADDR_GYRO_CTRL_REG4, 0x30))
+    if (!imu_write(DEVICE_GYRO, ADDR_GYRO_CTRL_REG4, 0xE0))
       return false;
 
     return true;
