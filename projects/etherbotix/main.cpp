@@ -36,15 +36,15 @@
 #include "lwip/udp.h"
 #include "stm32f4x7_eth.h"
 
-#include "mini_imu9_v2.hpp"
+#include "mini_imu9.hpp"
 #include "md01.hpp"
 #include "encoder.hpp"
 #include "usart_dma.hpp"
 #include "analog_sampler.hpp"
 
-MiniImu9v2<I2C1_BASE,
-           DMA1_Stream0_BASE, 0 /* stream */, 1 /* channel */,
-           imu_scl, imu_sda> imu;
+MiniImu9<I2C1_BASE,
+         DMA1_Stream0_BASE, 0 /* stream */, 1 /* channel */,
+         imu_scl, imu_sda> imu;
 Md01<TIM1_BASE, m1_a, m1_b, m1_en> m1;
 Md01<TIM8_BASE, m2_a, m2_b, m2_en> m2;
 Encoder<TIM4_BASE> m1_enc;

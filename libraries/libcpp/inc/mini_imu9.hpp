@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Michael E. Ferguson
+ * Copyright (c) 2014-2018, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,19 +27,131 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _STM32_CPP_MINI_IMU9_V2_H_
-#define	_STM32_CPP_MINI_IMU9_V2_H_
+#ifndef _STM32_CPP_MINI_IMU9_H_
+#define _STM32_CPP_MINI_IMU9_H_
 
 #include "stm32f4xx.h"
 #include "stm32f4xx_i2c.h"
 #include "stm32f4xx_dma.h"
 #include "delay.hpp"
 
-/* L3GD20 (Gyro) Configuration Information */
+/* LSM6DS33 provides Gyro & Accel on v5 */
+enum LSM6DS33_CONFIG
+{
+  LSM6DS33_DEVICE_ID =          0xD6,
+  LSM6DS33_WHO_AM_I =           0x69,  // This is return value, not address
+
+  LSM6DS33_CTRL1_XL =           0x10,
+  LSM6DS33_CTRL2_G =            0x11,
+  LSM6DS33_CTRL3_C =            0x12,
+  LSM6DS33_CTRL4_C =            0x13,
+  LSM6DS33_CTRL5_C =            0x14,
+  LSM6DS33_CTRL6_C =            0x15,
+  LSM6DS33_CTRL7_G =            0x16,
+  LSM6DS33_CTRL8_XL =           0x17,
+  LSM6DS33_CTRL9_XL =           0x18,
+  LSM6DS33_CTRL10_C =           0x19,
+
+  LSM6DS33_OUT_TEMP_L =         0x20,
+  LSM6DS33_OUT_TEMP_H =         0x21,
+  LSM6DS33_OUTX_L_G =           0x22,
+  LSM6DS33_OUTX_H_G =           0x23,
+  LSM6DS33_OUTY_L_G =           0x24,
+  LSM6DS33_OUTY_H_G =           0x25,
+  LSM6DS33_OUTZ_L_G =           0x26,
+  LSM6DS33_OUTZ_H_G =           0x27,
+  LSM6DS33_OUTX_L_XL =          0x28,
+  LSM6DS33_OUTX_H_XL =          0x29,
+  LSM6DS33_OUTY_L_XL =          0x2A,
+  LSM6DS33_OUTY_H_XL =          0x2B,
+  LSM6DS33_OUTZ_L_XL =          0x2C,
+  LSM6DS33_OUTZ_H_XL =          0x2D,
+};
+
+/* LIS3MDL provides Mag on v5 */
+enum LIS3MDL_CONFIG
+{
+  LIS3MDL_DEVICE_ID =           0x3C,
+  LIS3MDL_WHO_AM_I =            0x4D,  // This is return value, not address
+
+  LIS3MDL_CTRL_REG1 =           0x20,
+  LIS3MDL_CTRL_REG2 =           0x21,
+  LIS3MDL_CTRL_REG3 =           0x22,
+  LIS3MDL_CTRL_REG4 =           0x23,
+  LIS3MDL_CTRL_REG5 =           0x24,
+
+  LIS3MDL_OUT_X_L =             0x28,
+  LIS3MDL_OUT_X_H =             0x29,
+  LIS3MDL_OUT_Y_L =             0x2A,
+  LIS3MDL_OUT_Y_H =             0x2B,
+  LIS3MDL_OUT_Z_L =             0x2C,
+  LIS3MDL_OUT_Z_H =             0x2D,
+  LIS3MDL_TEMP_OUT_L =          0x2E,
+  LIS3MDL_TEMP_OUT_H =          0x2F,
+};
+
+/* L3GD20H provides Gyro on v3 */
+enum L3GD20H_CONFIG
+{
+  L3GD20H_DEVICE_ID =            0xD6,
+  L3GD20H_WHO_AM_I =             0xD7,  // This is return value, not address
+
+  L3GD20H_CTRL_REG1 =            0x20,
+  L3GD20H_CTRL_REG2 =            0x21,
+  L3GD20H_CTRL_REG3 =            0x22,
+  L3GD20H_CTRL_REG4 =            0x23,
+  L3GD20H_CTRL_REG5 =            0x24,
+  L3GD20H_REFERENCE =            0x25,
+
+  L3GD20H_TEMP_OUT  =            0x26,
+  L3GD20H_STATUS_REG =           0x27,
+  L3GD20H_OUTX_L_G =             0x28,
+  L3GD20H_OUTX_H_G =             0x29,
+  L3GD20H_OUTY_L_G =             0x2A,
+  L3GD20H_OUTY_H_G =             0x2B,
+  L3GD20H_OUTZ_L_G =             0x2C,
+  L3GD20H_OUTZ_H_G =             0x2D,
+};
+
+/* LSM303D provides Accel/Mag on v3 */
+enum LSM303D_CONFIG
+{
+  LSM303D_DEVICE_ID =           0x3A,
+  LSM303D_WHO_AM_I =            0x49,  // This is return value, not address
+
+  LSM303D_TEMP_OUT_L =          0x05,
+  LSM303D_TEMP_OUT_H =          0x06,
+  LSM303D_STATUS_M =            0x07,
+  LSM303D_OUTX_L_M =            0x08,
+  LSM303D_OUTX_H_M =            0x09,
+  LSM303D_OUTY_L_M =            0x0A,
+  LSM303D_OUTY_H_M =            0x0B,
+  LSM303D_OUTZ_L_M =            0x0C,
+  LSM303D_OUTZ_H_M =            0x0D,
+
+  LSM303D_CTRL_REG0 =           0x1F,
+  LSM303D_CTRL_REG1 =           0x20,
+  LSM303D_CTRL_REG2 =           0x21,
+  LSM303D_CTRL_REG3 =           0x22,
+  LSM303D_CTRL_REG4 =           0x23,
+  LSM303D_CTRL_REG5 =           0x24,
+  LSM303D_CTRL_REG6 =           0x25,
+  LSM303D_CTRL_REG7 =           0x26,
+
+  LSM303D_STATUS_A =            0x27,
+  LSM303D_OUTX_L_A =            0x28,
+  LSM303D_OUTX_H_A =            0x29,
+  LSM303D_OUTY_L_A =            0x2A,
+  LSM303D_OUTY_H_A =            0x2B,
+  LSM303D_OUTZ_L_A =            0x2C,
+  LSM303D_OUTZ_H_A =            0x2D,
+};
+
+/* L3GD20 provides Gyro on v2 */
 enum L3GD20_CONFIG
 {
   L3GD20_DEVICE_ID =            0xD6,
-  L3GD20_WHO_AM_I =             0xD4,
+  L3GD20_WHO_AM_I =             0xD4,  // This is return value, not address
 
   L3GD20_CTRL_REG1 =            0x20,
   L3GD20_CTRL_REG2 =            0x21,
@@ -58,38 +170,43 @@ enum L3GD20_CONFIG
   L3GD20_OUTZ_H_G =             0x2D,
 };
 
-/* LSM303 (Accel/Mag) Configuration Information */
-enum LSM303D_CONFIG
+/* LSM303DHLC provides Accel & Mag on v2 */
+enum LSM303DHLC_CONFIG
 {
-  LSM303D_DEVICE_ID =           0x32,
-  LSM303D_WHO_AM_I =            0x49,
+  LSM303DHLC_DEVICE_ID =        0x32,
+  LSM303DHLC_WHO_AM_I =         0x49,  // This is return value, not address
 
-  LSM303D_TEMP_OUT_L =          0x05,
-  LSM303D_TEMP_OUT_H =          0x06,
-  LSM303D_STATUS_M =            0x07,
-  LSM303D_OUTX_L_M =            0x08,
-  LSM303D_OUTX_H_M =            0x09,
-  LSM303D_OUTY_L_M =            0x0A,
-  LSM303D_OUTY_H_M =            0x0B,
-  LSM303D_OUTZ_L_M =            0x0C,
-  LSM303D_OUTZ_H_M =            0x0D,
+  LSM303DHLC_TEMP_OUT_L =       0x05,
+  LSM303DHLC_TEMP_OUT_H =       0x06,
 
-  LSM303D_CTRL_REG0 =           0x1F,
-  LSM303D_CTRL_REG1 =           0x20,
-  LSM303D_CTRL_REG2 =           0x21,
-  LSM303D_CTRL_REG3=            0x22,
-  LSM303D_CTRL_REG4 =           0x23,
-  LSM303D_CTRL_REG5 =           0x24,
-  LSM303D_CTRL_REG6 =           0x25,
-  LSM303D_CTRL_REG7 =           0x26,
+  LSM303DHLC_STATUS_A =         0x27,
+  LSM303DHLC_OUTX_L_A =         0x28,
+  LSM303DHLC_OUTX_H_A =         0x29,
+  LSM303DHLC_OUTY_L_A =         0x2A,
+  LSM303DHLC_OUTY_H_A =         0x2B,
+  LSM303DHLC_OUTZ_L_A =         0x2C,
+  LSM303DHLC_OUTZ_H_A =         0x2D,
 
-  LSM303D_STATUS_A =            0x27,
-  LSM303D_OUTX_L_A =            0x28,
-  LSM303D_OUTX_H_A =            0x29,
-  LSM303D_OUTY_L_A =            0x2A,
-  LSM303D_OUTY_H_A =            0x2B,
-  LSM303D_OUTZ_L_A =            0x2C,
-  LSM303D_OUTZ_H_A =            0x2D,
+  LSM303DHLC_CTRL_REG1_A =      0x20,
+  LSM303DHLC_CTRL_REG2_A =      0x21,
+  LSM303DHLC_CTRL_REG3_A =      0x22,
+  LSM303DHLC_CTRL_REG4_A =      0x23,
+  LSM303DHLC_CTRL_REG5_A =      0x24,
+  LSM303DHLC_CTRL_REG6_A =      0x25,
+
+  // Magnetometer has it's own address and table
+  LSM303DHLC_DEVICE_ID_M =      0x3C,
+
+  LSM303DHLC_CRA_REG_M =        0x00,
+  LSM303DHLC_CRB_REG_M =        0x01,
+  LSM303DHLC_MR_REG_M =         0x02,
+  // NOTE: Order is different than anything else!
+  LSM303DHLC_OUTX_H_M =         0x03,
+  LSM303DHLC_OUTX_L_M =         0x04,
+  LSM303DHLC_OUTZ_H_M =         0x05,
+  LSM303DHLC_OUTZ_L_M =         0x06,
+  LSM303DHLC_OUTY_H_M =         0x07,
+  LSM303DHLC_OUTY_L_M =         0x08,
 };
 
 /*
@@ -99,8 +216,15 @@ enum LSM303D_CONFIG
  */
 #define IMU_FLAG_TIMEOUT        ((uint32_t)0x80*6)
 
+#define VERSION_2_L3GD20_LSM303DLHC   2
+#define VERSION_3_L3GD20H_LSM303D     3
+#define VERSION_5_LSM6DS33_LIS3MDL    5
+
 /**
- *  \brief Driver for Pololu MiniIMU-9 v2, with ST L3GD20 and LSM303DLHC.
+ *  \brief Driver for Pololu MiniIMU-9, supports the following versions:
+ *           v2 with ST L3GD20 and LSM303DLHC
+ *           v3 with ST L3GD20H and LSM303D (untested)
+ *           v5 with ST LSM6DS33 and LIS3MDL
  *  \tparam I2C The I2C device, for instance I2C1.
  *  \tparam DMA The stream device, for instance DMA1_Stream3_BASE.
  *  \tparam STREAM The stream number (3 for DMA1_Stream3_BASE).
@@ -108,22 +232,22 @@ enum LSM303D_CONFIG
  *  \tparam SCL The GPIO used for SCL.
  *  \tparam SDA The GPIO used for SDA.
  *
- * Settings selected by the driver:
- *  - Accelerometer is +/- 2g
+ * Settings selected by the driver (closely match popular UM7):
+ *  - Accelerometer is +/- 8g
  *  - Gyro is full scale, +/-2000degrees/s, or 70millidegrees/digit
- *  - Magnetometer is max gain, 1100LSB/Gauss
+ *  - Magnetometer is +/-12 gauss (except v2, which maxes out at 8.1)
  *
  * Example:
  * \code
  * // Example definitions for using I2C2, DMA1, Stream 3, Channel 7:
  * typedef Gpio<GPIOB_BASE,11> SDA;
  * typedef Gpio<GPIOB_BASE,10> SCL;
- * MiniImu9v2<I2C2_BASE,
- *            DMA1_Stream3_BASE,
- *            3, // DMA STREAM
- *            7, // DMA_CHANNEL
- *            SCL
- *            SDA> imu;
+ * MiniImu9<I2C2_BASE,
+ *          DMA1_Stream3_BASE,
+ *          3, // DMA STREAM
+ *          7, // DMA_CHANNEL
+ *          SCL
+ *          SDA> imu;
  *
  * // In the beginning of your main, initialize the IMU with the I2C speed.
  * imu.init(100000);
@@ -133,7 +257,7 @@ enum LSM303D_CONFIG
  * \endcode
  */
 template<int I2C, int DMA, int STREAM, int CHANNEL, typename SCL, typename SDA>
-class MiniImu9v2
+class MiniImu9
 {
   /** \brief Timeouts, in milliseconds */
   enum
@@ -229,6 +353,7 @@ public:
    */
   void init(uint32_t clock_speed)
   {
+    version_ = 0;
     clock_speed_ = clock_speed;
     use_mag_ = false;  // do not use magnetometer by default
 
@@ -282,6 +407,15 @@ public:
   void use_magnetometer(bool read_mag)
   {
     use_mag_ = read_mag;
+  }
+
+  /**
+   *  \brief Returns the version of the IMU (v2, 3, or 5)
+   *         Will return 0 if no IMU is present
+   */
+  uint8_t get_version()
+  {
+    return version_;
   }
 
   /**
@@ -407,9 +541,19 @@ public:
       {
         imu_finish_read();
         /* Read successful */
-        mag_data.x = mag_buffer_[0] + (mag_buffer_[1]<<8);
-        mag_data.y = mag_buffer_[2] + (mag_buffer_[3]<<8);
-        mag_data.z = mag_buffer_[4] + (mag_buffer_[5]<<8);
+        if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+        {
+          // Order is different than anything else!
+          mag_data.x = mag_buffer_[1] + (mag_buffer_[0]<<8);
+          mag_data.z = mag_buffer_[3] + (mag_buffer_[2]<<8);
+          mag_data.y = mag_buffer_[5] + (mag_buffer_[4]<<8);
+        }
+        else
+        {
+          mag_data.x = mag_buffer_[0] + (mag_buffer_[1]<<8);
+          mag_data.y = mag_buffer_[2] + (mag_buffer_[3]<<8);
+          mag_data.z = mag_buffer_[4] + (mag_buffer_[5]<<8);
+        }
         ++num_mag_updates_;
         /* Setup next cycle */
         timer_ = clock;
@@ -535,55 +679,6 @@ private:
 
     /* Send stop bit */
     I2C_GenerateSTOP(I2Cx, ENABLE);
-
-    return true;
-  }
-
-  /** \brief Configure the accelerometer. */
-  bool configure_accelerometer(void)
-  {
-    /*
-     * Enable Accelerometer via Control Register 1
-     * bits 7:4 = data rate = 0111b (Normal / low-power mode (400hz))
-     * bit  3   = block data update = 1b
-     * bits 2:0 = Z/Y/X on = 111b
-     */
-    return imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG1, 0x78);
-  }
-
-  /** \brief Configure the gyro. */
-  bool configure_gyro(void)
-  {
-    /* Enable Gyro via Control Register 1
-     *  bits 7:6 = data rate = 10b (380hz update rate)
-     *  bits 5:4 = bandwidth = 11b (100hz cutoff)
-     *  bit  3   = power on = 1b
-     *  bits 2:0 = Z/Y/X on = 111b
-     */
-    if (!imu_write(L3GD20_DEVICE_ID, L3GD20_CTRL_REG1, 0xBF))
-      return false;
-
-    /* Change Full Scale Selection
-     *  bit  7   = block update (default: 0)
-     *  bit  6   = lsb (0)
-     *  bit  5:4 = full scale = 11b (2000dps)
-     *                              (=70mdps/digit)
-     */
-    if (!imu_write(L3GD20_DEVICE_ID, L3GD20_CTRL_REG4, 0xE0))
-      return false;
-
-    return true;
-  }
-
-  /** \brief Configure the magnetometer. */
-  bool configure_magnetometer(void)
-  {
-    /*
-     * Configure Magnetometer
-     *  bit 4:2  = 011b = 25Hz
-     */
-    if (!imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG5, 0x0C))
-      return false;
 
     return true;
   }
@@ -716,24 +811,247 @@ private:
     return int32_t(t1-t2);
   }
 
+  /** \brief Configure the accelerometer to +/-8g. */
+  bool configure_accelerometer(void)
+  {
+    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    {
+      /* Enable Accelerometer via Control Register 1
+       *  bits 7:4 = output data rate = 0110b (high performance (416hz))
+       *  bit  3:2 = full scale = 11b = +/-8g
+       *  bits 1:0 = anti-aliasing filter = 00b = 400hz
+       */
+      return imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL1_XL, 0x6C);
+    }
+    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    {
+      /* Enable Accelerometer via Control Register 1
+       *  bits 7:4 = data rate = 1000b (Normal / low-power mode (400hz))
+       *  bit  3   = block data update = 1b
+       *  bits 2:0 = Z/Y/X on = 111b
+       */
+      if (!imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG1, 0x8F))
+        return false;
+
+      /* Configure full scale via Control Register 2
+       *   bits 5:3 = full scale = 011b = +/- 8g
+       */
+      return imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG2, 0x0C);
+    }
+    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    {
+      /* Enable Accelerometer via Control Register 1A
+       *  bits 7:4 = data rate = 0111b (Normal / low-power mode (400hz))
+       *  bit  3   = low power mode enabled = 0b
+       *  bits 2:0 = Z/Y/X on = 111b
+       */
+      if (!imu_write(LSM303DHLC_DEVICE_ID, LSM303DHLC_CTRL_REG1_A, 0x77))
+        return false;
+
+      /* Configure data format via Control Register 4A
+       *  bit  7   = block data update = 1b
+       *  bits 5:4 = full scale selection = 10b = +/- 8g
+       */
+      return imu_write(LSM303DHLC_DEVICE_ID, LSM303DHLC_CTRL_REG4_A, 0x90);
+    }
+    // Unsupported version
+    return false;
+  }
+
   /** \brief Start reading from the accelerometer */
   bool start_accel_read()
   {
-    /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
-    return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
+    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    {
+      return imu_start_read(LSM6DS33_DEVICE_ID, LSM6DS33_OUTX_L_XL, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
+    }
+    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
+    }
+    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(LSM303DHLC_DEVICE_ID, LSM303DHLC_OUTX_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
+    }
+    // Unsupported version
+    return false;
+  }
+
+  /** \brief Configure the gyro to +/- 2000dps. */
+  bool configure_gyro(void)
+  {
+    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    {
+      /* Enable Gyro via Control Register 2
+       *  bits 7:4 = output data rate = 0110b (416hz update rate)
+       *  bits 3:2 = full scale = 11b = 2000dps
+       */
+      if (!imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL2_G, 0x6C))
+        return false;
+
+      /* Configure Control Register 3
+       *  bit  6   = block update (default: 0)
+       *  bit  2   = register address updated automatically (default: 1)
+       */
+      if (!imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL3_C, 0x44))
+        return false;
+
+      return true;
+    }
+    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    {
+      /* Enable Gyro via Control Register 1
+       *  bits 7:6 = data rate = 10b (400hz update rate)
+       *  bits 5:4 = bandwidth = 11b (110hz cutoff)
+       *  bit  3   = power on = 1b
+       *  bits 2:0 = Z/Y/X on = 111b
+       */
+      if (!imu_write(L3GD20H_DEVICE_ID, L3GD20H_CTRL_REG1, 0xBF))
+        return false;
+
+      /* Change Full Scale Selection
+       *  bit  7   = block update (default: 0)
+       *  bit  6   = lsb (0)
+       *  bit  5:4 = full scale = 11b (2000dps)
+       *                              (=70mdps/digit)
+       */
+      return imu_write(L3GD20H_DEVICE_ID, L3GD20H_CTRL_REG4, 0xE0);
+    }
+    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    {
+      /* Enable Gyro via Control Register 1
+       *  bits 7:6 = data rate = 10b (380hz update rate)
+       *  bits 5:4 = bandwidth = 11b (100hz cutoff)
+       *  bit  3   = power on = 1b
+       *  bits 2:0 = Z/Y/X on = 111b
+       */
+      if (!imu_write(L3GD20_DEVICE_ID, L3GD20_CTRL_REG1, 0xBF))
+        return false;
+
+      /* Change Full Scale Selection
+       *  bit  7   = block update (default: 0)
+       *  bit  6   = lsb (0)
+       *  bit  5:4 = full scale = 11b (2000dps)
+       *                              (=70mdps/digit)
+       */
+      return imu_write(L3GD20_DEVICE_ID, L3GD20_CTRL_REG4, 0xE0);
+    }
+    // Unsupported version
+    return false;
   }
 
   /** \brief Start reading from the gyro */
   bool start_gyro_read()
   {
-    /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
-    return imu_start_read(L3GD20_DEVICE_ID, L3GD20_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
+    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    {
+      return imu_start_read(LSM6DS33_DEVICE_ID, LSM6DS33_OUT_TEMP_L, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
+    }
+    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(L3GD20H_DEVICE_ID, L3GD20H_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
+    }
+    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(L3GD20_DEVICE_ID, L3GD20_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
+    }
+    // Unsupported version
+    return false;
+  }
+
+  /** \brief Configure the magnetometer to +/-12 Gauss. */
+  bool configure_magnetometer(void)
+  {
+    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    {
+      /* Configure Performance
+       *  bits 6:5 = 11b = Ultra High Performance X/Y
+       *  bits 4:2 = 110b = 40hz output rate
+       */
+      if (!imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG1, 0x78))
+        return false;
+
+      /* Configure Scale
+       *  bits 6:5 = 10b = +/-12 gauss
+       *                 = 2281LSB/Gauss
+       */
+      if (!imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG2, 0x40))
+        return false;
+
+      /* Configure continuous conversion
+       *  bit 1:0  = 00b = continuous conversion
+       */
+      if (!imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG3, 0x00))
+        return false;
+
+      /* Configure Z mode
+       *  bit 3:2  = 11b = Ultra High Performance Z
+       */
+      if (!imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG4, 0x0C))
+        return false;
+
+      /* Configure BDU
+       *  bit 6   = 1b = enable BDU
+       */
+      return imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG5, 0x40);
+    }
+    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    {
+      /* Configure Magnetometer Update Rate
+       *  bit 4:2  = 011b = 25Hz
+       */
+      if (!imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG5, 0x0C))
+        return false;
+
+      /* Configure Magnetometer Scale
+       *  bit 6:5  = 11b = +/- 12 Gauss
+       *                 = 0.479 mgauss/lsb
+       */
+      return imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG6, 0x60);
+    }
+    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    {
+      /* Configure Magnetometer Update Rate
+       *  bit 4:2  = 100b = 15Hz (default)
+       */
+      if (!imu_write(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_CRA_REG_M, 0x10))
+        return false;
+
+      /* Configure Magnetometer Scale
+       *  bit 7:5  = 111b = +/- 8.1 Gauss
+       *  LSB/Gauss = 230 for X/Y, 205 for Z
+       */
+      return imu_write(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_CRB_REG_M, 0xE0);
+    }
+
+    // Unsupported version
+    return false;
   }
 
   /** \brief Start reading from the magnetometer */
   bool start_mag_read()
   {
-    return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(LIS3MDL_DEVICE_ID, LIS3MDL_OUT_X_L | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    }
+    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    }
+    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    {
+      /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
+      return imu_start_read(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_OUTX_H_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    }
+    // Unsupported version
+    return false;
   }
 
   /** \brief State of the updates */
@@ -746,8 +1064,8 @@ private:
   accel_data_t accel_buffer_;
   /** \brief Private copy of gyro data for DMA read */
   gyro_data_t gyro_buffer_;
-  /** \brief Private copy of mag data for DMA read
-             The magnetometer is H/L byte, whereas everything else is L/H.. ugh */
+  /** \brief Private copy of mag data for DMA read, due to LSM303DHLC where
+             the magnetometer is H/L byte, whereas everything else is L/H.. ugh */
   uint8_t mag_buffer_[6];
 
   /* internal logging */
@@ -763,6 +1081,9 @@ private:
 
   /** \brief Should we read the magnetometer */
   bool use_mag_;
+
+  /** \brief What verison IMU do we have? */
+  uint8_t version_;
 };
 
-#endif  // _STM32_CPP_MINI_IMU9_V2_H_
+#endif  // _STM32_CPP_MINI_IMU9_H_
