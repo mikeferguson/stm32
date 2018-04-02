@@ -1025,7 +1025,13 @@ private:
        *  bit 7:5  = 111b = +/- 8.1 Gauss
        *  LSB/Gauss = 230 for X/Y, 205 for Z
        */
-      return imu_write(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_CRB_REG_M, 0xE0);
+      if (!imu_write(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_CRB_REG_M, 0xE0))
+        return false;
+
+      /* Configure continuous conversion
+       *  bit 1:0  = 00b
+       */
+      return imu_write(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_MR_REG_M, 0x00);
     }
 
     // Unsupported version
