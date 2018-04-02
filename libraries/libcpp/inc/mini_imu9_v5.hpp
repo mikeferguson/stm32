@@ -39,7 +39,7 @@
 enum LSM6DS33_CONFIG
 {
   LSM6DS33_DEVICE_ID =          0xD6,
-  LSM6DS33_WHO_AM_I =           0x0F,  // Returns 0x69
+  LSM6DS33_WHO_AM_I =           0x69,  // This is return value, not address
 
   LSM6DS33_CTRL1_XL =           0x10,
   LSM6DS33_CTRL2_G =            0x11,
@@ -71,7 +71,7 @@ enum LSM6DS33_CONFIG
 enum LIS3MDL_CONFIG
 {
   LIS3MDL_DEVICE_ID =           0x3C,
-  LIS3MDL_WHO_AM_I =            0x0F,  // Returns 0x4d
+  LIS3MDL_WHO_AM_I =            0x4D,  // This is return value, not address
 
   LIS3MDL_CTRL_REG1 =           0x20,
   LIS3MDL_CTRL_REG2 =           0x21,

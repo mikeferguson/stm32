@@ -35,52 +35,62 @@
 #include "stm32f4xx_dma.h"
 #include "delay.hpp"
 
-/* I2C Device Addresses */
-#define DEVICE_GYRO             0xD6
-#define DEVICE_ACCEL            0x32
-#define DEVICE_MAG              0x3C
+/* L3GD20 (Gyro) Configuration Information */
+enum L3GD20_CONFIG
+{
+  L3GD20_DEVICE_ID =            0xD6,
+  L3GD20_WHO_AM_I =             0xD4,
 
-/* L3GD20 Register Table */
-#define ADDR_GYRO_WHO_AM_I      0x0F
+  L3GD20_CTRL_REG1 =            0x20,
+  L3GD20_CTRL_REG2 =            0x21,
+  L3GD20_CTRL_REG3 =            0x22,
+  L3GD20_CTRL_REG4 =            0x23,
+  L3GD20_CTRL_REG5 =            0x24,
+  L3GD20_REFERENCE =            0x25,
 
-#define ADDR_GYRO_CTRL_REG1     0x20
-#define ADDR_GYRO_CTRL_REG2     0x21
-#define ADDR_GYRO_CTRL_REG3     0x22
-#define ADDR_GYRO_CTRL_REG4     0x23
-#define ADDR_GYRO_CTRL_REG5     0x24
-#define ADDR_GYRO_REFERENCE     0x25
-#define ADDR_GYRO_TEMP_OUT      0x26
-#define ADDR_GYRO_STATUS_REG    0x27
+  L3GD20_TEMP_OUT  =            0x26,
+  L3GD20_STATUS_REG =           0x27,
+  L3GD20_OUTX_L_G =             0x28,
+  L3GD20_OUTX_H_G =             0x29,
+  L3GD20_OUTY_L_G =             0x2A,
+  L3GD20_OUTY_H_G =             0x2B,
+  L3GD20_OUTZ_L_G =             0x2C,
+  L3GD20_OUTZ_H_G =             0x2D,
+};
 
-#define ADDR_GYRO_XOUT_L        0x28
-#define ADDR_GYRO_XOUT_H        0x29
-#define ADDR_GYRO_YOUT_L        0x2A
-#define ADDR_GYRO_YOUT_H        0x2B
-#define ADDR_GYRO_ZOUT_L        0x2C
-#define ADDR_GYRO_ZOUT_H        0x2D
+/* LSM303 (Accel/Mag) Configuration Information */
+enum LSM303D_CONFIG
+{
+  LSM303D_DEVICE_ID =           0x32,
+  LSM303D_WHO_AM_I =            0x49,
 
-/* LSM303 Register Table */
-#define ADDR_ACCEL_CTRL_REG1_A  0x20
-#define ADDR_ACCEL_STAT_REG_A   0x27
+  LSM303D_TEMP_OUT_L =          0x05,
+  LSM303D_TEMP_OUT_H =          0x06,
+  LSM303D_STATUS_M =            0x07,
+  LSM303D_OUTX_L_M =            0x08,
+  LSM303D_OUTX_H_M =            0x09,
+  LSM303D_OUTY_L_M =            0x0A,
+  LSM303D_OUTY_H_M =            0x0B,
+  LSM303D_OUTZ_L_M =            0x0C,
+  LSM303D_OUTZ_H_M =            0x0D,
 
-#define ADDR_ACCEL_X_L_A        0x28
-#define ADDR_ACCEL_X_H_A        0x29
-#define ADDR_ACCEL_Y_L_A        0x2A
-#define ADDR_ACCEL_Y_H_A        0x2B
-#define ADDR_ACCEL_Z_L_A        0x2C
-#define ADDR_ACCEL_Z_H_A        0x2D
+  LSM303D_CTRL_REG0 =           0x1F,
+  LSM303D_CTRL_REG1 =           0x20,
+  LSM303D_CTRL_REG2 =           0x21,
+  LSM303D_CTRL_REG3=            0x22,
+  LSM303D_CTRL_REG4 =           0x23,
+  LSM303D_CTRL_REG5 =           0x24,
+  LSM303D_CTRL_REG6 =           0x25,
+  LSM303D_CTRL_REG7 =           0x26,
 
-/* Note order: some should probably die for that */
-#define ADDR_ACCEL_X_H_M        0x03
-#define ADDR_ACCEL_X_L_M        0x04
-#define ADDR_ACCEL_Z_H_M        0x05
-#define ADDR_ACCEL_Z_L_M        0x06
-#define ADDR_ACCEL_Y_H_M        0x07
-#define ADDR_ACCEL_Y_L_M        0x08
-
-#define ADDR_MAG_CRA_REG_M      0x00
-#define ADDR_MAG_CRB_REG_M      0x01
-#define ADDR_MAG_MR_REG_M       0x02
+  LSM303D_STATUS_A =            0x27,
+  LSM303D_OUTX_L_A =            0x28,
+  LSM303D_OUTX_H_A =            0x29,
+  LSM303D_OUTY_L_A =            0x2A,
+  LSM303D_OUTY_H_A =            0x2B,
+  LSM303D_OUTZ_L_A =            0x2C,
+  LSM303D_OUTZ_H_A =            0x2D,
+};
 
 /*
  * This is currently tuned for 168mhz STM32F4 and 100khz I2C,
@@ -172,7 +182,7 @@ class MiniImu9v2
   enum imu_error_op_t
   {
     IMU_ERROR_WRITE_REG  = 1,  // error occurred while writing byte to register
-    IMU_ERROR_WRITE_ADDR = 2,  // error occurred while wrtting register address
+    IMU_ERROR_WRITE_ADDR = 2,  // error occurred while writing register address
     IMU_ERROR_READ_REG   = 3,  // error occurred while reading register data
     IMU_ERROR_READ_DMA   = 4   // error occurred while reading register data DMA
   };
@@ -239,6 +249,11 @@ public:
       SCL::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
       SDA::mode(GPIO_ALTERNATE_OD_2MHz | GPIO_AF_I2C2);
     }
+    // Technically, the MINI-IMU9 has pull up resistors --
+    // but they are connected to VIN, not VDD, so they aren't
+    // pulling anything up
+    SCL::pullup();
+    SDA::pullup();
 
     /* Enable the proper DMA */
     if (DMA < DMA2_BASE)
@@ -392,9 +407,9 @@ public:
       {
         imu_finish_read();
         /* Read successful */
-        mag_data.x = mag_buffer_[1] + (mag_buffer_[0]<<8);
-        mag_data.z = mag_buffer_[3] + (mag_buffer_[2]<<8);
-        mag_data.y = mag_buffer_[5] + (mag_buffer_[4]<<8);
+        mag_data.x = mag_buffer_[0] + (mag_buffer_[1]<<8);
+        mag_data.y = mag_buffer_[2] + (mag_buffer_[3]<<8);
+        mag_data.z = mag_buffer_[4] + (mag_buffer_[5]<<8);
         ++num_mag_updates_;
         /* Setup next cycle */
         timer_ = clock;
@@ -530,10 +545,10 @@ private:
     /*
      * Enable Accelerometer via Control Register 1
      * bits 7:4 = data rate = 0111b (Normal / low-power mode (400hz))
-     * bit  3   = power on = 0b
+     * bit  3   = block data update = 1b
      * bits 2:0 = Z/Y/X on = 111b
      */
-    return imu_write(DEVICE_ACCEL, ADDR_ACCEL_CTRL_REG1_A, 0x77);
+    return imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG1, 0x78);
   }
 
   /** \brief Configure the gyro. */
@@ -545,7 +560,7 @@ private:
      *  bit  3   = power on = 1b
      *  bits 2:0 = Z/Y/X on = 111b
      */
-    if (!imu_write(DEVICE_GYRO, ADDR_GYRO_CTRL_REG1, 0xBF))
+    if (!imu_write(L3GD20_DEVICE_ID, L3GD20_CTRL_REG1, 0xBF))
       return false;
 
     /* Change Full Scale Selection
@@ -554,7 +569,7 @@ private:
      *  bit  5:4 = full scale = 11b (2000dps)
      *                              (=70mdps/digit)
      */
-    if (!imu_write(DEVICE_GYRO, ADDR_GYRO_CTRL_REG4, 0xE0))
+    if (!imu_write(L3GD20_DEVICE_ID, L3GD20_CTRL_REG4, 0xE0))
       return false;
 
     return true;
@@ -564,11 +579,13 @@ private:
   bool configure_magnetometer(void)
   {
     /*
-     * Configure continuous conversion
-     *  bit 1:0  = 00b = continuous conversion
+     * Configure Magnetometer
+     *  bit 4:2  = 011b = 25Hz
      */
-    if (!imu_write(DEVICE_MAG, ADDR_MAG_MR_REG_M, 0x00))
+    if (!imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG5, 0x0C))
       return false;
+
+    return true;
   }
 
   /**
@@ -703,20 +720,20 @@ private:
   bool start_accel_read()
   {
     /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
-    return imu_start_read(DEVICE_ACCEL, ADDR_ACCEL_X_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
+    return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
   }
 
   /** \brief Start reading from the gyro */
   bool start_gyro_read()
   {
     /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
-    return imu_start_read(DEVICE_GYRO, ADDR_GYRO_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
+    return imu_start_read(L3GD20_DEVICE_ID, L3GD20_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
   }
 
   /** \brief Start reading from the magnetometer */
   bool start_mag_read()
   {
-    return imu_start_read(DEVICE_MAG, ADDR_ACCEL_X_H_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
+    return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
   }
 
   /** \brief State of the updates */
