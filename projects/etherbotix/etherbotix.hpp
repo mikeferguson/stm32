@@ -56,7 +56,7 @@
 #define REG_AUX_CURRENT     22  // 16-bit signed current in mA
 #define REG_SYSTEM_VOLTAGE  24  // Voltage in 0.1V increments
 #define REG_LED             25  // Turns on error led
-#define REG_IMU_VERSION     28  // Information on IMU version (read-only)
+#define REG_IMU_FLAGS       28  // Information on IMU (read-only)
 #define REG_MOTOR_PERIOD    29  // 8-bit motor cycle period (1-100mS, 0 deactives driver)
 #define REG_MOTOR_MAX_STEP  30  // Max amount of change in PID setpoint per motor period
 
@@ -242,7 +242,7 @@ typedef struct
   uint8_t system_voltage;
   uint8_t led;
   uint16_t unused_26;
-  uint8_t imu_version;
+  uint8_t imu_flags;
   uint8_t motor_period;
   uint16_t motor_max_step;
 

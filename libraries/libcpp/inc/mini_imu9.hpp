@@ -316,6 +316,15 @@ class MiniImu9
     IMU_ERROR_READ_DMA   = 4   // error occurred while reading register data DMA
   };
 
+  /** \brief Flags definition */
+  enum imu_flags_t
+  {
+    IMU_FLAG_ACCEL_READY   = 0x80,
+    IMU_FLAG_GYRO_READY    = 0x40,
+    IMU_FLAG_MAG_READY     = 0x20,
+    IMU_FLAG_VERSION_MASK  = 0x0F,
+  };
+
 public:
   /** \brief Data read from accelerometer. */
   struct accel_data_t
@@ -358,7 +367,7 @@ public:
    */
   void init(uint32_t clock_speed)
   {
-    version_ = 0;
+    flags_ = 0;
     clock_speed_ = clock_speed;
     use_mag_ = false;  // do not use magnetometer by default
 
@@ -420,7 +429,15 @@ public:
    */
   uint8_t get_version()
   {
-    return version_;
+    return flags_ & IMU_FLAG_VERSION_MASK;
+  }
+
+  /**
+   *  \brief Get the whole set of flags
+   */
+  uint8_t get_flags()
+  {
+    return flags_;
   }
 
   /**
@@ -450,7 +467,7 @@ public:
       /* Wait a bit before starting accelerometer read */
       if (time_diff(clock, timer_) > ACCEL_DELAY_TIME)
       {
-        if (start_accel_read())
+        if ((flags_ & IMU_FLAG_ACCEL_READY) && start_accel_read())
         {
           state_ = IMU_READING_ACCEL;
           timer_ = clock;
@@ -480,7 +497,8 @@ public:
     }
     else if (state_ == IMU_RESTART_ACCEL)
     {
-      configure_accelerometer();
+      flags_ = configure_accelerometer() ? flags_ | IMU_FLAG_ACCEL_READY :
+                                           flags_ & ~IMU_FLAG_ACCEL_READY;
       state_ = IMU_DELAY_GYRO;
       timer_ = clock;
     }
@@ -489,7 +507,7 @@ public:
       /* Wait a bit before starting gyro read */
       if (time_diff(clock, timer_) > GYRO_DELAY_TIME)
       {
-        if (start_gyro_read())
+        if ((flags_ & IMU_FLAG_GYRO_READY) && start_gyro_read())
         {
           state_ = IMU_READING_GYRO;
           timer_ = clock;
@@ -522,7 +540,8 @@ public:
     }
     else if (state_ == IMU_RESTART_GYRO)
     {
-      configure_gyro();
+      flags_ = configure_gyro() ? flags_ | IMU_FLAG_GYRO_READY :
+                                  flags_ & ~IMU_FLAG_GYRO_READY;
       state_ = IMU_DELAY_ACCEL;
       timer_ = clock;
     }
@@ -531,7 +550,7 @@ public:
       /* Wait a bit before starting magnetometer read */
       if (time_diff(clock, timer_) > MAG_DELAY_TIME)
       {
-        if (start_mag_read())
+        if ((flags_ & IMU_FLAG_MAG_READY) && start_mag_read())
         {
           state_ = IMU_READING_MAG;
           timer_ = clock;
@@ -546,7 +565,7 @@ public:
       {
         imu_finish_read();
         /* Read successful */
-        if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+        if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
         {
           // Order is different than anything else!
           mag_data.x = mag_buffer_[1] + (mag_buffer_[0]<<8);
@@ -573,7 +592,8 @@ public:
     }
     else if (state_ == IMU_RESTART_MAG)
     {
-      configure_magnetometer();
+      flags_ = configure_magnetometer() ? flags_ | IMU_FLAG_MAG_READY :
+                                          flags_ & ~IMU_FLAG_MAG_READY;
       state_ = IMU_DELAY_ACCEL;
       timer_ = clock;
     }
@@ -585,15 +605,15 @@ public:
         imu_finish_read();
         if (mag_buffer_[0] == LSM6DS33_WHO_AM_I)
         {
-          version_ = VERSION_5_LSM6DS33_LIS3MDL;
+          flags_ = VERSION_5_LSM6DS33_LIS3MDL;
         }
         else if (mag_buffer_[0] == L3GD20H_WHO_AM_I)
         {
-          version_ = VERSION_3_L3GD20H_LSM303D;
+          flags_ = VERSION_3_L3GD20H_LSM303D;
         }
         else if (mag_buffer_[0] == L3GD20_WHO_AM_I)
         {
-          version_ = VERSION_2_L3GD20_LSM303DLHC;
+          flags_ = VERSION_2_L3GD20_LSM303DLHC;
         }
         else
         {
@@ -602,18 +622,8 @@ public:
           return false;
         }
 
-        // Now configure
-        if (configure_accelerometer() &&
-            configure_gyro() &&
-            configure_magnetometer())
-        {
-          state_ = IMU_DELAY_GYRO;
-          timer_ = clock;
-        }
-        else
-        {
-          state_ = IMU_IDLE;
-        }
+        state_ = IMU_DELAY_GYRO;
+        timer_ = clock;
       }
       else if (time_diff(clock, timer_) > ID_READ_TIMEOUT)
       {
@@ -649,7 +659,7 @@ private:
 
     /* Disable DMA, I2C */
     DMA_Cmd(DMAy_Streamx, DISABLE);
-    I2C_DMACmd(I2Cx,DISABLE);
+    I2C_DMACmd(I2Cx, DISABLE);
     DMA_ClearFlag(DMAy_Streamx, DMA_FLAG_TCIF7);
 
     /* Track errors */
@@ -811,7 +821,7 @@ private:
     }
 
     /* Enable I2C DMA request */
-    I2C_DMACmd(I2Cx,ENABLE);
+    I2C_DMACmd(I2Cx, ENABLE);
     /* Enable DMA NACK */
     I2C_DMALastTransferCmd(I2Cx, ENABLE);
     /* Enable DMA RX Channel */
@@ -834,7 +844,7 @@ private:
     DMA_Cmd(DMAy_Streamx, DISABLE);
 
     /* Disable I2C DMA request */
-    I2C_DMACmd(I2Cx,DISABLE);
+    I2C_DMACmd(I2Cx, DISABLE);
 
     /* Clear DMA RX Transfer Complete Flag */
     uint32_t flag_tc;
@@ -864,7 +874,7 @@ private:
   /** \brief Configure the accelerometer to +/-8g. */
   bool configure_accelerometer(void)
   {
-    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    if (get_version() == VERSION_5_LSM6DS33_LIS3MDL)
     {
       /* Enable Accelerometer via Control Register 1
        *  bits 7:4 = output data rate = 0110b (high performance (416hz))
@@ -873,7 +883,7 @@ private:
        */
       return imu_write(LSM6DS33_DEVICE_ID, LSM6DS33_CTRL1_XL, 0x6C);
     }
-    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    else if (get_version() == VERSION_3_L3GD20H_LSM303D)
     {
       /* Enable Accelerometer via Control Register 1
        *  bits 7:4 = data rate = 1000b (Normal / low-power mode (400hz))
@@ -888,7 +898,7 @@ private:
        */
       return imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG2, 0x0C);
     }
-    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    else if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
     {
       /* Enable Accelerometer via Control Register 1A
        *  bits 7:4 = data rate = 0111b (Normal / low-power mode (400hz))
@@ -911,16 +921,16 @@ private:
   /** \brief Start reading from the accelerometer */
   bool start_accel_read()
   {
-    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    if (get_version() == VERSION_5_LSM6DS33_LIS3MDL)
     {
       return imu_start_read(LSM6DS33_DEVICE_ID, LSM6DS33_OUTX_L_XL, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
     }
-    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    else if (get_version() == VERSION_3_L3GD20H_LSM303D)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
     }
-    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    else if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(LSM303DHLC_DEVICE_ID, LSM303DHLC_OUTX_L_A | 0x80, (uint8_t *) &accel_buffer_, sizeof(accel_buffer_));
@@ -932,7 +942,7 @@ private:
   /** \brief Configure the gyro to +/- 2000dps. */
   bool configure_gyro(void)
   {
-    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    if (get_version() == VERSION_5_LSM6DS33_LIS3MDL)
     {
       /* Enable Gyro via Control Register 2
        *  bits 7:4 = output data rate = 0110b (416hz update rate)
@@ -950,7 +960,7 @@ private:
 
       return true;
     }
-    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    else if (get_version() == VERSION_3_L3GD20H_LSM303D)
     {
       /* Enable Gyro via Control Register 1
        *  bits 7:6 = data rate = 10b (400hz update rate)
@@ -969,7 +979,7 @@ private:
        */
       return imu_write(L3GD20H_DEVICE_ID, L3GD20H_CTRL_REG4, 0xE0);
     }
-    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    else if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
     {
       /* Enable Gyro via Control Register 1
        *  bits 7:6 = data rate = 10b (380hz update rate)
@@ -995,16 +1005,16 @@ private:
   /** \brief Start reading from the gyro */
   bool start_gyro_read()
   {
-    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    if (get_version() == VERSION_5_LSM6DS33_LIS3MDL)
     {
       return imu_start_read(LSM6DS33_DEVICE_ID, LSM6DS33_OUT_TEMP_L, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
     }
-    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    else if (get_version() == VERSION_3_L3GD20H_LSM303D)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(L3GD20H_DEVICE_ID, L3GD20H_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
     }
-    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    else if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(L3GD20_DEVICE_ID, L3GD20_TEMP_OUT | 0x80, (uint8_t *) &gyro_buffer_, sizeof(gyro_buffer_));
@@ -1016,7 +1026,7 @@ private:
   /** \brief Configure the magnetometer to +/-12 Gauss. */
   bool configure_magnetometer(void)
   {
-    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    if (get_version() == VERSION_5_LSM6DS33_LIS3MDL)
     {
       /* Configure Performance
        *  bits 6:5 = 11b = Ultra High Performance X/Y
@@ -1049,7 +1059,7 @@ private:
        */
       return imu_write(LIS3MDL_DEVICE_ID, LIS3MDL_CTRL_REG5, 0x40);
     }
-    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    else if (get_version() == VERSION_3_L3GD20H_LSM303D)
     {
       /* Configure Magnetometer Update Rate
        *  bit 4:2  = 011b = 25Hz
@@ -1063,7 +1073,7 @@ private:
        */
       return imu_write(LSM303D_DEVICE_ID, LSM303D_CTRL_REG6, 0x60);
     }
-    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    else if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
     {
       /* Configure Magnetometer Update Rate
        *  bit 4:2  = 100b = 15Hz (default)
@@ -1091,17 +1101,17 @@ private:
   /** \brief Start reading from the magnetometer */
   bool start_mag_read()
   {
-    if (version_ == VERSION_5_LSM6DS33_LIS3MDL)
+    if (get_version() == VERSION_5_LSM6DS33_LIS3MDL)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(LIS3MDL_DEVICE_ID, LIS3MDL_OUT_X_L | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
     }
-    else if (version_ == VERSION_3_L3GD20H_LSM303D)
+    else if (get_version() == VERSION_3_L3GD20H_LSM303D)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(LSM303D_DEVICE_ID, LSM303D_OUTX_L_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
     }
-    else if (version_ == VERSION_2_L3GD20_LSM303DLHC)
+    else if (get_version() == VERSION_2_L3GD20_LSM303DLHC)
     {
       /* Register address bits 6:0 are address, bit 7 is auto-increment (1 = auto_increment) */
       return imu_start_read(LSM303DHLC_DEVICE_ID_M, LSM303DHLC_OUTX_H_M | 0x80, (uint8_t *) &mag_buffer_, sizeof(mag_buffer_));
@@ -1138,8 +1148,8 @@ private:
   /** \brief Should we read the magnetometer */
   bool use_mag_;
 
-  /** \brief What verison IMU do we have? */
-  uint8_t version_;
+  /** \brief Combined state/verison of IMU*/
+  uint8_t flags_;
 };
 
 #endif  // _STM32_CPP_MINI_IMU9_H_
