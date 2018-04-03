@@ -735,9 +735,9 @@ void SysTick_Handler(void)
   registers.aux_current = ((adc1.get_channel3()-2048.0f)/4096.0f) * 3.3f / 0.055f * 1000;
 
   // Analog channels
-  registers.a0 = adc1.get_channel4();
-  registers.a1 = adc2.get_channel3();
-  registers.a2 = adc2.get_channel4();
+  registers.a0 = (registers.digital_dir & (1<<0)) ? 0 : adc1.get_channel4();
+  registers.a1 = (registers.digital_dir & (1<<1)) ? 0 : adc2.get_channel3();
+  registers.a2 = (registers.digital_dir & (1<<2)) ? 0 : adc2.get_channel4();
 
   // Motor current sense channels
   registers.motor1_current = adc2.get_channel1();
