@@ -93,24 +93,24 @@ enum LIS3MDL_CONFIG
 /* L3GD20H provides Gyro on v3 */
 enum L3GD20H_CONFIG
 {
-  L3GD20H_DEVICE_ID =            0xD6,
-  L3GD20H_WHO_AM_I =             0xD7,  // This is return value, not address
+  L3GD20H_DEVICE_ID =           0xD6,
+  L3GD20H_WHO_AM_I =            0xD7,  // This is return value, not address
 
-  L3GD20H_CTRL_REG1 =            0x20,
-  L3GD20H_CTRL_REG2 =            0x21,
-  L3GD20H_CTRL_REG3 =            0x22,
-  L3GD20H_CTRL_REG4 =            0x23,
-  L3GD20H_CTRL_REG5 =            0x24,
-  L3GD20H_REFERENCE =            0x25,
+  L3GD20H_CTRL_REG1 =           0x20,
+  L3GD20H_CTRL_REG2 =           0x21,
+  L3GD20H_CTRL_REG3 =           0x22,
+  L3GD20H_CTRL_REG4 =           0x23,
+  L3GD20H_CTRL_REG5 =           0x24,
+  L3GD20H_REFERENCE =           0x25,
 
-  L3GD20H_TEMP_OUT  =            0x26,
-  L3GD20H_STATUS_REG =           0x27,
-  L3GD20H_OUTX_L_G =             0x28,
-  L3GD20H_OUTX_H_G =             0x29,
-  L3GD20H_OUTY_L_G =             0x2A,
-  L3GD20H_OUTY_H_G =             0x2B,
-  L3GD20H_OUTZ_L_G =             0x2C,
-  L3GD20H_OUTZ_H_G =             0x2D,
+  L3GD20H_TEMP_OUT  =           0x26,
+  L3GD20H_STATUS_REG =          0x27,
+  L3GD20H_OUTX_L_G =            0x28,
+  L3GD20H_OUTX_H_G =            0x29,
+  L3GD20H_OUTY_L_G =            0x2A,
+  L3GD20H_OUTY_H_G =            0x2B,
+  L3GD20H_OUTZ_L_G =            0x2C,
+  L3GD20H_OUTZ_H_G =            0x2D,
 };
 
 /* LSM303D provides Accel/Mag on v3 */
@@ -216,6 +216,9 @@ enum LSM303DHLC_CONFIG
  */
 #define IMU_FLAG_TIMEOUT        ((uint32_t)0x80*6)
 
+/*
+ * Definitions of MinIMU-9 versions
+ */
 #define VERSION_2_L3GD20_LSM303DLHC   2
 #define VERSION_3_L3GD20H_LSM303D     3
 #define VERSION_5_LSM6DS33_LIS3MDL    5
