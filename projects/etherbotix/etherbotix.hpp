@@ -231,7 +231,7 @@ typedef struct
   uint8_t digital_in;  // Read only, acts as mask when written
   uint8_t digital_dir;
   uint8_t digital_out;
-  uint8_t unused_9;
+  uint8_t user_io_use;
   uint16_t a0;
   uint16_t a1;
   uint16_t a2;

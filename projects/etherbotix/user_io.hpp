@@ -41,6 +41,10 @@ uint8_t user_io_spi2_active_;
 uint8_t user_io_tim9_active_;
 uint8_t user_io_tim12_active_;
 
+// State of actual IO pins
+// if bit is high, pin is in use by user IO
+uint8_t user_io_pin_status_;
+
 inline void user_io_init()
 {
   // Disable everything
@@ -58,6 +62,7 @@ inline void user_io_init()
   d5::mode(GPIO_INPUT); d5::low();
   d6::mode(GPIO_INPUT); d6::low();
   d7::mode(GPIO_INPUT); d7::low();
+  user_io_pin_status_ = 0;
 }
 
 inline void user_io_deinit()
@@ -77,67 +82,74 @@ inline void user_io_deinit()
   d5::mode(GPIO_INPUT); d5::low();
   d6::mode(GPIO_INPUT); d6::low();
   d7::mode(GPIO_INPUT); d7::low();
+  user_io_pin_status_ = 0;
+}
+
+inline bool user_io_pin_in_use(uint8_t pin)
+{
+  return ((user_io_pin_status_ & (1 << pin)) > 0);
 }
 
 inline void user_io_set_output()
 {
-  if (registers.digital_out & 0x01)
-    a0_sense::high();
-  else
-    a0_sense::low();
-
-  if (user_io_spi2_active_ == 0)
+  if (!user_io_pin_in_use(0))
   {
-    // A1 is also SPI2_MISO
+    if (registers.digital_out & 0x01)
+      a0_sense::high();
+    else
+      a0_sense::low();
+  }
+
+  if (!user_io_pin_in_use(1))
+  {
     if (registers.digital_out & 0x02)
       a1_sense::high();
     else
       a1_sense::low();
+  }
 
-    // A2 is also SPI2_MOSI
+  if (!user_io_pin_in_use(2))
+  {
     if (registers.digital_out & 0x04)
       a2_sense::high();
     else
       a2_sense::low();
   }
 
-  if ((user_io_spi2_active_ == 0) &&
-      (user_io_usart3_active_ == 0))
+  if (!user_io_pin_in_use(3))
   {
-    // D3 is also USART3_TX, SPI2_SCK
     if (registers.digital_out & 0x08)
       d3::high();
     else
       d3::low();
   }
 
-  if (user_io_usart3_active_ == 0)
+  if (!user_io_pin_in_use(4))
   {
-    // D4 is also USART3_RX
     if (registers.digital_out & 0x10)
       d4::high();
     else
       d4::low();
   }
 
-  if (user_io_tim12_active_ == 0)
+  if (!user_io_pin_in_use(5))
   {
-    // D5 is also TIM12_CH2
     if (registers.digital_out & 0x20)
       d5::high();
     else
       d5::low();
   }
 
-  if (user_io_tim9_active_ == 0)
+  if (!user_io_pin_in_use(6))
   {
-    // D6 is also TIM9_CH1
     if (registers.digital_out & 0x40)
       d6::high();
     else
       d6::low();
+  }
 
-    // D7 is also TIM9_CH2
+  if (!user_io_pin_in_use(7))
+  {
     if (registers.digital_out & 0x80)
       d7::high();
     else
@@ -147,62 +159,64 @@ inline void user_io_set_output()
 
 inline void user_io_set_direction()
 {
-  if (registers.digital_dir & 0x01)
-    a0_sense::mode(GPIO_OUTPUT);
-  else
-    a0_sense::mode(GPIO_INPUT_ANALOG);
-
-  if (user_io_spi2_active_ == 0)
+  if (!user_io_pin_in_use(0))
   {
-    // A1 is also SPI2_MISO
+    if (registers.digital_dir & 0x01)
+      a0_sense::mode(GPIO_OUTPUT);
+    else
+      a0_sense::mode(GPIO_INPUT_ANALOG);
+  }
+
+  if (!user_io_pin_in_use(1))
+  {
     if (registers.digital_dir & 0x02)
       a1_sense::mode(GPIO_OUTPUT);
     else
       a1_sense::mode(GPIO_INPUT_ANALOG);
+  }
 
-    // A2 is also SPI2_MOSI
+  if (!user_io_pin_in_use(2))
+  {
     if (registers.digital_dir & 0x04)
       a2_sense::mode(GPIO_OUTPUT);
     else
       a2_sense::mode(GPIO_INPUT_ANALOG);
   }
 
-  if ((user_io_spi2_active_ == 0) &&
-      (user_io_usart3_active_ == 0))
+  if (!user_io_pin_in_use(3))
   {
-    // D3 is also SPI2_SCK, USART3_TX
     if (registers.digital_dir & 0x08)
       d3::mode(GPIO_OUTPUT);
     else
       d3::mode(GPIO_INPUT);
   }
 
-  if (user_io_usart3_active_ == 0)
+  if (!user_io_pin_in_use(4))
   {
-    // D4 is also USART3_TX
     if (registers.digital_dir & 0x10)
       d4::mode(GPIO_OUTPUT);
     else
       d4::mode(GPIO_INPUT);
   }
 
-  if (user_io_tim12_active_ == 0)
+  if (!user_io_pin_in_use(5))
   {
-    // D5 is also TIM12_CH2
     if (registers.digital_dir & 0x20)
       d5::mode(GPIO_OUTPUT);
     else
       d5::mode(GPIO_INPUT);
   }
 
-  if (user_io_tim9_active_ == 0)
+  if (!user_io_pin_in_use(6))
   {
-    // D6 is also TIM9_CH1
     if (registers.digital_dir & 0x40)
       d6::mode(GPIO_OUTPUT);
     else
       d6::mode(GPIO_INPUT);
+  }
 
+  if (!user_io_pin_in_use(7))
+  {
     // D7 is also TIM9_CH2
     if (registers.digital_dir & 0x80)
       d7::mode(GPIO_OUTPUT);
@@ -242,15 +256,23 @@ inline bool user_io_usart3_init()
   {
     // Unsupported baud, turn off usart3
     registers.usart3_baud = 0;
-    d3::mode(GPIO_INPUT);
-    d4::mode(GPIO_INPUT);
     user_io_usart3_active_ = 0;
+
+    d3::mode(GPIO_INPUT);
+    user_io_pin_status_ &= ~(1 << 3);
+
+    d4::mode(GPIO_INPUT);
+    user_io_pin_status_ &= ~(1 << 4);
     return false;
   }
 
-  RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
   d3::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
+  user_io_pin_status_ |= (1 << 3);
+
   d4::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
+  user_io_pin_status_ |= (1 << 4);
+
+  RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
   usart3.init(baud, 8);
   user_io_usart3_active_ = 1;
   return true;
@@ -301,6 +323,7 @@ inline bool user_io_tim12_init()
     RCC->APB1ENR |= RCC_APB1ENR_TIM12EN;
 
     d5::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
+    user_io_pin_status_ |= (1<<5);
     TIM12->CR1 &= (uint16_t) ~TIM_CR1_CEN;
     TIM12->ARR = 65535;  // Max range
     TIM12->SMCR |= TIM_TS_TI2FP2;  // Use filtered TI2
@@ -313,6 +336,7 @@ inline bool user_io_tim12_init()
     // Disable
     registers.tim12_mode = 0;
     d5::mode(GPIO_INPUT);
+    user_io_pin_status_ |= ~(1<<5);
   }
   user_io_tim12_active_ = registers.tim12_mode;
   return true;
@@ -344,8 +368,8 @@ inline void user_io_update()
     (d7::value() ? (1<<7) : 0);
 
   registers.tim12_count = user_io_tim12_get_count();
+
+  registers.user_io_use = user_io_pin_status_;
 }
-
-
 
 #endif  // _ETHERBOTIX_USER_IO_HPP_
