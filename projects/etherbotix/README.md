@@ -5,7 +5,7 @@ This is the firmware for the Etherbotix board.
 ## Features
  * Accepts a Pololu MD03 as motor driver.
    On-board PID, selectable period and gains.
- * Accepts a Pololu MiniIMU9-v2 or v3 as IMU.
+ * Accepts a Pololu MiniIMU9-v2, v3 or v5 as IMU.
  * Exposes several analog and digital IO, an extra SPI, and USART.
    Will eventually expose several timers, maybe servo outputs.
 
@@ -17,6 +17,19 @@ The Etherbotix has 2 leds:
  * ERROR - red - similar to the LED on the back of a dynamixel servo, can be
    controlled via register table. ERROR led also flashes when the board is
    in the bootloader.
+
+## User IO
+
+| Pin     | Analog In   | Digital In | Digital Out | SPI    | USART   | TIM9  | TIM12  |
+|---------|-------------|------------|-------------|--------|---------|-------|--------|
+| A0      | Yes, 12-bit |            | Yes         |        |         |       |        |
+| A1      | Yes, 12-bit |            | Yes         | MOSI   |         |       |        |
+| A2      | Yes, 12-bit |            | Yes         | MISO   |         |       |        |
+| D3      |             | Yes        | Yes         | SCK    | TX      |       |        |
+| D4      |             | Yes        | Yes         |        | RX      |       |        |
+| D5      |             | Yes        | Yes         |        |         |       | CH2    |
+| D6      |             | Yes        | Yes         |        |         | CH1   |        |
+| D7      |             | Yes        | Yes         |        |         | CH2   |        |
 
 ## Ethernet Protocol
 
