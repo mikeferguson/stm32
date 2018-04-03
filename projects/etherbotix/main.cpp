@@ -681,6 +681,7 @@ int main(void)
       registers.mag_y = imu.mag_data.y;
       registers.mag_z = imu.mag_data.z;
     }
+    registers.imu_version = imu.get_version();
 
     if (user_io_usart3_active_ && registers.usart3_char != 255)
     {

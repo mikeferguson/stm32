@@ -262,6 +262,7 @@ class MiniImu9
   /** \brief Timeouts, in milliseconds */
   enum
   {
+    ID_READ_TIMEOUT    = 6,
     GYRO_READ_TIMEOUT  = 6,
     GYRO_DELAY_TIME    = 2,
     ACCEL_READ_TIMEOUT = 4,
@@ -274,20 +275,21 @@ class MiniImu9
   enum imu_state_t
   {
     IMU_IDLE          = 0,  // initital state
+    IMU_READING_ID    = 1,  // reading the identity of the sensor
 
-    IMU_DELAY_GYRO    = 1,  // waiting a bit before starting gyro read
-    IMU_READING_GYRO  = 2,  // waiting for gyro read to complete
-    IMU_RESTART_GYRO  = 3,  // tries to intialize gyro, will return to
+    IMU_DELAY_GYRO    = 2,  // waiting a bit before starting gyro read
+    IMU_READING_GYRO  = 3,  // waiting for gyro read to complete
+    IMU_RESTART_GYRO  = 4,  // tries to intialize gyro, will return to
                             //   this state if there is a gyro read error
 
-    IMU_DELAY_ACCEL   = 4,  // waiting a bit before starting accelerometer read
-    IMU_READING_ACCEL = 5,  // waiting for accelerometer to read to complete
-    IMU_RESTART_ACCEL = 6,  // tries to initialize accel, will return to this
+    IMU_DELAY_ACCEL   = 5,  // waiting a bit before starting accelerometer read
+    IMU_READING_ACCEL = 6,  // waiting for accelerometer to read to complete
+    IMU_RESTART_ACCEL = 7,  // tries to initialize accel, will return to this
                             //   state if there is accel read error
 
-    IMU_DELAY_MAG     = 7,  // waiting a bit before starting magnetometer read
-    IMU_READING_MAG   = 8,  // waiting for magnetometer read to return
-    IMU_RESTART_MAG   = 9   // tries to initialize magnetometer, will return
+    IMU_DELAY_MAG     = 8,  // waiting a bit before starting magnetometer read
+    IMU_READING_MAG   = 9,  // waiting for magnetometer read to return
+    IMU_RESTART_MAG   = 10  // tries to initialize magnetometer, will return
                             //   to this state if there is a read error
   };
 
@@ -572,13 +574,58 @@ public:
       state_ = IMU_DELAY_ACCEL;
       timer_ = clock;
     }
+    else if (state_ == IMU_READING_ID)
+    {
+      if (DMA_GetFlagStatus(DMAy_Streamx, flag_tc))
+      {
+        /* read successful */
+        imu_finish_read();
+        if (mag_buffer_[0] == LSM6DS33_WHO_AM_I)
+        {
+          version_ = VERSION_5_LSM6DS33_LIS3MDL;
+        }
+        else if (mag_buffer_[0] == L3GD20H_WHO_AM_I)
+        {
+          version_ = VERSION_3_L3GD20H_LSM303D;
+        }
+        else if (mag_buffer_[0] == L3GD20_WHO_AM_I)
+        {
+          version_ = VERSION_2_L3GD20_LSM303DLHC;
+        }
+        else
+        {
+          // Not a valid version
+          state_ = IMU_IDLE;
+          return false;
+        }
+
+        // Now configure
+        if (configure_accelerometer() &&
+            configure_gyro() &&
+            configure_magnetometer())
+        {
+          state_ = IMU_DELAY_GYRO;
+          timer_ = clock;
+        }
+        else
+        {
+          state_ = IMU_IDLE;
+        }
+      }
+      else if (time_diff(clock, timer_) > ID_READ_TIMEOUT)
+      {
+        state_ = IMU_IDLE;
+        return imu_timeout_callback(I2C_ERROR_TIMEOUT, IMU_ERROR_READ_DMA);
+      }
+    }
     else
     {
-      configure_accelerometer();
-      configure_gyro();
-      configure_magnetometer();
-      state_ = IMU_DELAY_GYRO;
-      timer_ = clock;
+      // Read WHO_AM_I from 0xD6, which is where all Gyros are
+      if (imu_start_read(0xD6, 0x0F, (uint8_t *) &mag_buffer_, 1))
+      {
+        state_ = IMU_READING_ID;
+        timer_ = clock;
+      }
     }
     return false;
   }
