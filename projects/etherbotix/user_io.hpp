@@ -54,9 +54,9 @@ inline void user_io_init()
   user_io_tim12_active_ = 0;
 
   // Set all IO to inputs
-  a0_sense::mode(GPIO_INPUT); a0_sense::low();
-  a1_sense::mode(GPIO_INPUT); a1_sense::low();
-  a2_sense::mode(GPIO_INPUT); a2_sense::low();
+  a0_sense::mode(GPIO_INPUT_ANALOG); a0_sense::low();
+  a1_sense::mode(GPIO_INPUT_ANALOG); a1_sense::low();
+  a2_sense::mode(GPIO_INPUT_ANALOG); a2_sense::low();
   d3::mode(GPIO_INPUT); d3::low();
   d4::mode(GPIO_INPUT); d4::low();
   d5::mode(GPIO_INPUT); d5::low();
@@ -74,9 +74,9 @@ inline void user_io_deinit()
   user_io_tim12_active_ = 0;
 
   // Set all IO to inputs
-  a0_sense::mode(GPIO_INPUT); a0_sense::low();
-  a1_sense::mode(GPIO_INPUT); a1_sense::low();
-  a2_sense::mode(GPIO_INPUT); a2_sense::low();
+  a0_sense::mode(GPIO_INPUT_ANALOG); a0_sense::low();
+  a1_sense::mode(GPIO_INPUT_ANALOG); a1_sense::low();
+  a2_sense::mode(GPIO_INPUT_ANALOG); a2_sense::low();
   d3::mode(GPIO_INPUT); d3::low();
   d4::mode(GPIO_INPUT); d4::low();
   d5::mode(GPIO_INPUT); d5::low();

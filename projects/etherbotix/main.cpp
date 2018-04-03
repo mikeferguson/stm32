@@ -647,11 +647,11 @@ int main(void)
   adc1.setSampleTime(SERVO_CURRENT_ANALOG_CHANNEL, ADC_SampleTime_84Cycles);
   aux_sense::mode(GPIO_INPUT_ANALOG);
   adc1.setSampleTime(AUX_CURRENT_ANALOG_CHANNEL, ADC_SampleTime_84Cycles);
-  a0_sense::mode(GPIO_INPUT_ANALOG);
   m1_sense::mode(GPIO_INPUT_ANALOG);
   m2_sense::mode(GPIO_INPUT_ANALOG);
-  a1_sense::mode(GPIO_INPUT_ANALOG);
-  a2_sense::mode(GPIO_INPUT_ANALOG);
+
+  // Initialize IO pins (including analog)
+  user_io_init();
 
   // Setup systick
   SysTick_Config(SystemCoreClock/1000);
