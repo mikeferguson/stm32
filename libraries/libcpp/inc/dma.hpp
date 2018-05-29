@@ -98,13 +98,13 @@ public:
    *  \brief Read next byte from the buffer, if any exists.
    *  \returns -1 if nothing in buffer.
    */
-  T read()
+  int32_t read()
   {
     /* Check the status of the dma */
     head_ = (BUFFER_SIZE - (uint16_t)(reinterpret_cast<DMA_Stream_TypeDef*>(DMA)->NDTR))%BUFFER_SIZE;
 
     /* Get data to return */
-    T data = (T) -1;
+    int32_t data = -1;
     if (head_ != tail_)
     {
       data = buffer_[tail_];
@@ -153,6 +153,8 @@ template <typename T, uint32_t DMA, uint32_t STREAM_FLAG, uint32_t CHANNEL, uint
 class PeriphWriteDMA
 {
 public:
+  typedef T data_type;
+
   /**
    *  \brief Initialize the DMA.
    *  \param priority The priority to assign to the DMA, should be selected from

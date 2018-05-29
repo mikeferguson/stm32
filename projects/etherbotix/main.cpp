@@ -367,11 +367,6 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
       while (!(usart1.done() && usart2.done()))
         ;
 
-      // Serial bus deals in 16-bit data, need to copy packet
-      uint16_t packet[256];
-      for (int j = 0; j < len+4; ++j)
-        packet[j] = data[i+j];
-
       // Reset parsers
       usart1_parser.reset(&usart1);
       usart2_parser.reset(&usart2);
@@ -379,8 +374,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
       if (instruction == DYN_READ_DATA)
       {
         // Blast packet to each bus
-        usart1.write(packet, len+4);
-        usart2.write(packet, len+4);
+        usart1.write(&data[i], len+4);
+        usart2.write(&data[i], len+4);
 
         // Wait for send to complete
         while (!(usart1.done() && usart2.done()))
@@ -398,7 +393,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             packet[1] = 0xff;
             packet[2] = usart1_parser.packet.id;
             packet[3] = usart1_parser.packet.length;
-            packet[4] = usart1_parser.packet.error;
+            packet[4] = usart1_parser.packet.instr_status;
             for (int j = 0; j < usart1_parser.packet.length-2; ++j)
               packet[5+j] = usart1_parser.packet.parameters[j];
             packet[3+usart1_parser.packet.length] = usart1_parser.packet.checksum;
@@ -415,7 +410,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             packet[1] = 0xff;
             packet[2] = usart2_parser.packet.id;
             packet[3] = usart2_parser.packet.length;
-            packet[4] = usart2_parser.packet.error;
+            packet[4] = usart2_parser.packet.instr_status;
             for (int j = 0; j < usart2_parser.packet.length-2; ++j)
               packet[5+j] = usart2_parser.packet.parameters[j];
             packet[3+usart2_parser.packet.length] = usart2_parser.packet.checksum;
@@ -449,7 +444,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         // Read data from each servo
         for (int j = 2; j < len-2; ++j)
         {
-          uint16_t pkt[256];
+          uint8_t pkt[256];
           pkt[0] = 0xff;
           pkt[1] = 0xff;
           pkt[2] = data[i+5+j];  // ID of this servo
@@ -521,8 +516,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
                instruction == DYN_SYNC_WRITE)
       {
         // Blast packet to each bus
-        usart1.write(packet, len+4);
-        usart2.write(packet, len+4);
+        usart1.write(&data[i], len+4);
+        usart2.write(&data[i], len+4);
 
         // Wait for send to complete
         while (!(usart1.done() && usart2.done()))
@@ -688,7 +683,7 @@ int main(void)
       while (1)
       {
         // Attempt to read from usart3 and forward packet
-        int16_t c = usart3.read();
+        int32_t c = usart3.read();
 
         if (c >= 0)
           usart3_string[usart3_len+5] = c;

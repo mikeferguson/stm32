@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __ETHERBOTIX_DYNAMIXEL_HPP__
-#define __ETHERBOTIX_DYNAMIXEL_HPP__
+#ifndef _STM32_CPP_DYNAMIXEL_HPP_
+#define _STM32_CPP_DYNAMIXEL_HPP_
 
 // Dynamixel Instructions
 #define DYN_READ_DATA       2
@@ -41,7 +41,7 @@ typedef struct
 {
   uint8_t id;
   uint8_t length;
-  uint8_t error;
+  uint8_t instr_status;
   uint8_t parameters[256];
   uint8_t checksum;
 } DynamixelPacket_t;
@@ -62,7 +62,7 @@ class DynamixelParser
     BUS_READING_2ND_FF,
     BUS_READING_ID,
     BUS_READING_LENGTH,
-    BUS_READING_ERROR,
+    BUS_READING_INSTR_STATUS,
     BUS_READING_PARAMS,
     BUS_READING_CHECKSUM,
     BUS_ERROR
@@ -91,7 +91,7 @@ public:
       last_byte_ = ms;
     }
 
-    int16_t b = bus->read();
+    int32_t b = bus->read();
     while (b >= 0)
     {
       last_byte_ = ms;
@@ -131,14 +131,14 @@ public:
         if (b < 140)  // Based on 143 character max in RX64 datasheet
         {
           packet.length = b;
-          state_ = BUS_READING_ERROR;
+          state_ = BUS_READING_INSTR_STATUS;
         }
         else
           state_ = BUS_READING_FF;  // Restart
       }
-      else if (state_ == BUS_READING_ERROR)
+      else if (state_ == BUS_READING_INSTR_STATUS)
       {
-        packet.error = b;
+        packet.instr_status = b;
         checksum_ = packet.id + packet.length + b;
         param_ = 0;
         state_ = BUS_READING_PARAMS;
@@ -166,10 +166,20 @@ public:
     }
 
     // If we got here, no packet this time around, should we timeout?
-    if (ms > last_byte_ + timeout_)
+    if ((timeout_ > 0) && (ms > last_byte_ + timeout_))
     {
       if (state_ != BUS_ERROR)
       {
+#ifdef DYNAMIXEL_DEVICE
+        if (state_ == BUS_READING_FF)
+        {
+          // When we are a Dynamixel device (i.e. pretending to be a servo)
+          // the default mode is READING, so if nobody sends us anything,
+          // we would otherwise keep erroring.
+          last_byte_ = ms;
+          return 0;
+        }
+#endif
         state_ = BUS_ERROR;
         timeouts_++;
       }
@@ -191,6 +201,12 @@ public:
     state_ = BUS_IDLE;
   }
 
+  /** @brief Set the timeout */
+  void setTimeout(uint32_t timeout)
+  {
+    timeout_ = timeout;
+  }
+
   DynamixelPacket_t packet;  /// The actual packet parsed
 
 private:
@@ -206,4 +222,4 @@ private:
   uint32_t errors_;
 };
 
-#endif // __ETHERBOTIX_DYNAMIXEL_HPP__
+#endif // _STM32_CPP_DYNAMIXEL_HPP_

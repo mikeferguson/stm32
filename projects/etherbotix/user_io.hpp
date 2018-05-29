@@ -284,11 +284,7 @@ inline void user_io_usart3_write(uint8_t * data, uint8_t len)
   if (user_io_usart3_active_ == 0)
     return;
 
-  uint16_t d[len];
-  for (int i = 0; i < len; ++i)
-    d[i] = data[i];
-
-  usart3.write(d, len);
+  usart3.write(data, len);
 }
 
 /** @brief Read a buffer of data from the USART3 */
@@ -303,7 +299,7 @@ inline uint8_t user_io_usart3_read(uint8_t * data, uint8_t max_len)
   int len = 0;
   while (max_len--)
   {
-    int16_t d = usart3.read();
+    int32_t d = usart3.read();
     if (d == -1)
       return len;
     data[len++] = d;

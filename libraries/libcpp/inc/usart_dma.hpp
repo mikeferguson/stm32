@@ -77,7 +77,7 @@ public:
     USART_Cmd(reinterpret_cast<USART_TypeDef*>(USARTx), ENABLE);
   }
 
-  void write(uint16_t * data, uint8_t len)
+  void write(typename DMAw::data_type * data, uint8_t len)
   {
     /* Need to clear previous TC, if any */
     reinterpret_cast<USART_TypeDef*>(USARTx)->SR &= ~USART_FLAG_TC;
@@ -95,17 +95,15 @@ public:
     return write_dma.done() && ((reinterpret_cast<USART_TypeDef*>(USARTx)->SR & USART_FLAG_TC) > 0);
   }
 
-  int16_t read()
+  int32_t read()
   {
-    return (int16_t) read_dma.read();
+    return read_dma.read();
   }
 
 protected:
   DMAw write_dma;
   DMAr read_dma;
 };
-
-
 
 /**
  * Similar to above, except it adds an enable pin and functions.
@@ -177,7 +175,7 @@ public:
     write_complete_ = true;
   }
 
-  inline void write(uint16_t * data, uint8_t len)
+  inline void write(typename DMAw::data_type * data, uint8_t len)
   {
     setTX();
     write_complete_ = false;

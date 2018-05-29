@@ -165,16 +165,16 @@ typedef Gpio<GPIOB_BASE, 5> m2_enc_b;       // tim3_ch2
 typedef Gpio<GPIOA_BASE, 9> usart1_tx;
 typedef Gpio<GPIOA_BASE, 10> usart1_rx;
 typedef Gpio<GPIOD_BASE, 15> usart1_en;
-typedef PeriphReadDMA<uint16_t, DMA2_Stream2_BASE, DMA_FLAG_TCIF2, DMA_Channel_4, USART1_BASE+4, 256> usart1_read_dma;
-typedef PeriphWriteDMA<uint16_t, DMA2_Stream7_BASE, DMA_FLAG_TCIF7, DMA_Channel_4, USART1_BASE+4, 256> usart1_write_dma;
+typedef PeriphReadDMA<uint8_t, DMA2_Stream2_BASE, DMA_FLAG_TCIF2, DMA_Channel_4, USART1_BASE+4, 256> usart1_read_dma;
+typedef PeriphWriteDMA<uint8_t, DMA2_Stream7_BASE, DMA_FLAG_TCIF7, DMA_Channel_4, USART1_BASE+4, 256> usart1_write_dma;
 typedef UsartDMAWithEnable<USART1_BASE, usart1_en, usart1_read_dma, usart1_write_dma> usart1_t;
 
 // Usart2 - ax/mx bus
 typedef Gpio<GPIOD_BASE, 5> usart2_tx;
 typedef Gpio<GPIOD_BASE, 6> usart2_rx;
 typedef Gpio<GPIOD_BASE, 7> usart2_en;
-typedef PeriphReadDMA<uint16_t, DMA1_Stream5_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART2_BASE+4, 256> usart2_read_dma;
-typedef PeriphWriteDMA<uint16_t, DMA1_Stream6_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART2_BASE+4, 256> usart2_write_dma;
+typedef PeriphReadDMA<uint8_t, DMA1_Stream5_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART2_BASE+4, 256> usart2_read_dma;
+typedef PeriphWriteDMA<uint8_t, DMA1_Stream6_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART2_BASE+4, 256> usart2_write_dma;
 typedef UsartDMAWithEnable<USART2_BASE, usart2_en, usart2_read_dma, usart2_write_dma> usart2_t;
 
 // IMU - i2c1
@@ -191,8 +191,8 @@ typedef Gpio<GPIOB_BASE, 15> d5;  // also TIM12_CH2
 typedef Gpio<GPIOE_BASE, 5> d6;   // also TIM9_CH1
 typedef Gpio<GPIOE_BASE, 6> d7;   // also TIM9_CH2
 
-typedef PeriphReadDMA<uint16_t, DMA1_Stream1_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART3_BASE+4, 1024> usart3_read_dma;
-typedef PeriphWriteDMA<uint16_t, DMA1_Stream3_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART3_BASE+4, 1024> usart3_write_dma;
+typedef PeriphReadDMA<uint8_t, DMA1_Stream1_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART3_BASE+4, 1024> usart3_read_dma;
+typedef PeriphWriteDMA<uint8_t, DMA1_Stream3_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART3_BASE+4, 1024> usart3_write_dma;
 typedef UsartDMA<USART3_BASE, usart3_read_dma, usart3_write_dma> usart3_t;
 
 // Init function for ethernet GPIO
