@@ -10,7 +10,7 @@ Things to keep in mind if adapting to STM32F1, F2, or F3:
  * Much of libcpp has been tested with F1 series. Notably, the gpio.h will not
    work with F2 or F3 processors right now.
 
-# Setup of development environment (14.04)
+# Setup of development environment (18.04)
 
 I'm using the 4.7-2014-q2-update revision from the official GCC ARM launchpad
 repository:  https://launchpad.net/gcc-arm-embedded
@@ -27,28 +27,20 @@ echo 'export PATH=$PATH:~/bin/gcc-arm-none-eabi-4_7-2014q2/bin:$PATH' >> ~/.bash
 
 ## Build OpenOCD
 ```
-sudo apt-get install libusb-1.0.0-dev libtool automake texinfo
-cd ~/bin
-git clone git://github.com/mikeferguson/openocd.git
-cd openocd
-./bootstrap
-./configure --enable-ftdi
-make
-echo 'export PATH=$PATH:~/bin/openocd/src' >> ~/.bashrc
+sudo apt-get install openocd
 ```
 
 ## Build DSP_Lib (optional)
 In the CMSIS directory, you can build the DSP_Lib by running Make. You may need
 to change the target processor as it is currently M4lf (Cortex M4,
-little-endian, with floating point).
+little-endians, with floating point).
 
 # Connecting to a Target
 So far I haven't sorted out why openocd hates me, but the following command
 works around issues with jimtcl paths:
 
 ```
-cd ~/bin/openocd/tcl
-sudo ../src/openocd  -f interface/ftdi/flyswatter2.cfg -f target/stm32f4x.cfg
+openocd  -f interface/ftdi/flyswatter2.cfg -f target/stm32f4x.cfg
 ```
 
 Sudo may or may not be neccessary depending on your group configurations.
