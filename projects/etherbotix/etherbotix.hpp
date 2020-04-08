@@ -192,7 +192,7 @@ typedef Gpio<GPIOE_BASE, 5> d6;   // also TIM9_CH1
 typedef Gpio<GPIOE_BASE, 6> d7;   // also TIM9_CH2
 
 typedef PeriphReadDMA<uint8_t, DMA1_Stream1_BASE, DMA_FLAG_TCIF5, DMA_Channel_4, USART3_BASE+4, 1024> usart3_read_dma;
-typedef PeriphWriteDMA<uint8_t, DMA1_Stream3_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART3_BASE+4, 1024> usart3_write_dma;
+typedef PeriphWriteDMA<uint8_t, DMA1_Stream3_BASE, DMA_FLAG_TCIF6, DMA_Channel_4, USART3_BASE+4, 256> usart3_write_dma;
 typedef UsartDMA<USART3_BASE, usart3_read_dma, usart3_write_dma> usart3_t;
 
 // Init function for ethernet GPIO

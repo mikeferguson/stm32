@@ -554,7 +554,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 1;
+  registers.version = 2;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
@@ -705,6 +705,11 @@ int main(void)
             checksum += usart3_string[i];
           usart3_string[5+usart3_len] = 255 - checksum;
           udp_send_packet(usart3_string, usart3_len+6, usart3_port);
+          usart3_len = 0;
+        }
+        else if (usart3_len > 192)
+        {
+          // going to overflow, reset
           usart3_len = 0;
         }
       }
