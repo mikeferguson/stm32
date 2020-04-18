@@ -77,6 +77,9 @@ This firmware supports the sync_read instruction (0x84) as with the ArbotiX.
    * DMA1, Stream6, Ch4 = USART2_RX
    * DMA2, Stream2, Ch4 = USART1_RX
    * DMA2, Stream7, Ch4 = USART1_TX
+ * Motor control:
+   * Period is configurable from 1-100mS per timestep
+   * Velocity commands/status are in ticks/period
 
 ## Status
 

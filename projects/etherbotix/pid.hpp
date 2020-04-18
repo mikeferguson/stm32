@@ -68,6 +68,11 @@ public:
     desired_ = setpoint;
   }
 
+  int16_t get_setpoint()
+  {
+    return setpoint_;
+  }
+
   /** @brief Get command based on measurement. */
   int32_t update_pid(int32_t measurement)
   {

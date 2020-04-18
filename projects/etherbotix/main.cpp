@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018, Michael E. Ferguson
+ * Copyright (c) 2012-2020, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,7 @@
 
 #include "mini_imu9.hpp"
 #include "md01.hpp"
+#include "motor_trace.hpp"
 #include "encoder.hpp"
 #include "usart_dma.hpp"
 #include "analog_sampler.hpp"
@@ -49,6 +50,8 @@ Md01<TIM1_BASE, m1_a, m1_b, m1_en> m1;
 Md01<TIM8_BASE, m2_a, m2_b, m2_en> m2;
 Encoder<TIM4_BASE> m1_enc;
 Encoder<TIM3_BASE> m2_enc;
+MotorTrace<1000> m1_trace;
+MotorTrace<1000> m2_trace;
 usart1_t usart1;
 usart2_t usart2;
 DynamixelParser<usart1_t> usart1_parser;
@@ -179,6 +182,28 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               packet[5+read_len] += packet[5+j];
             }
           }
+          else if (read_addr == DEVICE_M1_TRACE)
+          {
+            read_len = m1_trace.get(&packet[5], read_len);
+            // Set checksum
+            packet[3] = read_len;
+            packet[5 + read_len] = ETHERBOTIX_ID + read_len;
+            for (size_t j = 0; j < read_len; ++j)
+            {
+              packet[5 + read_len] += packet[5 + j];
+            }
+          }
+          else if (read_addr == DEVICE_M2_TRACE)
+          {
+            read_len = m2_trace.get(&packet[5], read_len);
+            // Set checksum
+            packet[3] = read_len;
+            packet[5 + read_len] = ETHERBOTIX_ID + read_len;
+            for (size_t j = 0; j < read_len; ++j)
+            {
+              packet[5 + read_len] += packet[5 + j];
+            }
+          }
         }
         else
         {
@@ -240,6 +265,14 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               __set_MSP(*(__IO uint32_t*)0x08000000);
               Jump_To_Application();
             }
+          }
+          else if (write_addr == DEVICE_M1_TRACE)
+          {
+            m1_trace.stop_tracing();
+          }
+          else if (write_addr == DEVICE_M2_TRACE)
+          {
+            m2_trace.stop_tracing();
           }
         }
         else
@@ -554,7 +587,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 2;
+  registers.version = 3;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
@@ -757,6 +790,15 @@ void SysTick_Handler(void)
       // Update PID and set motor commands
       m1.set(m1_pid.update_pid(registers.motor1_vel));
       m2.set(m2_pid.update_pid(registers.motor2_vel));
+
+      m1_trace.update(registers.motor1_pos,
+                      registers.motor1_vel,
+                      m1_pid.get_setpoint(),
+                      m1.get());
+      m2_trace.update(registers.motor2_pos,
+                      registers.motor2_vel,
+                      m2_pid.get_setpoint(),
+                      m2.get());
     }
     else
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, Michael E. Ferguson
+ * Copyright (c) 2013-2020, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -102,6 +102,9 @@
 
 #define DEVICE_BOOTLOADER   192
 #define DEVICE_UNIQUE_ID    193
+
+#define DEVICE_M1_TRACE     194
+#define DEVICE_M2_TRACE     195
 
 // Activity and error LEDs
 typedef Gpio<GPIOC_BASE, 14> error;
