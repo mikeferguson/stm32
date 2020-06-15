@@ -166,9 +166,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         packet[0] = 0xff;
         packet[1] = 0xff;
         packet[2] = ETHERBOTIX_ID;
-        packet[3] = read_len;
-        packet[4] = 0;  // No error
-        packet[5 + read_len] = ETHERBOTIX_ID + read_len;  // Init checksum
+        packet[3] = read_len + 2;
+        packet[4] = read_addr;  // we transmit address instead of error
+        packet[5 + read_len] = ETHERBOTIX_ID + read_len + 2 + read_addr;  // Init checksum
 
         if (read_addr >= 128)
         {
@@ -186,8 +186,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           {
             read_len = m1_trace.get(&packet[5], read_len);
             // Set checksum
-            packet[3] = read_len;
-            packet[5 + read_len] = ETHERBOTIX_ID + read_len;
+            packet[3] = read_len + 2;
+            packet[5 + read_len] = ETHERBOTIX_ID + read_len + 2 + read_addr;
             for (size_t j = 0; j < read_len; ++j)
             {
               packet[5 + read_len] += packet[5 + j];
@@ -197,8 +197,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           {
             read_len = m2_trace.get(&packet[5], read_len);
             // Set checksum
-            packet[3] = read_len;
-            packet[5 + read_len] = ETHERBOTIX_ID + read_len;
+            packet[3] = read_len + 2;
+            packet[5 + read_len] = ETHERBOTIX_ID + read_len + 2 + read_addr;
             for (size_t j = 0; j < read_len; ++j)
             {
               packet[5 + read_len] += packet[5 + j];
@@ -560,7 +560,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
       }
     }
 
-    i += len + 6;
+    i += len + 4;
   }
 
   // Free buffer
@@ -587,7 +587,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 3;
+  registers.version = 4;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
@@ -732,7 +732,7 @@ int main(void)
           usart3_string[1] = 0xff;
           usart3_string[2] = 253;  // id
           usart3_string[3] = usart3_len + 2;  // len
-          usart3_string[4] = 0;  // error
+          usart3_string[4] = DEVICE_USART3_DATA;  // we transmit address instead of error
           uint8_t checksum = 0;
           for (int i = 2; i < usart3_len + 5; i++)
             checksum += usart3_string[i];
