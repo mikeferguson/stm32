@@ -139,7 +139,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   size_t i = 4;
   while (i < p->len)
   {
-    if ((data[i] != 0xff) || (data[i+1] != 0xff))
+    if ((data[i] != 0xff) || (data[i + 1] != 0xff))
     {
       // Packet has become corrupted?
       ++registers.packets_bad;
@@ -147,17 +147,17 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
       return;
     }
 
-    uint8_t id = data[i+2];
-    uint8_t len = data[i+3];
-    uint8_t instruction = data[i+4];
+    uint8_t id = data[i + 2];
+    uint8_t len = data[i + 3];
+    uint8_t instruction = data[i + 4];
 
     if (id == ETHERBOTIX_ID)
     {
       // Process packets for self
       if (instruction == DYN_READ_DATA)
       {
-        uint8_t read_addr = data[i+5];
-        uint8_t read_len = data[i+6];
+        uint8_t read_addr = data[i + 5];
+        uint8_t read_len = data[i + 6];
 
         // Update anything that isn't periodically updated
         user_io_update();
@@ -168,7 +168,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         packet[2] = ETHERBOTIX_ID;
         packet[3] = read_len;
         packet[4] = 0;  // No error
-        packet[5+read_len] = ETHERBOTIX_ID + read_len;  // Init checksum
+        packet[5 + read_len] = ETHERBOTIX_ID + read_len;  // Init checksum
 
         if (read_addr >= 128)
         {
@@ -178,8 +178,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             uint8_t * id_data = (uint8_t *) 0x1fff7a10;
             for (int j = 0; j < read_len; ++j)
             {
-              packet[5+j] = *(id_data++);
-              packet[5+read_len] += packet[5+j];
+              packet[5 + j] = *(id_data++);
+              packet[5 + read_len] += packet[5+j];
             }
           }
           else if (read_addr == DEVICE_M1_TRACE)
@@ -214,24 +214,24 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           reg_data += read_addr;
           for (int j = 0; j < read_len; ++j)
           {
-            packet[5+j] = *(reg_data++);
-            packet[5+read_len] += packet[5+j];
+            packet[5 + j] = *(reg_data++);
+            packet[5 + read_len] += packet[5 + j];
           }
           __enable_irq();
         }
 
-        packet[5+read_len] = 255 - packet[5+read_len];  // Compute checksum
+        packet[5 + read_len] = 255 - packet[5 + read_len];  // Compute checksum
         udp_send_packet(packet, read_len + 6, port);
       }
       else if (instruction == DYN_WRITE_DATA)
       {
-        uint8_t write_addr = data[i+5];
+        uint8_t write_addr = data[i + 5];
         if (write_addr >= 128)
         {
           // This is a device, write all data to single place
           if (write_addr == DEVICE_USART3_DATA)
           {
-            user_io_usart3_write(&data[i+6], len-3);
+            user_io_usart3_write(&data[i + 6], len - 3);
           }
           else if (write_addr == DEVICE_SPI2_DATA)
           {
@@ -240,10 +240,10 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
           else if (write_addr == DEVICE_BOOTLOADER)
           {
             if (len == 7 &&
-                data[i+6] == 'B' &&
-                data[i+7] == 'O' &&
-                data[i+8] == 'O' &&
-                data[i+9] == 'T')
+                data[i + 6] == 'B' &&
+                data[i + 7] == 'O' &&
+                data[i + 8] == 'O' &&
+                data[i + 9] == 'T')
             {
               // Disable interrupts before jumping
               __disable_irq();
@@ -279,12 +279,12 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         {
           int j = 0;
           bool update_gains = false;
-          while (j < len-3)
+          while (j < len - 3)
           {
             if (write_addr + j == REG_BAUD_RATE)
             {
               // Update baud rate
-              uint8_t baud = data[i+6+j];
+              uint8_t baud = data[i + 6 + j];
               set_dynamixel_baud(baud);
             }
             else if (write_addr + j == REG_DELAY_TIME)
@@ -293,30 +293,30 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             }
             else if (write_addr + j == REG_DIGITAL_OUT)
             {
-              registers.digital_out = data[i+6+j];
+              registers.digital_out = data[i + 6 + j];
               user_io_set_output();
             }
             else if (write_addr + j == REG_DIGITAL_DIR)
             {
-              registers.digital_dir = data[i+6+j];
+              registers.digital_dir = data[i + 6 + j];
               user_io_set_direction();
             }
             else if (write_addr + j == REG_LED)
             {
-              registers.led = data[i+6+j];
-              if (data[i+6+j] > 0)
+              registers.led = data[i + 6 + j];
+              if (data[i + 6 + j] > 0)
                 error::high();
               else
                 error::low();
             }
             else if (write_addr + j == REG_MOTOR_PERIOD)
             {
-              if (data[i+6+j] > 0 && data[i+6+j] < 100)
-                registers.motor_period = data[i+6+j];
+              if (data[i + 6 + j ] > 0 && data[i + 6 + j] < 100)
+                registers.motor_period = data[i + 6 + j];
             }
             else if (write_addr + j == REG_MOTOR_MAX_STEP)
             {
-              registers.motor_max_step = data[i+6+j] + (data[i+7+j]<<8);
+              registers.motor_max_step = data[i + 6 + j] + (data[i + 7 + j] << 8);
               __disable_irq();
               m1_pid.set_max_step(registers.motor_max_step);
               m2_pid.set_max_step(registers.motor_max_step);
@@ -326,7 +326,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             else if (write_addr + j == REG_MOTOR1_VEL)
             {
               // Write 16-bit setpoint
-              int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              int16_t v = data[i + 6 + j] + (data[i + 7 + j] << 8);
               __disable_irq();
               m1_pid.update_setpoint(v);
               __enable_irq();
@@ -336,7 +336,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             else if (write_addr + j == REG_MOTOR2_VEL)
             {
               // Write 16-bit setpoint
-              int16_t v = data[i+6+j] + (data[i+7+j]<<8);
+              int16_t v = data[i + 6 + j] + (data[i + 7 + j] << 8);
               __disable_irq();
               m2_pid.update_setpoint(v);
               __enable_irq();
@@ -348,25 +348,25 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // Updating gains
               uint8_t * reg_data = (uint8_t *) &registers;
-              reg_data[write_addr + j] = data[i+6+j];
+              reg_data[write_addr + j] = data[i + 6 + j];
               update_gains = true;
             }
             else if (write_addr + j == REG_USART3_BAUD)
             {
               // Set baud, start usart
-              registers.usart3_baud = data[i+6+j];
+              registers.usart3_baud = data[i + 6 + j];
               user_io_usart3_init();
             }
             else if (write_addr + j == REG_USART3_CHAR)
             {
               // Set terminating character & return port, reset length of string
-              registers.usart3_char = data[i+6+j];
+              registers.usart3_char = data[i + 6 + j];
               usart3_len = 0;
               usart3_port = port;
             }
             else if (write_addr + j == REG_TIM12_MODE)
             {
-              registers.tim12_mode = data[i+6+j];
+              registers.tim12_mode = data[i + 6 + j];
               user_io_tim12_init();
             }
             else if (write_addr + j == REG_SPI2_BAUD)
@@ -407,8 +407,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
       if (instruction == DYN_READ_DATA)
       {
         // Blast packet to each bus
-        usart1.write(&data[i], len+4);
-        usart2.write(&data[i], len+4);
+        usart1.write(&data[i], len + 4);
+        usart2.write(&data[i], len + 4);
 
         // Wait for send to complete
         while (!(usart1.done() && usart2.done()))
@@ -549,8 +549,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
                instruction == DYN_SYNC_WRITE)
       {
         // Blast packet to each bus
-        usart1.write(&data[i], len+4);
-        usart2.write(&data[i], len+4);
+        usart1.write(&data[i], len + 4);
+        usart2.write(&data[i], len + 4);
 
         // Wait for send to complete
         while (!(usart1.done() && usart2.done()))
@@ -719,7 +719,7 @@ int main(void)
         int32_t c = usart3.read();
 
         if (c >= 0)
-          usart3_string[usart3_len+5] = c;
+          usart3_string[usart3_len + 5] = c;
         else
           break;
 
@@ -730,14 +730,14 @@ int main(void)
           // Send return string
           usart3_string[0] = 0xff;
           usart3_string[1] = 0xff;
-          usart3_string[2] = 253; // id
-          usart3_string[3] = usart3_len+2; // len
+          usart3_string[2] = 253;  // id
+          usart3_string[3] = usart3_len + 2;  // len
           usart3_string[4] = 0;  // error
           uint8_t checksum = 0;
-          for (int i = 2; i < usart3_len+5; i++)
+          for (int i = 2; i < usart3_len + 5; i++)
             checksum += usart3_string[i];
           usart3_string[5+usart3_len] = 255 - checksum;
-          udp_send_packet(usart3_string, usart3_len+6, usart3_port);
+          udp_send_packet(usart3_string, usart3_len + 6, usart3_port);
           usart3_len = 0;
         }
         else if (usart3_len > 192)
