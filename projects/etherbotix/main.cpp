@@ -470,9 +470,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
         packet[1] = 0xff;
         packet[2] = 0xfe;  // broadcast
         packet[3] = 2 + (read_len*(len-4));
-        packet[4] = 0;  // No error
+        packet[4] = read_addr;  // we transmit address instead of error
         uint8_t packet_idx = 5;
-        uint8_t packet_chk = 0xfe + packet[3];
+        uint8_t packet_chk = packet[2] + packet[3] + packet[4];
 
         // Read data from each servo
         for (int j = 2; j < len-2; ++j)
@@ -587,7 +587,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 4;
+  registers.version = 5;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
