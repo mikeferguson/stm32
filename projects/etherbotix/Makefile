@@ -27,7 +27,7 @@ SIZE        := arm-none-eabi-size
 
 # Flags
 INCLUDES    := -I. -I$(LIB_PATH)/CMSIS/Include -I$(LIB_PATH)/ST/inc
-CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections
+CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections -fno-builtin
 ifdef USE_BOOTLOADER
 CFLAGS      += -DUSE_BOOTLOADER
 endif
