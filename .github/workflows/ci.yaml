@@ -1,0 +1,24 @@
+name: Build Firmware
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Get ARM toolchain
+      run: |
+        wget https://developer.arm.com/-/media/Files/downloads/gnu-rm/10-2020q4/gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
+        tar xvfj gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2 -C "$HOME"
+
+    - name: Setup path
+      run: echo "$HOME/gcc-arm-none-eabi-10-2020-q4-major/bin" >> $GITHUB_PATH
+
+    - name: Build Dyno
+      run: cd projects && cd dyno && make
+
+    - name: Build Etherbotix
+      run: cd projects && cd etherbotix && make
