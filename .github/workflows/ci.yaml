@@ -22,3 +22,6 @@ jobs:
 
     - name: Build Etherbotix
       run: cd projects && cd etherbotix && make
+
+    - name: Build Etherbotix Bootloader
+      run: cd projects && cd etherbotix && cd bootloader && make
