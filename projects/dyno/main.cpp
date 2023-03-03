@@ -319,6 +319,7 @@ int main(void)
 extern "C"
 {
 
+// Systick gets called at 25000hz
 void SysTick_Handler(void)
 {
   // Update system time
@@ -327,18 +328,19 @@ void SysTick_Handler(void)
 
   // Get system voltage
   //   adc is 12 bit (4096 count) spread over 3.3V
-  //   voltage divider is 15k/1k
-  dyno.system_voltage = (ADC1->JDR1/4096.0f) * 3.3f * 16.0f;
+  //   voltage divider is 20k/1k
+  dyno.system_voltage = (ADC1->JDR1/4096.0f) * 3.3f * 21.0f;
   ADC1->CR2 |= ADC_CR2_JSWSTART;
 
   // TODO: make the sampling time dynamic based on velocity
   if (dyno.system_time % 100 == 0)
   {
+    // This happens at 250hz
     int32_t pos = absorber_enc.read();
     int32_t vel = absorber_enc.read_speed();
     // TODO: calculate position
     dyno.position = 0.0f;
-    dyno.velocity = (static_cast<float>(vel) * 250.0f / 7200.0f) * 2.0f * 3.141592653589793f;
+    dyno.velocity = (static_cast<float>(vel) * 250.0f / 1024.0f) * 2.0f * 3.141592653589793f;
   }
 
   adc.update();
