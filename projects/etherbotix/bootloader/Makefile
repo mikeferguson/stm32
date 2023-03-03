@@ -21,7 +21,7 @@ SIZE        := arm-none-eabi-size
 
 # Flags
 INCLUDES    := -I. -I.. -I$(LIB_PATH)/CMSIS/Include -I$(LIB_PATH)/ST/inc
-CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections
+CFLAGS      := -c -D$(MCU) $(MCU_FLAGS) -fno-common -g3 -Os -ffunction-sections -fno-builtin
 CXXFLAGS    := $(CFLAGS) -fno-exceptions
 LDFLAGS     := -L$(LIB_PATH)/ST/ld -T$(LD_SCRIPT) --gc-sections -v
 CPFLAGS     := -Obinary -v
@@ -168,7 +168,7 @@ $(BUILDDIRS):
 	echo "target remote localhost:3333" > .gdbinit
 	echo "mon reset init" >> .gdbinit
 	echo "" >> .gdbinit
-	echo "def flash" >> .gdbinit
+	echo "define flash" >> .gdbinit
 	echo " file $(BUILD_PATH)/$(PRG).elf" >> .gdbinit
 	echo " mon reset halt" >> .gdbinit
 	echo " mon flash erase_address pad 0x08000000 [file size $(PWD)/$(BUILD_PATH)/$(PRG).bin]" >> .gdbinit
@@ -176,11 +176,11 @@ $(BUILDDIRS):
 	echo " mon reset init" >> .gdbinit
 	echo "end" >> .gdbinit
 	echo "" >> .gdbinit
-	echo "def reset" >> .gdbinit
+	echo "define reset" >> .gdbinit
 	echo " mon reset halt" >> .gdbinit
 	echo " mon reset init" >> .gdbinit
 	echo "end" >> .gdbinit
-	echo "def erase_all" >> .gdbinit
+	echo "define erase_all" >> .gdbinit
 	echo " mon reset halt" >> .gdbinit
 	echo " mon stm32f2x mass_erase 0" >> .gdbinit
 	echo " mon reset init" >> .gdbinit
