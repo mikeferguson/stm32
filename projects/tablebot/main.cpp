@@ -41,6 +41,7 @@
 #include "encoder.hpp"
 #include "usart_dma.hpp"
 #include "analog_sampler.hpp"
+#include "ld06.hpp"
 
 MiniImu9<I2C1_BASE,
          DMA1_Stream0_BASE, 0 /* stream */, 1 /* channel */,
@@ -52,6 +53,9 @@ Encoder<TIM3_BASE> m2_enc;
 usart2_t usart2;
 DynamixelParser<usart2_t> usart2_parser;
 usart3_t usart3;  // laser
+
+LD06<usart3_t> laser;
+ld06_packet_t latest_laser_packet;
 
 system_state_t system_state;
 
@@ -111,6 +115,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
     }
 
     // TODO
+    break;
   }
 
   // Free buffer
@@ -212,7 +217,7 @@ int main(void)
   // Laser interface
   RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
   laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  usart3.init(230400, 8);
+  laser.init(&usart3);
   laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
   TIM12->CR1 &= (uint16_t) ~TIM_CR1_CEN;
   //TIM12->ARR = 65535;  // Max range
@@ -258,19 +263,15 @@ int main(void)
       system_state.mag_z = imu.mag_data.z;
     }
 
-    while (1)
+    // Attempt to read from laser data
+    int8_t length = laser.update(&usart3, system_state.system_time);
+    if (length > 0)
     {
-      // Attempt to read from laser data
-      int32_t c = usart3.read();
-
-      if (c >= 0)
-      {
-        // TODO
-      }
-      else
-      {
-        break;
-      }
+      latest_laser_packet = laser.packet;
+    }
+    else if (length < 0)
+    {
+      laser.reset(&usart3);
     }
 
     // TODO: control loop
