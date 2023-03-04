@@ -91,7 +91,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   uint8_t * data = (uint8_t*) p->payload;
 
   // Toss any bad packets
-  if ( (p->len < 10) ||
+  if ( (p->len < 4) ||
        (p->len != p->tot_len) ||
        (data[0] != 0xff) || (data[1] != 'B') || (data[2] != 'O') || (data[3] != 'T'))
   {
@@ -103,20 +103,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   return_ipaddr = *addr;
   return_port = port;
 
-  // For each packet
-  size_t i = 4;
-  while (i < p->len)
-  {
-    if ((data[i] != 0xff) || (data[i + 1] != 0xff))
-    {
-      // Packet has become corrupted?
-      pbuf_free(p);
-      return;
-    }
-
-    // TODO
-    break;
-  }
+  // Send packet
+  udp_send_packet((uint8_t*) &system_state, sizeof(system_state), return_port);
 
   // Free buffer
   pbuf_free(p);
@@ -138,7 +126,7 @@ int udp_interface_init()
 int main(void)
 {
   // Setup register table data
-  system_state.system_time = 0;
+  system_state.time = 0;
 
   // TODO: set gains
   m1_pid.set_max_step(10);
@@ -217,14 +205,8 @@ int main(void)
   // Laser interface
   RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
   laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  laser.init(&usart3);
   laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
-  TIM12->CR1 &= (uint16_t) ~TIM_CR1_CEN;
-  //TIM12->ARR = 65535;  // Max range
-  //TIM12->SMCR |= TIM_TS_TI2FP2;  // Use filtered TI2
-  //TIM12->SMCR |= TIM_SlaveMode_External1;  // Use external clock mode 1 (count rising edges)
-  // TODO Filtering with IC2F
-  //TIM12->CR1 |= TIM_CR1_CEN;
+  laser.init(&usart3);
 
   // Start button
   start_button::mode(GPIO_INPUT);
@@ -246,9 +228,9 @@ int main(void)
 
   while(1)
   {
-    LwIP_Periodic_Handle(system_state.system_time);
+    LwIP_Periodic_Handle(system_state.time);
 
-    if (imu.update(system_state.system_time))
+    if (imu.update(system_state.time))
     {
       system_state.accel_x = imu.accel_data.x;
       system_state.accel_y = imu.accel_data.y;
@@ -264,10 +246,22 @@ int main(void)
     }
 
     // Attempt to read from laser data
-    int8_t length = laser.update(&usart3, system_state.system_time);
+    int8_t length = laser.update(&usart3, system_state.time);
     if (length > 0)
     {
-      latest_laser_packet = laser.packet;
+      // Parse packet into global view
+      float angle = laser.packet.start_angle * 0.01f;
+      float end_angle = laser.packet.end_angle * 0.01f;
+      float step = (end_angle - angle) / (laser.packet.length - 1);
+
+      // Decide where to insert this data
+      int index = angle * 0.8f;
+      for (int i = 0; i < length; ++i)
+      {
+        system_state.laser_data[index + i] = laser.packet.data[i].range;
+        system_state.laser_data[index + i] = angle;
+        angle += step;
+      }
     }
     else if (length < 0)
     {
@@ -285,16 +279,16 @@ extern "C"
 
 void SysTick_Handler(void)
 {
-  ++system_state.system_time;
+  ++system_state.time;
 
   // Get system voltage:
   //   adc is 12 bit (4096 count) spread over 3.3V
   //   voltage divider is 15k/1k
-  system_state.system_voltage = (adc1.get_channel1() / 4096.0f) * 3.3f * 16;
+  system_state.voltage = (adc1.get_channel1() / 4096.0f) * 3.3f * 16;
 
   // Get system/servo currents:
   //   ACS711: vcc/2 = 0A, 55mV/A
-  system_state.system_current = ((adc1.get_channel3()-2048.0f)/4096.0f) * 3.3f / 0.055f;
+  system_state.current = ((adc1.get_channel3()-2048.0f)/4096.0f) * 3.3f / 0.055f;
   system_state.servo_current = ((adc1.get_channel2()-2048.0f)/4096.0f) * 3.3f / 0.055f;
 
   // Analog channels
@@ -307,7 +301,7 @@ void SysTick_Handler(void)
   //system_state.motor2_current = adc2.get_channel2();
 
   // Update motors
-  if (system_state.system_time % 10 == 0)
+  if (system_state.time % 10 == 0)
   {
     // Update table with position/velocity
     system_state.motor1_pos = m1_enc.read();
@@ -321,9 +315,9 @@ void SysTick_Handler(void)
   }
 
   // Toggle LED
-  if (system_state.system_time % 200 == 0)
+  if (system_state.time % 200 == 0)
     act::high();
-  else if (system_state.system_time % 100 == 0)
+  else if (system_state.time % 100 == 0)
     act::low();
 
   // Start next conversion of voltage/current

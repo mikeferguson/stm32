@@ -155,9 +155,9 @@ inline void setup_gpio_ethernet()
 // Storage of system data
 typedef struct
 {
-  uint32_t system_time;
-  float system_voltage;
-  float system_current;
+  uint32_t time;
+  float voltage;
+  float current;
   float servo_current;
 
   // Cliff sensors
@@ -165,13 +165,7 @@ typedef struct
   uint16_t cliff_center;
   uint16_t cliff_right;
 
-  int16_t motor1_vel;
-  int16_t motor2_vel;
-  int32_t motor1_pos;
-  int32_t motor2_pos;
-  int16_t motor1_current;
-  int16_t motor2_current;
-
+  // IMU data
   int16_t accel_x;
   int16_t accel_y;
   int16_t accel_z;
@@ -181,6 +175,18 @@ typedef struct
   int16_t mag_x;
   int16_t mag_y;
   int16_t mag_z;
+
+  int16_t motor1_vel;
+  int16_t motor2_vel;
+  int32_t motor1_pos;
+  int32_t motor2_pos;
+  int16_t motor1_current;
+  int16_t motor2_current;
+
+  // 360 Laser View
+  // We expect about 450 points per rotation (4500/10hz)
+  uint16_t laser_data[450];
+  float laser_angle[450];
 } system_state_t;
 
 #endif // __TABLEBOT_HPP__

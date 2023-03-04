@@ -38,13 +38,13 @@
 /*
  * LD06 Packet structures
  */
-typedef struct
+typedef struct __attribute__((packed))
 {
   uint16_t range;           // Range in millimeters
   uint8_t confidence;       // Around 200 for white objects within 6m
 } ld06_measurement_t;
 
-typedef struct
+typedef struct __attribute__((packed, aligned(sizeof(uint32_t))))
 {
   uint8_t start_byte;       // Always 0x54
   uint8_t length;           // Lower 5 bits are number of data measurements
@@ -82,11 +82,27 @@ public:
     state_ = BUS_READING_START;
     timeout_ = 10;
     packets_ = errors_ = timeouts_ = 0;
+
+    // Packet size is 9 + 3 * 32 = 105, then aligned to 32-bits
+    static_assert(sizeof(ld06_packet_t) == (9 + 3 * 32 + 3));
   }
 
   void init(T* bus)
   {
+    // Initialize usart
     bus->init(230400, 8);
+
+    // Setup timer, for 30khz PWM
+    TIM12->CR1 &= (uint16_t) ~TIM_CR1_CEN;  // Disable before configuring
+    TIM12->ARR = 1400;  // 42mhz / 30khz
+    TIM12->PSC = 0;     // Clock is 42mhz, no prescaler
+    // CH2 = PWM Mode 1 - high output while CNT < CCR
+    TIM12->CCMR1 = TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1;
+    // Enable CH2
+    TIM12->CCER = TIM_CCER_CC2E;
+    // 40% should be about 10hz rotation
+    TIM12->CCR2  = 560;
+    TIM12->CR1 |= TIM_CR1_CEN;  // Enable
   }
 
   /**
@@ -170,6 +186,10 @@ public:
         state_ = BUS_READING_START;
         packet.crc = b;
         // TODO: check CRC, return -1 if bad, state to BUS_ERROR
+        // Now that CRC is computed, make length correct
+        packet.length = packet.length % 0x1F;
+        last_speed_ = packet.radar_speed;
+        // TODO: Add feedback loop for PWM
         return (9 + 3 * packet.length);
       }
       b = bus->read();
@@ -205,19 +225,19 @@ public:
 
 private:
   uint8_t state_;
-  uint8_t data_idx_;    // Index within data to write next byte
+  uint8_t data_idx_;     // Index within data to write next byte
   uint8_t bytes_to_read_;
 
-  uint8_t checksum_;    // Scratch workspace for computing checksum
+  uint8_t checksum_;     // Scratch workspace for computing checksum
 
-  uint32_t last_byte_;  // Timestamp of last byte
-  uint32_t timeout_;    // Timeout after which we abort packet
+  uint32_t last_byte_;   // Timestamp of last byte
+  uint32_t timeout_;     // Timeout after which we abort packet
 
-  uint32_t packets_;    // Error counters for debugging
+  uint32_t packets_;     // Error counters for debugging
   uint32_t timeouts_;
   uint32_t errors_;
+
+  uint16_t last_speed_;  // For control loop
 };
-
-
 
 #endif  // _TABLEBOT_LD06_HPP_
