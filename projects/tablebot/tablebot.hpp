@@ -183,10 +183,32 @@ typedef struct
   int16_t motor1_current;
   int16_t motor2_current;
 
+  int16_t state;
+  int16_t reserved;
+
+  float pose_x;
+  float pose_y;
+  float pose_th;
+
   // 360 Laser View
   // We expect about 450 points per rotation (4500/10hz)
   uint16_t laser_data[450];
-  float laser_angle[450];
+  uint16_t laser_angle[450];
 } system_state_t;
+
+// 1024 cpr / (pi * 73mm diameter)
+#define TICK_PER_METER   4465.059f
+// TODO: tune track width
+#define TRACK_WIDTH      0.140f
+// Update motors at 100hz
+// Which is every 10th iteration of systick
+#define MOTOR_FREQUENCY   100
+#define MOTOR_PERIOD      10
+
+// These speeds are the ticks/period to input to the PID
+// Standard speed is 10cm/sec for starters
+#define STANDARD_SPEED    0
+// Max speed is 200RPM * 73mm diameter wheel = 0.243 m/s
+#define MAX_SPEED         0
 
 #endif // __TABLEBOT_HPP__

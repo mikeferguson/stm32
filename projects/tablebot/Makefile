@@ -43,6 +43,7 @@ BUILDDIRS   := $(BUILD_PATH)
 # Build main stuff
 TGT_BIN     := $(BUILD_PATH)/main.o $(BUILD_PATH)/startup_f4.o $(BUILD_PATH)/system_stm32f4xx.o
 TGT_BIN 	+= $(BUILD_PATH)/netconf.o # This is the setup for stm32 ethernet + lwip
+TGT_BIN     += $(BUILD_PATH)/arm_sin_cos_f32.o
 
 all: $(BUILD_PATH)/$(PRG).bin
 clean:

@@ -30,6 +30,7 @@
 #include "tablebot.hpp"
 #include "dynamixel.hpp"
 #include "pid.hpp"
+#include "arm_math.h"
 
 #include "netconf.h"
 #include "lwip/memp.h"
@@ -63,10 +64,12 @@ struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
 
+#include "behaviors.hpp"
+
 // From IAP app note
 typedef  void (*pFunction)(void);
 
-void udp_send_packet(uint8_t * packet, uint8_t len, uint16_t port)
+void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port)
 {
   struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
   unsigned char * x = (unsigned char *) p_send->payload;
@@ -78,6 +81,29 @@ void udp_send_packet(uint8_t * packet, uint8_t len, uint16_t port)
   for(int i = 0; i < len; ++i)
   {
     *x++ = packet[i];
+  }
+
+  // send it
+  udp_sendto(eth_udp, p_send, &return_ipaddr, port);
+  pbuf_free(p_send);
+}
+
+// Minor optimization to avoid double copy of system state (which is ~2kb)
+void udp_send_system_packet(uint16_t port)
+{
+  uint32_t len = sizeof(system_state);
+  unsigned char * data = (unsigned char *) &system_state;
+
+  struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
+  unsigned char * x = (unsigned char *) p_send->payload;
+
+  // ethernet header
+  *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
+
+  // copy payload
+  for(int i = 0; i < len; ++i)
+  {
+    *x++ = data[i];
   }
 
   // send it
@@ -104,7 +130,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   return_port = port;
 
   // Send packet
-  udp_send_packet((uint8_t*) &system_state, sizeof(system_state), return_port);
+  udp_send_system_packet(return_port);
 
   // Free buffer
   pbuf_free(p);
@@ -125,8 +151,11 @@ int udp_interface_init()
 
 int main(void)
 {
-  // Setup register table data
+  // Setup system state
   system_state.time = 0;
+  system_state.pose_x = 0;
+  system_state.pose_y = 0;
+  system_state.pose_th = 0;
 
   // TODO: set gains
   m1_pid.set_max_step(10);
@@ -259,7 +288,7 @@ int main(void)
       for (int i = 0; i < length; ++i)
       {
         system_state.laser_data[index + i] = laser.packet.data[i].range;
-        system_state.laser_data[index + i] = angle;
+        system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
         angle += step;
       }
     }
@@ -268,9 +297,7 @@ int main(void)
       laser.reset(&usart3);
     }
 
-    // TODO: control loop
-    m1_pid.update_setpoint(0);
-    m2_pid.update_setpoint(0);
+    run_behavior(system_state.state, system_state.time);
   }
 }
 
@@ -301,7 +328,7 @@ void SysTick_Handler(void)
   //system_state.motor2_current = adc2.get_channel2();
 
   // Update motors
-  if (system_state.time % 10 == 0)
+  if (system_state.time % MOTOR_PERIOD == 0)
   {
     // Update table with position/velocity
     system_state.motor1_pos = m1_enc.read();
@@ -312,6 +339,20 @@ void SysTick_Handler(void)
     // Update PID and set motor commands
     m1.set(m1_pid.update_pid(system_state.motor1_vel));
     m2.set(m2_pid.update_pid(system_state.motor2_vel));
+
+    // Compute odometry position
+    float left_vel = system_state.motor1_vel / TICK_PER_METER;
+    float right_vel = system_state.motor2_vel / TICK_PER_METER;
+    float d = (left_vel + left_vel) / 2.0f;
+    float dth = (left_vel - left_vel) / TRACK_WIDTH;
+    if (d != 0)
+    {
+      float cos_th, sin_th;
+      arm_sin_cos_f32(system_state.pose_th * 57.2958f, &sin_th, &cos_th);
+      system_state.pose_x += cos_th * d;
+      system_state.pose_y += sin_th * d;
+    }
+    system_state.pose_th += dth;
   }
 
   // Toggle LED
