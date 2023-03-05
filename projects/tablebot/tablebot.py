@@ -128,21 +128,21 @@ class TableBotGUI:
 
     def update(self):
 
-        self.conn.sendto(b"\x00BOT", 0, (self.ip, self.port))
+        self.conn.sendto(b"\xffBOT", 0, (self.ip, self.port))
 
         # Read data back
         t = time.time()
         while True:
             try:
-                packet = self.conn.recv(4096)
+                packet = self.conn.recv(1024)
 
                 # TODO confirm header
                 
                 # Remove header
                 packet = packet[4:]
-                if len(packet) != 1860:
-                    print("Invalid packet size")
-                    break
+                #if len(packet) != 1872:
+                #    print("Invalid packet size")
+                #    break
 
                 self.system_time = struct.unpack_from("<L", packet, 0)[0]
                 self.system_voltage = struct.unpack_from("<f", packet, 4)[0]
@@ -170,21 +170,23 @@ class TableBotGUI:
                 self.motor1_current = struct.unpack_from("<h", packet, 52)[0]
                 self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
 
-                self.state = struct.unpack("<H", packet, 56)[0]
+                self.state = struct.unpack_from("<H", packet, 56)[0]
                 # 58 is unused
 
                 self.pose_x = struct.unpack_from("<f", packet, 60)[0]
                 self.pose_y = struct.unpack_from("<f", packet, 64)[0]
                 self.pose_th = struct.unpack_from("<f", packet, 68)[0]
 
+                return;
+
                 for i in range(450):
                     self.laser_data[i] = struct.unpack_from("<H", packet, 72 + i * 2)[0]
                     self.laser_angle[i] = float(struct.unpack_from("<H", packet, 972 + i * 2)[0]) * 0.01
 
-            except socket.error:
-                if time.time() - t > 1:
+            except socket.error as err:
+                #print(err)
+                if time.time() - t > 10:
                     print("Failed to get return packet!")
-                    self.system_time += 1
                     break
 
     def refresh(self):

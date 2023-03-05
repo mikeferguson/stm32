@@ -32,7 +32,10 @@
 
 /*
  * NOTE: Each packet from laser is max 107 bytes
- *       We expect about 140 packets per second
+ *
+ * Typical packet appears to have 12 readings in it - meaning we expect 375
+ * packets per second (each packet being 45 bytes). This is 16875 bytes per
+ * second.
  */
 
 /*
@@ -95,7 +98,7 @@ public:
     // Setup timer, for 30khz PWM
     TIM12->CR1 &= (uint16_t) ~TIM_CR1_CEN;  // Disable before configuring
     TIM12->ARR = 1400;  // 42mhz / 30khz
-    TIM12->PSC = 0;     // Clock is 42mhz, no prescaler
+    TIM12->PSC = 1;     // Clock is 42mhz, no prescaler   TODO??? But confirmed via scope as 29.8khz
     // CH2 = PWM Mode 1 - high output while CNT < CCR
     TIM12->CCMR1 = TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1;
     // Enable CH2
@@ -127,7 +130,7 @@ public:
       {
         // The most used state_, so we put it first.
         unsigned char * x = (unsigned char *) packet.data;
-        x[data_idx_] = b;
+        x[data_idx_++] = b;
         if (data_idx_ == bytes_to_read_)
         {
           state_ = BUS_READING_END_ANGLE_L;
@@ -186,6 +189,7 @@ public:
         state_ = BUS_READING_START;
         packet.crc = b;
         // TODO: check CRC, return -1 if bad, state to BUS_ERROR
+        ++packets_;
         // Now that CRC is computed, make length correct
         packet.length = packet.length % 0x1F;
         last_speed_ = packet.radar_speed;

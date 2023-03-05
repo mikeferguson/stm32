@@ -91,7 +91,7 @@ void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port)
 // Minor optimization to avoid double copy of system state (which is ~2kb)
 void udp_send_system_packet(uint16_t port)
 {
-  uint32_t len = sizeof(system_state);
+  uint32_t len = sizeof(system_state) - 900;  // Hack: don't send laser data for now
   unsigned char * data = (unsigned char *) &system_state;
 
   struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
@@ -146,6 +146,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
     m2_pwm::mode(GPIO_INPUT);
     m1_en::mode(GPIO_INPUT);
     m2_en::mode(GPIO_INPUT);
+
+    // Turn off LED
+    act::low();
 
     // Jump into bootloader
     force_bootloader::mode(GPIO_OUTPUT);
@@ -308,20 +311,20 @@ int main(void)
       float step = (end_angle - angle) / (laser.packet.length - 1);
 
       // Decide where to insert this data
-      int index = angle * 0.8f;
-      for (int i = 0; i < length; ++i)
-      {
-        system_state.laser_data[index + i] = laser.packet.data[i].range;
-        system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
-        angle += step;
-      }
+      //int index = angle * 0.8f;
+      //for (int i = 0; i < length; ++i)
+      //{
+      //  system_state.laser_data[index + i] = laser.packet.data[i].range;
+      //  system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
+      //  angle += step;
+      //}
     }
     else if (length < 0)
     {
       laser.reset(&usart3);
     }
 
-    run_behavior(system_state.state, system_state.time);
+    //run_behavior(system_state.state, system_state.time);
   }
 }
 
@@ -367,8 +370,8 @@ void SysTick_Handler(void)
     // Compute odometry position
     float left_vel = system_state.motor1_vel / TICK_PER_METER;
     float right_vel = system_state.motor2_vel / TICK_PER_METER;
-    float d = (left_vel + left_vel) / 2.0f;
-    float dth = (left_vel - left_vel) / TRACK_WIDTH;
+    float d = (left_vel + right_vel) / 2.0f;
+    float dth = (left_vel - right_vel) / TRACK_WIDTH;
     if (d != 0)
     {
       float cos_th, sin_th;

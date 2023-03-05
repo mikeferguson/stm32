@@ -6,16 +6,16 @@ NOTE: this uses the same bootloader as the Etherbotix board.
 
 ## Wiring
 
-| Pin     | Function                     |
-|---------|------------------------------|
-| A0      | Cliff sensor (likely analog) |
-| A1      | Cliff sensor (likely analog) |
-| A2      | Cliff sensor (likely analog) |
-| D3      |                              |
-| D4      | LD06 Lidar RX (USART3_RX)    |
-| D5      | LD06 Lidar PWM (TIM12_CH2)   |
-| D6      |                              |
-| D7      | Start button (input)         |
+| Pin     | Function                          |
+|---------|-----------------------------------|
+| A0      | Cliff sensor (likely analog)      |
+| A1      | Cliff sensor (likely analog)      |
+| A2      | Cliff sensor (likely analog)      |
+| D3      |                                   |
+| D4      | LD06 Lidar RX (USART3_RX) - White |
+| D5      | LD06 Lidar PWM (TIM12_CH2) - Blue |
+| D6      |                                   |
+| D7      | Start button (input)              |
 
 ## Implementation Notes
 

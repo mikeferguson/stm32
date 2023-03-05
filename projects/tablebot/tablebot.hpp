@@ -196,8 +196,10 @@ typedef struct
   uint16_t laser_angle[450];
 } system_state_t;
 
-// 1024 cpr / (pi * 73mm diameter)
-#define TICK_PER_METER   4465.059f
+// Encoder is E4P-100-079-D-H-T-B
+// 400 PPR * 30:1 Gearbox = 12000 Ticks/Rev
+// 12000 cpr / (pi * 73mm diameter)
+#define TICK_PER_METER   52324.913f
 // TODO: tune track width
 #define TRACK_WIDTH      0.140f
 // Update motors at 100hz
@@ -206,9 +208,9 @@ typedef struct
 #define MOTOR_PERIOD      10
 
 // These speeds are the ticks/period to input to the PID
-// Standard speed is 10cm/sec for starters
-#define STANDARD_SPEED    0
+// Standard speed is just under 10cm/sec for starters
+#define STANDARD_SPEED    150.0f
 // Max speed is 200RPM * 73mm diameter wheel = 0.243 m/s
-#define MAX_SPEED         0
+#define MAX_SPEED         400.0f
 
 #endif // __TABLEBOT_HPP__
