@@ -88,29 +88,6 @@ void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port)
   pbuf_free(p_send);
 }
 
-// Minor optimization to avoid double copy of system state (which is ~2kb)
-void udp_send_system_packet(uint16_t port)
-{
-  uint32_t len = sizeof(system_state) - 900;  // Hack: don't send laser data for now
-  unsigned char * data = (unsigned char *) &system_state;
-
-  struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
-  unsigned char * x = (unsigned char *) p_send->payload;
-
-  // ethernet header
-  *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
-
-  // copy payload
-  for(int i = 0; i < len; ++i)
-  {
-    *x++ = data[i];
-  }
-
-  // send it
-  udp_sendto(eth_udp, p_send, &return_ipaddr, port);
-  pbuf_free(p_send);
-}
-
 void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
                   struct ip_addr *addr, uint16_t port)
 {
@@ -129,8 +106,8 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   return_ipaddr = *addr;
   return_port = port;
 
-  // Send packet
-  udp_send_system_packet(return_port);
+  // Send packet with just the table, no laser data
+  udp_send_packet((unsigned char *) &system_state, sizeof(system_state) - 1800, return_port);
 
   if (p->len == 8 &&
       data[4] == 'B' &&
@@ -270,7 +247,8 @@ int main(void)
 
   // Unused IO
   d3::mode(GPIO_INPUT);
-  d6::mode(GPIO_INPUT);
+  // Temporarily used for timing debugging
+  d6::mode(GPIO_OUTPUT);
 
   // Setup systick
   SysTick_Config(SystemCoreClock/1000);
@@ -302,6 +280,7 @@ int main(void)
     }
 
     // Attempt to read from laser data
+    d6::high();
     int8_t length = laser.update(&usart3, system_state.time);
     if (length > 0)
     {
@@ -311,18 +290,19 @@ int main(void)
       float step = (end_angle - angle) / (laser.packet.length - 1);
 
       // Decide where to insert this data
-      //int index = angle * 0.8f;
-      //for (int i = 0; i < length; ++i)
-      //{
-      //  system_state.laser_data[index + i] = laser.packet.data[i].range;
-      //  system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
-      //  angle += step;
-      //}
+      int index = angle * 0.8f;
+      for (int i = 0; i < length; ++i)
+      {
+        system_state.laser_data[index + i] = laser.packet.data[i].range;
+        system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
+        angle += step;
+      }
     }
     else if (length < 0)
     {
       laser.reset(&usart3);
     }
+    d6::low();
 
     //run_behavior(system_state.state, system_state.time);
   }
