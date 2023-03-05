@@ -132,6 +132,30 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   // Send packet
   udp_send_system_packet(return_port);
 
+  if (p->len == 8 &&
+      data[4] == 'B' &&
+      data[5] == 'O' &&
+      data[6] == 'O' &&
+      data[7] == 'T')
+  {
+    // Disable interrupts before jumping
+    __disable_irq();
+
+    // Disable motor driver
+    m1_pwm::mode(GPIO_INPUT);
+    m2_pwm::mode(GPIO_INPUT);
+    m1_en::mode(GPIO_INPUT);
+    m2_en::mode(GPIO_INPUT);
+
+    // Jump into bootloader
+    force_bootloader::mode(GPIO_OUTPUT);
+    force_bootloader::low();
+    uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
+    pFunction Jump_To_Application = (pFunction) JumpAddress;
+    __set_MSP(*(__IO uint32_t*)0x08000000);
+    Jump_To_Application();
+  }
+
   // Free buffer
   pbuf_free(p);
 }
