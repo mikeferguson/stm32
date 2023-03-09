@@ -25,3 +25,7 @@ jobs:
 
     - name: Build Etherbotix Bootloader
       run: cd projects && cd etherbotix && cd bootloader && make
+
+    - name: Build Tablebot
+      run: cd projects && cd tablebot && make
+
