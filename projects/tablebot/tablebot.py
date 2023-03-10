@@ -184,6 +184,8 @@ class TableBotGUI:
                 self.pose_y = struct.unpack_from("<f", packet, 64)[0]
                 self.pose_th = struct.unpack_from("<f", packet, 68)[0]
 
+                print(self.pose_x, self.pose_y, self.pose_th)
+
                 return;
 
                 for i in range(450):

@@ -159,9 +159,10 @@ int main(void)
   // Setup system state
   system_state.time = 0;
   system_state.run_state = MODE_UNSELECTED;
-  system_state.pose_x = 0;
-  system_state.pose_y = 0;
-  system_state.pose_th = 0;
+  system_state.pose_x = 0.0f;
+  system_state.pose_y = 0.0f;
+  system_state.pose_th = 0.0f;
+  system_state.last_motor_command = 0;
 
   // Setup drive motors
   m1_pid.set_max_step(10);
@@ -311,7 +312,7 @@ int main(void)
     d6::low();
     */
 
-    //run_behavior(system_state.runstate, system_state.time);
+    run_behavior(system_state.run_state, system_state.time);
   }
 }
 
@@ -351,8 +352,19 @@ void SysTick_Handler(void)
     system_state.motor2_vel = m2_enc.read_speed();
 
     // Update PID and set motor commands
-    m1.set(m1_pid.update_pid(system_state.motor1_vel));
-    m2.set(m2_pid.update_pid(system_state.motor2_vel));
+    if (system_state.time - system_state.last_motor_command < 100)
+    {
+      m1.set(m1_pid.update_pid(system_state.motor1_vel));
+      m2.set(m2_pid.update_pid(system_state.motor2_vel));
+    }
+    else
+    {
+      // Motors have timed out
+      m1.set(0);
+      m2.set(0);
+      m1_pid.reset();
+      m2_pid.reset();
+    }
 
     // Compute odometry position
     float left_vel = system_state.motor1_vel / TICK_PER_METER;

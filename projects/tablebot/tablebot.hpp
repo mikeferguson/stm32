@@ -190,6 +190,8 @@ typedef struct
   float pose_y;
   float pose_th;
 
+  uint32_t last_motor_command;
+
   // 360 Laser View
   // We expect about 450 points per rotation (4500/10hz)
   uint16_t laser_data[450];
@@ -208,9 +210,18 @@ typedef struct
 #define MOTOR_PERIOD      10
 
 // These speeds are the ticks/period to input to the PID
+#define MIN_SPEED         25
+#define SLOW_SPEED        75
 // Standard speed is just under 10cm/sec for starters
-#define STANDARD_SPEED    150.0f
+#define STANDARD_SPEED    150
 // Max speed is 200RPM * 73mm diameter wheel = 0.243 m/s
-#define MAX_SPEED         400.0f
+#define MAX_SPEED         400
+
+// Analog level that indicates cliff detected
+// TODO: should this be done with digital?
+#define CLIFF_DETECTED    1500
+
+// TODO: find this value with laser
+#define TABLE_LENGTH      1.2192f
 
 #endif // __TABLEBOT_HPP__

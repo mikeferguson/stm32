@@ -37,26 +37,29 @@
 // Phase 3 = find the cube, push it into the box
 #define BEHAVIOR_ID_PHASE_3   3
 
-uint8_t behavior_id = 0;
-uint8_t behavior_state = 0;
-
-float last_pose_x;
-float last_pose_y;
-float last_pose_th;
-
 // Phase 1 states
 #define PHASE1_DRIVE_TOWARDS_END  0
 #define PHASE1_BACK_UP_A_BIT      1
 #define PHASE1_TURN_IN_PLACE      2
 #define PHASE1_RETURN_TO_START    3
 
-// Analog level that indicates cliff detected
-// TODO: should this be done with digital?
-#define CLIFF_DETECTED            1500
+uint16_t behavior_id = 0;
+uint8_t behavior_state = 0;
 
-void run_behavior(uint8_t id, uint32_t stamp)
+void set_motors(int16_t left, int16_t right)
 {
-  if (id == 0)
+  m1_pid.update_setpoint(left);
+  m2_pid.update_setpoint(right);
+  system_state.last_motor_command = system_state.time;
+}
+
+void run_behavior(uint16_t id, uint32_t stamp)
+{
+  static float last_pose_x;
+  static float last_pose_y;
+  static float last_pose_th;
+
+  if (id == MODE_UNSELECTED)
   {
     // Phase is not yet selected
     return;
@@ -67,7 +70,18 @@ void run_behavior(uint8_t id, uint32_t stamp)
     // This is our first iteration through - reset things
     behavior_id = id;
     behavior_state = 0;
-    last_pose_x = system_state.motor1_pos;  // TOOD: use combined odometry
+
+    // Reset pose
+    __disable_irq();
+    system_state.pose_x = 0.0f;
+    system_state.pose_y = 0.0f;
+    system_state.pose_th = 0.0f;
+    __enable_irq();
+
+    // Cache starting pose
+    last_pose_x = system_state.pose_x;
+    last_pose_y = system_state.pose_y;
+    last_pose_th = system_state.pose_th;
   }
 
   if (id == BEHAVIOR_ID_PHASE_1)
@@ -79,62 +93,74 @@ void run_behavior(uint8_t id, uint32_t stamp)
           system_state.cliff_right > CLIFF_DETECTED ||
           system_state.cliff_center > CLIFF_DETECTED)
       {
-        m1_pid.update_setpoint(0);
-        m2_pid.update_setpoint(0);
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
         behavior_state = PHASE1_BACK_UP_A_BIT;
+        set_motors(0, 0);
       }
-
-      // Else drive forward at constant speed
-      // TODO: what speed?
-      // TODO: use odometry & maintain heading
-      m1_pid.update_setpoint(0);
-      m2_pid.update_setpoint(0);
+      else if (system_state.pose_x > 0.7f * TABLE_LENGTH)
+      {
+        set_motors(SLOW_SPEED, SLOW_SPEED);
+      }
+      else
+      {
+        // Else drive forward at constant speed
+        // TODO: use odometry & maintain heading
+        set_motors(STANDARD_SPEED, STANDARD_SPEED);
+      }
     }
     else if (behavior_state == PHASE1_BACK_UP_A_BIT)
     {
       if ((last_pose_x - system_state.pose_x) > 0.15f)
       {
         // Done backing up - stop robot
-        m1_pid.update_setpoint(0);
-        m2_pid.update_setpoint(0);
+        set_motors(0, 0);
         last_pose_th = system_state.pose_th;
         behavior_state = PHASE1_TURN_IN_PLACE;
       }
       else
       {
-        // TODO: Backup Command
+        // Backup
+        set_motors(-SLOW_SPEED, -SLOW_SPEED);
       }
     }
     else if (behavior_state == PHASE1_TURN_IN_PLACE)
     {
-      float angle_error = last_pose_th + 1.57f - system_state.pose_th;
+      float angle_error = last_pose_th + 3.14f - system_state.pose_th;
       if (abs(angle_error) < 0.025f)
       {
         // Done rotating in place - stop robot
-        m1_pid.update_setpoint(0);
-        m2_pid.update_setpoint(0);
+        set_motors(0, 0);
         last_pose_th = system_state.pose_th;
         behavior_state = PHASE1_RETURN_TO_START;
       }
       else
       {
-        // TODO: Rotate Command based on angular error
+        // Rotate based on error
+        int16_t speed = angle_error * 75;
+        if (speed < 0) speed = -speed;
+        if (speed > SLOW_SPEED) speed = SLOW_SPEED;
+        if (speed < MIN_SPEED) speed = MIN_SPEED;
+        set_motors(speed, -speed);
       } 
     }
     else if (behavior_state == PHASE1_RETURN_TO_START)
     {
-      // Drive only if the cliff sensors aren't tripped
-      if (system_state.cliff_left == 0 || system_state.cliff_right == 0 || system_state.cliff_center == 0)
+      // If we see the cliff, stop and transition to next state
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
       {
-        m1_pid.update_setpoint(100);
-        m2_pid.update_setpoint(100);
+        system_state.run_state = MODE_DONE;
+        set_motors(0, 0);
+      }
+      else if (system_state.pose_x < 0.3f * TABLE_LENGTH)
+      {
+        set_motors(SLOW_SPEED, SLOW_SPEED);
       }
       else
       {
-        // Stop robot
-        m1_pid.update_setpoint(0);
-        m2_pid.update_setpoint(0);
+        // TODO: use odometery to follow straight line
+        set_motors(STANDARD_SPEED, STANDARD_SPEED);
       }
     }
   }

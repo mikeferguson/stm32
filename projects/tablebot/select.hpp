@@ -82,9 +82,19 @@ uint16_t select_mode()
     }
     else if (system_state.accel_z > 7000)
     {
-      // Robot is on level - we can start if we have been level for 3 seconds
+      // Robot is on the level
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
+      {
+        // But not on the table
+        last_unlevel_stamp = system_state.time;
+      }
+
+      // Have we been level and on table for 3 seconds?
       if (system_state.time - last_unlevel_stamp > 3000 && next_selection > 0)
       {
+        // We are level and on a table
         mode = next_selection;
       }
     }
