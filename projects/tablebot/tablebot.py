@@ -36,6 +36,8 @@ class TableBotGUI:
     motor1_current = 0
     motor2_current = 0
 
+    run_state = 0
+
     pose_x = 0
     pose_y = 0
     pose_th = 0
@@ -74,6 +76,9 @@ class TableBotGUI:
         self.current_value = QtWidgets.QLabel(text="0")
         self.current_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
+        self.run_state_value = QtWidgets.QLabel(text="NONE")
+        self.run_state_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
         self.left_cliff = QtWidgets.QLabel(text="0")
         self.left_cliff.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
@@ -101,12 +106,14 @@ class TableBotGUI:
         self.status_layout.addWidget(self.voltage_value, 1, 1)
         self.status_layout.addWidget(QtWidgets.QLabel(text="System Current (A)"), 2, 0)
         self.status_layout.addWidget(self.current_value, 2, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Left Cliff"), 3, 0)
-        self.status_layout.addWidget(self.left_cliff, 3, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Center Cliff"), 4, 0)
-        self.status_layout.addWidget(self.center_cliff, 4, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Right Cliff"), 5, 0)
-        self.status_layout.addWidget(self.right_cliff, 5, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="System State"), 3, 0)
+        self.status_layout.addWidget(self.run_state_value, 3, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Left Cliff"), 4, 0)
+        self.status_layout.addWidget(self.left_cliff, 4, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Center Cliff"), 5, 0)
+        self.status_layout.addWidget(self.center_cliff, 5, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Right Cliff"), 6, 0)
+        self.status_layout.addWidget(self.right_cliff, 6, 1)
         self.right_column_layout.addLayout(self.status_layout)
         self.right_column_layout.addStretch()
 
@@ -170,7 +177,7 @@ class TableBotGUI:
                 self.motor1_current = struct.unpack_from("<h", packet, 52)[0]
                 self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
 
-                self.state = struct.unpack_from("<H", packet, 56)[0]
+                self.run_state = struct.unpack_from("<H", packet, 56)[0]
                 # 58 is unused
 
                 self.pose_x = struct.unpack_from("<f", packet, 60)[0]
@@ -210,6 +217,7 @@ class TableBotGUI:
         self.time_value.setText("%i" % self.system_time)
         self.voltage_value.setText("%.3f" % self.system_voltage)
         self.current_value.setText("%.3f" % self.system_current)
+        self.run_state_value.setText(self.getRunStateValue(self.run_state))
         self.left_cliff.setText(self.getCliffValue(self.cliff_left))
         self.center_cliff.setText(self.getCliffValue(self.cliff_center))
         self.right_cliff.setText(self.getCliffValue(self.cliff_right))
@@ -217,11 +225,25 @@ class TableBotGUI:
         self.window.update()
 
     def getCliffValue(self, value):
-        if value == 0:
+        if value < 1500:
             # Table is there
             return "OK"
         else:
             return "<b><font color='red'>CLIFF</font></b>"
+
+    def getRunStateValue(self, value):
+        if value == 0:
+            return "NONE"
+        elif value == 1:
+            return "Phase 1"
+        elif value == 2:
+            return "Phase 2"
+        elif value == 3:
+            return "Phase 3"
+        elif value == 255:
+            return "DONE"
+        else:
+            return str(value)
 
 
 if __name__ == "__main__":
@@ -229,10 +251,10 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     gui = TableBotGUI()
 
-    # Read data at 1hz
+    # Read data at 10hz
     read_board = QtCore.QTimer()
     read_board.timeout.connect(gui.update)
-    read_board.start(1000)
+    read_board.start(100)
 
     # Start refresh timer at 10hz
     update_map = QtCore.QTimer()

@@ -29,6 +29,7 @@
 
 #ifndef _TABLEBOT_BEHAVIORS_HPP_
 #define _TABLEBOT_BEHAVIORS_HPP_
+
 // Phase 1 = drive to end of table and back
 #define BEHAVIOR_ID_PHASE_1   1
 // Phase 2 = find the cube, push it off the table
@@ -48,6 +49,10 @@ float last_pose_th;
 #define PHASE1_BACK_UP_A_BIT      1
 #define PHASE1_TURN_IN_PLACE      2
 #define PHASE1_RETURN_TO_START    3
+
+// Analog level that indicates cliff detected
+// TODO: should this be done with digital?
+#define CLIFF_DETECTED            1500
 
 void run_behavior(uint8_t id, uint32_t stamp)
 {
@@ -70,7 +75,9 @@ void run_behavior(uint8_t id, uint32_t stamp)
     if (behavior_state == PHASE1_DRIVE_TOWARDS_END)
     {
       // If we see the cliff, stop and transition to next state
-      if (system_state.cliff_left > 0 || system_state.cliff_right > 0 || system_state.cliff_center > 0)
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
       {
         m1_pid.update_setpoint(0);
         m2_pid.update_setpoint(0);

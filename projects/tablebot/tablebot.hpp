@@ -183,8 +183,8 @@ typedef struct
   int16_t motor1_current;
   int16_t motor2_current;
 
-  int16_t state;
-  int16_t reserved;
+  uint16_t run_state;
+  uint16_t reserved;
 
   float pose_x;
   float pose_y;
@@ -200,8 +200,8 @@ typedef struct
 // 400 PPR * 30:1 Gearbox = 12000 Ticks/Rev
 // 12000 cpr / (pi * 73mm diameter)
 #define TICK_PER_METER   52324.913f
-// TODO: tune track width
-#define TRACK_WIDTH      0.140f
+// Track width tuned on 3/10/2023
+#define TRACK_WIDTH      0.150f
 // Update motors at 100hz
 // Which is every 10th iteration of systick
 #define MOTOR_FREQUENCY   100

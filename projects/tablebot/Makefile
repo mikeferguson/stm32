@@ -186,3 +186,7 @@ $(BUILDDIRS):
 	echo "define reload" >> .gdbinit
 	echo " file $(BUILD_PATH)/$(PRG).elf" >> .gdbinit
 	echo "end" >> .gdbinit
+	echo "define erase_firmware" >> .gdbinit
+	echo " mon reset halt" >> .gdbinit
+	echo " mon flash erase_sector 0 4 11" >> .gdbinit
+	echo "end" >> .gdbinit

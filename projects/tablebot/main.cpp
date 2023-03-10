@@ -64,6 +64,7 @@ struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
 
+#include "select.hpp"
 #include "behaviors.hpp"
 
 // From IAP app note
@@ -157,15 +158,16 @@ int main(void)
 {
   // Setup system state
   system_state.time = 0;
+  system_state.run_state = MODE_UNSELECTED;
   system_state.pose_x = 0;
   system_state.pose_y = 0;
   system_state.pose_th = 0;
 
-  // TODO: set gains
+  // Setup drive motors
   m1_pid.set_max_step(10);
-  m1_pid.set_gains(1.0, 0.0, 0.0, 0.0);
+  m1_pid.set_gains(5.0, 0.0, 0.2, 400.0);
   m2_pid.set_max_step(10);
-  m2_pid.set_gains(1.0, 0.0, 0.0, 0.0);
+  m2_pid.set_gains(5.0, 0.0, 0.2, 400.0);
 
   NVIC_SetPriorityGrouping(3);
 
@@ -235,11 +237,11 @@ int main(void)
   center_cliff::mode(GPIO_INPUT_ANALOG);
   right_cliff::mode(GPIO_INPUT_ANALOG);
 
-  // Laser interface
-  RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
-  laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
-  laser.init(&usart3);
+  // Laser interface - temporarily disabled
+  //RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
+  //laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
+  //laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
+  //laser.init(&usart3);
 
   // Start button
   start_button::mode(GPIO_INPUT);
@@ -279,7 +281,11 @@ int main(void)
       system_state.mag_z = imu.mag_data.z;
     }
 
+    system_state.run_state = select_mode();
+
     // Attempt to read from laser data
+    // From scope: this takes 2-8uS, and loop runs about 3.7khz (3/8/2023)
+    /*
     d6::high();
     int8_t length = laser.update(&usart3, system_state.time);
     if (length > 0)
@@ -303,8 +309,9 @@ int main(void)
       laser.reset(&usart3);
     }
     d6::low();
+    */
 
-    //run_behavior(system_state.state, system_state.time);
+    //run_behavior(system_state.runstate, system_state.time);
   }
 }
 
@@ -362,11 +369,58 @@ void SysTick_Handler(void)
     system_state.pose_th += dth;
   }
 
-  // Toggle LED
-  if (system_state.time % 200 == 0)
-    act::high();
-  else if (system_state.time % 100 == 0)
+  // Control LED
+  if (system_state.run_state == MODE_UNSELECTED)
+  {
+    // Red LED indicates next selection (if any)
+    int next_mode = get_next_mode();
+    if (next_mode > 0)
+    {
+      // Blink out pattern
+      if (system_state.time % 200 == 0)
+      {
+        if (system_state.time % 1000 < next_mode * 200)
+        {
+          error::high();
+        }
+      }
+      else if (system_state.time % 100 == 0)
+      {
+        error::low();
+      }
+    }
+    else
+    {
+      // Solid RED led
+      error::high();
+    }
+  }
+  else if (system_state.run_state == MODE_DONE)
+  {
+    // Toggle RED
+    if (system_state.time % 200 == 0)
+    {
+      error::high();
+    }
+    else if (system_state.time % 100 == 0)
+    {
+      error::low();
+    }
+
+    // Blue OFF
     act::low();
+  }
+  else
+  {
+    // Red LED Off
+    error::low();
+    // Toggle Blue LED
+    if (system_state.time % 200 == 0)
+      act::high();
+    else if (system_state.time % 100 == 0)
+      act::low();
+  }
+
 
   // Start next conversion of voltage/current
   adc1.convert();

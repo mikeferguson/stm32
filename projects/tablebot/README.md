@@ -41,5 +41,10 @@ NOTE: this uses the same bootloader as the Etherbotix board.
    * Left side up = Phase 1
    * Right side up = Phase 2
    * Front side up = Phase 3
- * Once the phase has been detected, red led blinks out the phase, blue LED goes solid
- * Once placed on a flat surface, blue LED starts to blink, laser spins up
+ * Once the phase has been detected, red led blinks out the phase
+ * Once turned right side up, 3 seconds will elapse and then the
+   blue LED starts to blink, laser spins up
+
+## Connecting to the board
+
+    openocd -f interface/stlink-v2.cfg -f target/stm32f4x_stlink.cfg
