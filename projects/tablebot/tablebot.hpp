@@ -221,7 +221,4 @@ typedef struct
 // TODO: should this be done with digital?
 #define CLIFF_DETECTED    1500
 
-// TODO: find this value with laser
-#define TABLE_LENGTH      1.2192f
-
 #endif // __TABLEBOT_HPP__
