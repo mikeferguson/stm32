@@ -43,6 +43,12 @@
 #define PHASE1_TURN_IN_PLACE      2
 #define PHASE1_RETURN_TO_START    3
 
+// Distance to back up before making in-place 180 degree turn
+#define PHASE1_BACKUP_DISTANCE    0.15f
+
+// TODO: find this value with laser
+#define TABLE_LENGTH      1.2192f
+
 uint16_t behavior_id = 0;
 uint8_t behavior_state = 0;
 
@@ -73,7 +79,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
 
     // Reset pose
     __disable_irq();
-    system_state.pose_x = 0.0f;
+    system_state.pose_x = 0.15f;  // We aren't right on the end of the table
     system_state.pose_y = 0.0f;
     system_state.pose_th = 0.0f;
     __enable_irq();
@@ -97,20 +103,24 @@ void run_behavior(uint16_t id, uint32_t stamp)
         behavior_state = PHASE1_BACK_UP_A_BIT;
         set_motors(0, 0);
       }
-      else if (system_state.pose_x > 0.7f * TABLE_LENGTH)
+      else if (system_state.pose_x > 0.8f * TABLE_LENGTH)
       {
         set_motors(SLOW_SPEED, SLOW_SPEED);
       }
       else
       {
-        // Else drive forward at constant speed
-        // TODO: use odometry & maintain heading
-        set_motors(STANDARD_SPEED, STANDARD_SPEED);
+        // Else drive forward, keeping robot centered on table
+        // Error of 0.05m in Y axis generates ~max_adjustment
+        int16_t adjustment = system_state.pose_y * 600;
+        int16_t max_adjustment = STANDARD_SPEED * 0.2f;
+        if (adjustment > max_adjustment) adjustment = max_adjustment;
+        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+        set_motors(STANDARD_SPEED - adjustment, STANDARD_SPEED + adjustment);
       }
     }
     else if (behavior_state == PHASE1_BACK_UP_A_BIT)
     {
-      if ((last_pose_x - system_state.pose_x) > 0.15f)
+      if (abs(last_pose_x - system_state.pose_x) > PHASE1_BACKUP_DISTANCE)
       {
         // Done backing up - stop robot
         set_motors(0, 0);
@@ -135,7 +145,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-        // Rotate based on error
+        // Rotate based on error - slow down as we approach goal angle
         int16_t speed = angle_error * 75;
         if (speed < 0) speed = -speed;
         if (speed > SLOW_SPEED) speed = SLOW_SPEED;
@@ -159,8 +169,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-        // TODO: use odometery to follow straight line
-        set_motors(STANDARD_SPEED, STANDARD_SPEED);
+        // Else drive forward, keeping robot centered on table
+        // Error of 0.05m in Y axis generates ~max_adjustment
+        int16_t adjustment = system_state.pose_y * 600;
+        int16_t max_adjustment = STANDARD_SPEED * 0.2f;
+        if (adjustment > max_adjustment) adjustment = max_adjustment;
+        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+        set_motors(STANDARD_SPEED + adjustment, STANDARD_SPEED - adjustment);
       }
     }
   }

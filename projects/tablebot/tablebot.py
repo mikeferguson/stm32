@@ -38,9 +38,12 @@ class TableBotGUI:
 
     run_state = 0
 
-    pose_x = 0
-    pose_y = 0
-    pose_th = 0
+    pose_x = list()
+    pose_y = list()
+    pose_th = list()
+
+    TABLE_LENGTH = 1.2192
+    TABLE_WIDTH = TABLE_LENGTH / 2.0
 
     laser_data = [0 for i in range(450)]  # millimeters
     laser_angle = [0 for i in range(450)]  # 0.01 degree steps
@@ -180,11 +183,18 @@ class TableBotGUI:
                 self.run_state = struct.unpack_from("<H", packet, 56)[0]
                 # 58 is unused
 
-                self.pose_x = struct.unpack_from("<f", packet, 60)[0]
-                self.pose_y = struct.unpack_from("<f", packet, 64)[0]
-                self.pose_th = struct.unpack_from("<f", packet, 68)[0]
+                pose_x = struct.unpack_from("<f", packet, 60)[0]
+                pose_y = -struct.unpack_from("<f", packet, 64)[0]
+                pose_th = struct.unpack_from("<f", packet, 68)[0]
 
-                print(self.pose_x, self.pose_y, self.pose_th)
+                if len(self.pose_x) == 0 or \
+                        abs(pose_x - self.pose_x[-1]) > 0.01 or \
+                        abs(pose_y - self.pose_y[-1]) > 0.01 or \
+                        abs(pose_th - self.pose_th[-1]) > 0.1:
+                    print(pose_x, pose_y, pose_th)
+                    self.pose_x.append(pose_x)
+                    self.pose_y.append(pose_y)
+                    self.pose_th.append(pose_th)
 
                 return;
 
@@ -199,7 +209,54 @@ class TableBotGUI:
                     break
 
     def refresh(self):
+        self.time_value.setText("%i" % self.system_time)
+        self.voltage_value.setText("%.3f" % self.system_voltage)
+        self.current_value.setText("%.3f" % self.system_current)
+        self.run_state_value.setText(self.getRunStateValue(self.run_state))
+        self.left_cliff.setText(self.getCliffValue(self.cliff_left))
+        self.center_cliff.setText(self.getCliffValue(self.cliff_center))
+        self.right_cliff.setText(self.getCliffValue(self.cliff_right))
 
+        #self.drawLidarScan()
+        self.drawPoseGraph()
+
+        self.window.update()
+
+    def drawPoseGraph(self):
+        if len(self.pose_x) == 0:
+            # Can't draw anything yet
+            return
+
+        # Convert meters to pixels
+        SCALE = 600.0 / (self.TABLE_LENGTH * 1.5)
+
+        pen = QtGui.QPen()
+        pen.setWidth(4)
+        pen.setBrush(QtCore.Qt.red)
+
+        paint = QtGui.QPainter(self.map.pixmap())
+
+        # Draw poses
+        paint.setPen(pen)
+        offset_x = 300 + self.TABLE_LENGTH * SCALE / 2.0
+        for i in range(len(self.pose_x)):
+            x = int(SCALE * self.pose_x[i])
+            y = int(SCALE * self.pose_y[i])
+            paint.drawPoint(300 - y, offset_x - x)
+
+        # Draw table
+        table_pen = QtGui.QPen()
+        pen.setWidth(4)
+        pen.setBrush(QtCore.Qt.green)
+        paint.setPen(pen)
+        x = self.TABLE_LENGTH * SCALE / 2.0
+        y = self.TABLE_WIDTH * SCALE / 2.0
+        paint.drawRect(300 - y, 300 - x, 2 * y, 2 * x)
+
+        paint.end()
+
+
+    def drawLidarScan(self):
         # Convert millimeters to pixels
         SCALE = 0.2
 
@@ -215,16 +272,6 @@ class TableBotGUI:
             y = int(SCALE * self.laser_data[i] * cos(angle))
             paint.drawPoint(300 + x, 300 - y)
         paint.end()
-
-        self.time_value.setText("%i" % self.system_time)
-        self.voltage_value.setText("%.3f" % self.system_voltage)
-        self.current_value.setText("%.3f" % self.system_current)
-        self.run_state_value.setText(self.getRunStateValue(self.run_state))
-        self.left_cliff.setText(self.getCliffValue(self.cliff_left))
-        self.center_cliff.setText(self.getCliffValue(self.cliff_center))
-        self.right_cliff.setText(self.getCliffValue(self.cliff_right))
-
-        self.window.update()
 
     def getCliffValue(self, value):
         if value < 1500:
