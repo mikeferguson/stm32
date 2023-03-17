@@ -79,7 +79,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
 
     // Reset pose
     __disable_irq();
-    system_state.pose_x = 0.0f;
+    system_state.pose_x = 0.15f;  // We aren't right on the end of the table
     system_state.pose_y = 0.0f;
     system_state.pose_th = 0.0f;
     __enable_irq();
@@ -103,15 +103,15 @@ void run_behavior(uint16_t id, uint32_t stamp)
         behavior_state = PHASE1_BACK_UP_A_BIT;
         set_motors(0, 0);
       }
-      else if (system_state.pose_x > 0.7f * TABLE_LENGTH)
+      else if (system_state.pose_x > 0.8f * TABLE_LENGTH)
       {
         set_motors(SLOW_SPEED, SLOW_SPEED);
       }
       else
       {
         // Else drive forward, keeping robot centered on table
-        // Error of 0.1m in Y axis generates ~max_adjustment
-        int16_t adjustment = system_state.pose_y * 300;
+        // Error of 0.05m in Y axis generates ~max_adjustment
+        int16_t adjustment = system_state.pose_y * 600;
         int16_t max_adjustment = STANDARD_SPEED * 0.2f;
         if (adjustment > max_adjustment) adjustment = max_adjustment;
         if (adjustment < -max_adjustment) adjustment = -max_adjustment;
@@ -169,8 +169,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-        // TODO: use odometery to follow straight line
-        set_motors(STANDARD_SPEED, STANDARD_SPEED);
+        // Else drive forward, keeping robot centered on table
+        // Error of 0.05m in Y axis generates ~max_adjustment
+        int16_t adjustment = system_state.pose_y * 600;
+        int16_t max_adjustment = STANDARD_SPEED * 0.2f;
+        if (adjustment > max_adjustment) adjustment = max_adjustment;
+        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+        set_motors(STANDARD_SPEED + adjustment, STANDARD_SPEED - adjustment);
       }
     }
   }
