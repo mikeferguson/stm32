@@ -380,7 +380,7 @@ void SysTick_Handler(void)
     float left_vel = system_state.motor1_vel / TICK_PER_METER;
     float right_vel = system_state.motor2_vel / TICK_PER_METER;
     float d = (left_vel + right_vel) / 2.0f;
-    float dth = (left_vel - right_vel) / TRACK_WIDTH;
+    float dth = (right_vel - left_vel) / TRACK_WIDTH;
     if (d != 0)
     {
       float cos_th, sin_th;

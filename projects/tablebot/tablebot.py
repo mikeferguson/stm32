@@ -177,7 +177,7 @@ class TableBotGUI:
                     # 58 is unused
 
                     pose_x = struct.unpack_from("<f", packet, 60)[0]
-                    pose_y = -struct.unpack_from("<f", packet, 64)[0]
+                    pose_y = struct.unpack_from("<f", packet, 64)[0]
                     pose_th = struct.unpack_from("<f", packet, 68)[0]
 
                     if len(self.pose_x) == 0 or \
@@ -207,8 +207,8 @@ class TableBotGUI:
                         y = range_m * sin(angle)
 
                         # Get global coordinates
-                        gx = self.pose_x[-1] + (cos(self.pose_th[-1]) * x + sin(self.pose_th[-1]) * y)
-                        gy = self.pose_y[-1] + (-sin(self.pose_th[-1]) * x + cos(self.pose_th[-1]) * y)
+                        gx = self.pose_x[-1] + (cos(self.pose_th[-1]) * x - sin(self.pose_th[-1]) * y)
+                        gy = self.pose_y[-1] + (sin(self.pose_th[-1]) * x + cos(self.pose_th[-1]) * y)
 
                         # Add the global point
                         self.laser_data.append([gx, gy])

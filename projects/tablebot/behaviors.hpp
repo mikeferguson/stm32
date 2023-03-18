@@ -115,7 +115,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
         int16_t max_adjustment = STANDARD_SPEED * 0.2f;
         if (adjustment > max_adjustment) adjustment = max_adjustment;
         if (adjustment < -max_adjustment) adjustment = -max_adjustment;
-        set_motors(STANDARD_SPEED - adjustment, STANDARD_SPEED + adjustment);
+        // Moving with axis, so positive error = steer to the right
+        set_motors(STANDARD_SPEED + adjustment, STANDARD_SPEED - adjustment);
       }
     }
     else if (behavior_state == PHASE1_BACK_UP_A_BIT)
@@ -150,7 +151,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
         if (speed < 0) speed = -speed;
         if (speed > SLOW_SPEED) speed = SLOW_SPEED;
         if (speed < MIN_SPEED) speed = MIN_SPEED;
-        set_motors(speed, -speed);
+        // Turn in positive direction (to the left)
+        set_motors(-speed, +speed);
       } 
     }
     else if (behavior_state == PHASE1_RETURN_TO_START)
@@ -175,7 +177,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
         int16_t max_adjustment = STANDARD_SPEED * 0.2f;
         if (adjustment > max_adjustment) adjustment = max_adjustment;
         if (adjustment < -max_adjustment) adjustment = -max_adjustment;
-        set_motors(STANDARD_SPEED + adjustment, STANDARD_SPEED - adjustment);
+        // Moving against axis, so positive error = steer to the left
+        set_motors(STANDARD_SPEED - adjustment, STANDARD_SPEED + adjustment);
       }
     }
   }
