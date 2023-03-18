@@ -62,7 +62,34 @@ uint16_t select_mode()
 
   if (mode == MODE_UNSELECTED)
   {
-    if (system_state.accel_x < -7000)
+    if (system_state.accel_z > 3000)
+    {
+      // Robot is mostly right side up
+
+      if (system_state.accel_x > 3000 || system_state.accel_x < -3000 ||
+          system_state.accel_y > 3000 || system_state.accel_y < -3000 ||
+          system_state.accel_z < 7000)
+      {
+        // Not level enough
+        last_unlevel_stamp = system_state.time;
+      }
+
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
+      {
+        // Not on the table
+        last_unlevel_stamp = system_state.time;
+      }
+
+      // Have we been level and on table for 3 seconds?
+      if (system_state.time - last_unlevel_stamp > 3000 && next_selection > 0)
+      {
+        // We are level and on a table
+        mode = next_selection;
+      }
+    }
+    else if (system_state.accel_x < -7000)
     {
       // Robot - left side up side
       next_selection = 1;
@@ -79,24 +106,6 @@ uint16_t select_mode()
       // Robot front side up
       next_selection = 3;
       last_unlevel_stamp = system_state.time;
-    }
-    else if (system_state.accel_z > 7000)
-    {
-      // Robot is on the level
-      if (system_state.cliff_left > CLIFF_DETECTED ||
-          system_state.cliff_right > CLIFF_DETECTED ||
-          system_state.cliff_center > CLIFF_DETECTED)
-      {
-        // But not on the table
-        last_unlevel_stamp = system_state.time;
-      }
-
-      // Have we been level and on table for 3 seconds?
-      if (system_state.time - last_unlevel_stamp > 3000 && next_selection > 0)
-      {
-        // We are level and on a table
-        mode = next_selection;
-      }
     }
   }
 
