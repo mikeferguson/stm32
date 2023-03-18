@@ -209,16 +209,14 @@ void arm_sin_cos_f32(
   /* Scale the input, divide input by 360, for cosine add 0.25 (pi/2) to read sine table */
   in = theta * 0.00277777777778f;
 
-  /* Calculation of floor value of input */
-  n = (int32_t) in;
-
   /* Make negative values towards -infinity */
   if(in < 0.0f)
   {
-    n--;
+    in = -in;
   }
+
   /* Map input value to [0 1] */
-  in = in - (float32_t) n;
+  in = in - (int32_t) in;
 
   /* Calculation of index of the table */
   findex = (float32_t) FAST_MATH_TABLE_SIZE * in;
