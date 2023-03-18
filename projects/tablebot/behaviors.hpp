@@ -46,11 +46,39 @@
 // Distance to back up before making in-place 180 degree turn
 #define PHASE1_BACKUP_DISTANCE    0.15f
 
+// Phase 2 states
+#define PHASE2_SWEEP_LASER        0
+#define PHASE2_WAIT_LASER         1
+#define PHASE2_ASSEMBLE_SCAN      2
+#define PHASE2_ANALYZE_SCAN       3
+#define PHASE2_BLOCK_FOUND        4
+
 // TODO: find this value with laser
 #define TABLE_LENGTH      1.2192f
 
 uint16_t behavior_id = 0;
 uint8_t behavior_state = 0;
+
+int last_laser_start_angle;
+
+typedef struct
+{
+  float x;
+  float y;
+  float z;
+} point_t;
+
+point_t line_points[100];
+
+typedef struct
+{
+  point_t start;
+  point_t end;
+  int points;
+} line_segment_t;
+
+point_t block;
+line_segment_t segments[10];
 
 void set_motors(int16_t left, int16_t right)
 {
@@ -64,6 +92,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
   static float last_pose_x;
   static float last_pose_y;
   static float last_pose_th;
+
+  static uint32_t last_stable_stamp;
 
   if (id == MODE_UNSELECTED)
   {
@@ -184,7 +214,208 @@ void run_behavior(uint16_t id, uint32_t stamp)
   }
   else if (id == BEHAVIOR_ID_PHASE_2)
   {
+    if (behavior_state == PHASE2_SWEEP_LASER)
+    {
+      // Change laser angle as we search for block
+      if (system_state.neck_angle > 450 || system_state.neck_angle < 375)
+      {
+        move_neck(450);
+      }
+      else
+      {
+        move_neck(system_state.neck_angle - 10);
+      }
+      behavior_state = PHASE2_WAIT_LASER;
+      last_stable_stamp = 0;
+    }
+    else if (behavior_state == PHASE2_WAIT_LASER)
+    {
+      // Read neck angle
+      int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
+      if ((neck_angle > 0) && (neck_angle - system_state.neck_angle < 5) && (system_state.neck_angle - neck_angle < 5))
+      {
+        // Has settled - has a new laser scan started?
+        if (last_stable_stamp == 0)
+        {
+          last_stable_stamp = system_state.time;
+        }
+        else if (system_state.time - last_stable_stamp > 125)
+        {
+          behavior_state = PHASE2_ASSEMBLE_SCAN;
+          // Clear laser data
+          for (int i = 0; i < ASSEMBLED_SCAN_SIZE; ++i)
+          {
+            system_state.laser_data[i] = 0;
+            system_state.laser_angle[i] = INVALID_ANGLE;
+          }
+          last_laser_start_angle = -1;
+        }
+      }
+      else
+      {
+        // Command it again
+        move_neck(system_state.neck_angle);
+      }
+    }
+    else if (behavior_state == PHASE2_ASSEMBLE_SCAN)
+    {
+      // Compute in floating point and degrees to reduce discretization issues
+      float angle = latest_laser_packet.start_angle * 0.01f;
+      float end_angle = latest_laser_packet.end_angle * 0.01f;
+      float step = (end_angle - angle) / (MEASUREMENTS_PER_PACKET - 1);
+      if (angle > end_angle)
+      {
+        // This packet wraps around 0
+        step = (end_angle + 360.0f - angle) / (MEASUREMENTS_PER_PACKET - 1);
+      }
 
+      // Process packet if it is new (this loop can run faster than laser packets appear)
+      if (latest_laser_packet.start_angle != last_laser_start_angle)
+      {
+        // How many of these data points are new?
+        int new_data = 0;
+
+        for (int i = 0; i < MEASUREMENTS_PER_PACKET; ++i)
+        {
+          // Compute index within assembled scan
+          int idx = ((angle + 0.75f) / 360.0f) * (ASSEMBLED_SCAN_SIZE - 1);
+          if (idx >= ASSEMBLED_SCAN_SIZE) idx -= ASSEMBLED_SCAN_SIZE;
+          if (idx < 0) idx += ASSEMBLED_SCAN_SIZE;
+
+          if (system_state.laser_angle[idx] == INVALID_ANGLE)
+          {
+            // This is a new data point
+            ++new_data;
+            // Copy range measurement
+            system_state.laser_data[idx] = latest_laser_packet.data[i].range;
+            // Figure out exact angle
+            system_state.laser_angle[idx] = angle / 0.01f;  // Convert back to 0.01 degree steps
+            if (system_state.laser_angle[idx] > 36000)
+            {
+              system_state.laser_angle[idx] -= 36000;
+            }
+          }
+          angle += step;
+        }
+
+        // Note we have processed this packet
+        last_laser_start_angle = latest_laser_packet.start_angle;
+
+        if (new_data < 3)
+        {
+          // Have we analyzed the whole scan?
+          int empty_data = 0;
+          for (int i = 0; i < ASSEMBLED_SCAN_SIZE; ++i)
+          {
+            if (system_state.laser_angle[i] == INVALID_ANGLE)
+            {
+              ++empty_data;
+            }
+          }
+
+          if (empty_data < 20)
+          {
+            // We have filled in the whole scan
+            behavior_state = PHASE2_ANALYZE_SCAN;
+          }
+        }
+      }
+    }
+    else if (behavior_state == PHASE2_ANALYZE_SCAN)
+    {
+      // Determine where our neck is - AX12 has 1024 ticks over 300 degrees
+      float neck_angle = (512 - system_state.neck_angle) * (300.0f / 1023.0f);
+
+      float cos_neck, sin_neck;
+      arm_sin_cos_f32(neck_angle, &sin_neck, &cos_neck);
+
+      // Project points to table
+      int line_points_idx = 0;
+      for (int i = 300; i < 600; i += 2)
+      {
+        int laser_idx = i;
+        if (laser_idx >= ASSEMBLED_SCAN_SIZE)
+        {
+          laser_idx -= ASSEMBLED_SCAN_SIZE;
+        }
+
+        float dist_m = system_state.laser_data[laser_idx] * 0.001f;
+        float angle = system_state.laser_angle[laser_idx] * 0.01f;
+
+        if (angle > 360.0f || dist_m < 0.0001f)
+        {
+          // Not valid
+          continue;
+        }
+
+        float cos_angle, sin_angle;
+        arm_sin_cos_f32(-angle, &sin_angle, &cos_angle);
+
+        // Project to XY plane
+        float x = cos_angle * dist_m;
+        float y = sin_angle * dist_m;
+
+        // Now handle neck rotation
+        float xx = cos_neck * x;
+        float zz = -sin_neck * x + 0.127f;  // Neck is 5" off ground
+
+        if (zz < 0.2f && zz > -0.05f &&
+            y > -0.5f && y < 0.5f && x > 0.0f)
+        {
+          line_points[line_points_idx].x = xx;
+          line_points[line_points_idx].y = y;
+          line_points[line_points_idx].z = zz;
+          ++line_points_idx;
+        }
+      }
+
+      udp_send_packet((unsigned char *) &line_points, line_points_idx * 12, return_port);
+
+      // Now process segments
+      int segment_idx = 0;
+      int point_idx = 0;
+      segments[0].start = line_points[0];
+      segments[0].end = line_points[0];
+      segments[0].points = 1;
+      for (int i = 1; i < line_points_idx; ++i)
+      {
+        float dx = segments[segment_idx].end.x - line_points[i].x;
+        float dy = segments[segment_idx].end.y - line_points[i].y;
+
+        float d = dx * dx + dy * dy;
+        if (d < 0.0008f)
+        {
+          ++segments[segment_idx].points;
+          segments[segment_idx].end = line_points[i];
+        }
+        else
+        {
+          if (++segment_idx >= 10)
+          {
+            // Out of segments
+            break;
+          }
+          segments[segment_idx].start = line_points[i];
+          segments[segment_idx].end = line_points[i];
+          segments[segment_idx].points = 1;
+        }
+      }
+
+      if (segment_idx < 2)
+      {
+        // No block found
+        behavior_state = PHASE2_SWEEP_LASER;
+      }
+      else
+      {
+        // we got a possible block
+        behavior_state = PHASE2_SWEEP_LASER; //PHASE2_BLOCK_FOUND;
+      }
+    }
+    else if (behavior_state == PHASE2_BLOCK_FOUND)
+    {
+      // TODO: approach block
+    }
   }
   else if (id == BEHAVIOR_ID_PHASE_3)
   {

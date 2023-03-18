@@ -68,7 +68,6 @@ uint32_t last_packet;
 #define NECK_SERVO_ID     13
 #include "ax12.hpp"
 #include "select.hpp"
-#include "behaviors.hpp"
 
 // From IAP app note
 typedef  void (*pFunction)(void);
@@ -144,6 +143,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   // Free buffer
   pbuf_free(p);
 }
+
+// Located here so we can send packets from behaviors
+#include "behaviors.hpp"
 
 int udp_interface_init()
 {
@@ -268,8 +270,7 @@ int main(void)
   __enable_irq();
   error::low();  // Done with setup
 
-  system_state.neck_angle = 512;
-  ax12_set_register2(&usart2_parser, &usart2, NECK_SERVO_ID, AX_GOAL_POSITION_L, system_state.neck_angle);
+  move_neck(512);
 
   while(1)
   {
