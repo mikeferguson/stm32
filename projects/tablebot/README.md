@@ -48,3 +48,7 @@ NOTE: this uses the same bootloader as the Etherbotix board.
 ## Connecting to the board
 
     openocd -f interface/stlink-v2.cfg -f target/stm32f4x_stlink.cfg
+
+## Wireless Configuration
+
+The GL-AR300M16 is configured as 192.168.0.99
