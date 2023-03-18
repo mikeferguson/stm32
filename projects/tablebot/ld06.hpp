@@ -191,7 +191,6 @@ public:
 
           // Bad packet, return -1, set state to BUS_ERROR
           ++crc_errors_;
-          bad_crc = crc;
           state_ = BUS_ERROR;
           return -2;
         }
@@ -248,7 +247,6 @@ public:
   }
 
   ld06_packet_t packet;
-  uint8_t bad_crc;
 
 private:
   uint8_t state_;
