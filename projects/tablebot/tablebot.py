@@ -45,18 +45,11 @@ class TableBotGUI:
     TABLE_LENGTH = 1.2192
     TABLE_WIDTH = TABLE_LENGTH / 2.0
 
-    laser_data = [0 for i in range(450)]  # millimeters
-    laser_angle = [0 for i in range(450)]  # 0.01 degree steps
+    laser_data = list()
+
+    SCALE = 200.0
 
     def __init__(self):
-
-        # TODO: remove this fake data for test
-        self.laser_data = [500]
-        for i in range(449):
-            self.laser_data.append(self.laser_data[-1] + 1)
-        self.laser_angle = [0.0]
-        for i in range(449):
-            self.laser_angle.append(self.laser_angle[-1] + 0.8)
 
         # Setup comms to robot
         self.ip = "192.168.0.42"
@@ -96,7 +89,7 @@ class TableBotGUI:
 
         # State variables in vertical column on right of screen
         self.right_column = QtWidgets.QWidget()
-        self.right_column.setFixedWidth(200)
+        self.right_column.setFixedWidth(250)
         self.right_column_layout = QtWidgets.QVBoxLayout()
         self.right_column.setLayout(self.right_column_layout)
         self.right_column_layout.addWidget(self.state_label)
@@ -134,79 +127,98 @@ class TableBotGUI:
         self.window.setWindowTitle("TableBot")
         self.window.show()
 
-        self.color = QtCore.Qt.red
-
-    def update(self):
-
+    def request_updates(self):
+        # Request updates
         self.conn.sendto(b"\xffBOT", 0, (self.ip, self.port))
 
+    def handle_packets(self):
         # Read data back
-        t = time.time()
         while True:
             try:
                 packet = self.conn.recv(1024)
 
                 # TODO confirm header
-                
+
                 # Remove header
                 packet = packet[4:]
-                #if len(packet) != 1872:
-                #    print("Invalid packet size")
-                #    break
 
-                self.system_time = struct.unpack_from("<L", packet, 0)[0]
-                self.system_voltage = struct.unpack_from("<f", packet, 4)[0]
-                self.system_current = struct.unpack_from("<f", packet, 8)[0]
-                self.servo_current = struct.unpack_from("<f", packet, 12)[0]
+                if len(packet) == 76:
+                    # System state packet
+                    self.system_time = struct.unpack_from("<L", packet, 0)[0]
+                    self.system_voltage = struct.unpack_from("<f", packet, 4)[0]
+                    self.system_current = struct.unpack_from("<f", packet, 8)[0]
+                    self.servo_current = struct.unpack_from("<f", packet, 12)[0]
 
-                self.cliff_left = struct.unpack_from("<H", packet, 16)[0]
-                self.cliff_center = struct.unpack_from("<H", packet, 18)[0]
-                self.cliff_right = struct.unpack_from("<H", packet, 20)[0]
+                    self.cliff_left = struct.unpack_from("<H", packet, 16)[0]
+                    self.cliff_center = struct.unpack_from("<H", packet, 18)[0]
+                    self.cliff_right = struct.unpack_from("<H", packet, 20)[0]
 
-                self.accel_x = struct.unpack_from("<h", packet, 22)[0]
-                self.accel_y = struct.unpack_from("<h", packet, 24)[0]
-                self.accel_z = struct.unpack_from("<h", packet, 26)[0]
-                self.gyro_x = struct.unpack_from("<h", packet, 28)[0]
-                self.gyro_y = struct.unpack_from("<h", packet, 30)[0]
-                self.gyro_z = struct.unpack_from("<h", packet, 32)[0]
-                self.mag_x = struct.unpack_from("<h", packet, 34)[0]
-                self.mag_y = struct.unpack_from("<h", packet, 36)[0]
-                self.mag_z = struct.unpack_from("<h", packet, 38)[0]
+                    self.accel_x = struct.unpack_from("<h", packet, 22)[0]
+                    self.accel_y = struct.unpack_from("<h", packet, 24)[0]
+                    self.accel_z = struct.unpack_from("<h", packet, 26)[0]
+                    self.gyro_x = struct.unpack_from("<h", packet, 28)[0]
+                    self.gyro_y = struct.unpack_from("<h", packet, 30)[0]
+                    self.gyro_z = struct.unpack_from("<h", packet, 32)[0]
+                    self.mag_x = struct.unpack_from("<h", packet, 34)[0]
+                    self.mag_y = struct.unpack_from("<h", packet, 36)[0]
+                    self.mag_z = struct.unpack_from("<h", packet, 38)[0]
 
-                self.motor1_vel = struct.unpack_from("<h", packet, 40)[0]
-                self.motor2_vel = struct.unpack_from("<h", packet, 42)[0]
-                self.motor1_pos = struct.unpack_from("<i", packet, 44)[0]
-                self.motor2_pos = struct.unpack_from("<i", packet, 48)[0]
-                self.motor1_current = struct.unpack_from("<h", packet, 52)[0]
-                self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
+                    self.motor1_vel = struct.unpack_from("<h", packet, 40)[0]
+                    self.motor2_vel = struct.unpack_from("<h", packet, 42)[0]
+                    self.motor1_pos = struct.unpack_from("<i", packet, 44)[0]
+                    self.motor2_pos = struct.unpack_from("<i", packet, 48)[0]
+                    self.motor1_current = struct.unpack_from("<h", packet, 52)[0]
+                    self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
 
-                self.run_state = struct.unpack_from("<H", packet, 56)[0]
-                # 58 is unused
+                    self.run_state = struct.unpack_from("<H", packet, 56)[0]
+                    # 58 is unused
 
-                pose_x = struct.unpack_from("<f", packet, 60)[0]
-                pose_y = -struct.unpack_from("<f", packet, 64)[0]
-                pose_th = struct.unpack_from("<f", packet, 68)[0]
+                    pose_x = struct.unpack_from("<f", packet, 60)[0]
+                    pose_y = -struct.unpack_from("<f", packet, 64)[0]
+                    pose_th = struct.unpack_from("<f", packet, 68)[0]
 
-                if len(self.pose_x) == 0 or \
-                        abs(pose_x - self.pose_x[-1]) > 0.01 or \
-                        abs(pose_y - self.pose_y[-1]) > 0.01 or \
-                        abs(pose_th - self.pose_th[-1]) > 0.1:
-                    print(pose_x, pose_y, pose_th)
-                    self.pose_x.append(pose_x)
-                    self.pose_y.append(pose_y)
-                    self.pose_th.append(pose_th)
+                    if len(self.pose_x) == 0 or \
+                            abs(pose_x - self.pose_x[-1]) > 0.01 or \
+                            abs(pose_y - self.pose_y[-1]) > 0.01 or \
+                            abs(pose_th - self.pose_th[-1]) > 0.1:
+                        print(pose_x, pose_y, pose_th)
+                        self.pose_x.append(pose_x)
+                        self.pose_y.append(pose_y)
+                        self.pose_th.append(pose_th)
 
-                return;
+                elif len(packet) == 47:
+                    if len(self.pose_x) == 0:
+                        # Need a pose before we process laser data
+                        continue
 
-                for i in range(450):
-                    self.laser_data[i] = struct.unpack_from("<H", packet, 72 + i * 2)[0]
-                    self.laser_angle[i] = float(struct.unpack_from("<H", packet, 972 + i * 2)[0]) * 0.01
+                    # Laser packet
+                    start_angle = (struct.unpack_from("<H", packet, 4)[0]) * 0.01
+                    end_angle = (struct.unpack_from("<H", packet, 42)[0]) * 0.01
+                    step = (end_angle - start_angle) / 11.0
+
+                    for i in range(12):
+                        angle = -radians(start_angle)
+
+                        range_m = (struct.unpack_from("<H", packet, 6 + (i * 3))[0]) * 0.001
+                        x = range_m * cos(angle)
+                        y = range_m * sin(angle)
+
+                        # Get global coordinates
+                        gx = self.pose_x[-1] + (cos(self.pose_th[-1]) * x + sin(self.pose_th[-1]) * y)
+                        gy = self.pose_y[-1] + (-sin(self.pose_th[-1]) * x + cos(self.pose_th[-1]) * y)
+
+                        # Add the global point
+                        self.laser_data.append([gx, gy])
+
+                        # Increment for next point
+                        start_angle += step
+
+                    if len(self.laser_data) > 600:
+                        self.laser_data = self.laser_data[-600:]
 
             except socket.error as err:
-                #print(err)
-                if time.time() - t > 10:
-                    print("Failed to get return packet!")
-                    break
+                # Not an error to not have packets
+                break
 
     def refresh(self):
         self.time_value.setText("%i" % self.system_time)
@@ -217,61 +229,53 @@ class TableBotGUI:
         self.center_cliff.setText(self.getCliffValue(self.cliff_center))
         self.right_cliff.setText(self.getCliffValue(self.cliff_right))
 
-        #self.drawLidarScan()
-        self.drawPoseGraph()
-
-        self.window.update()
-
-    def drawPoseGraph(self):
         if len(self.pose_x) == 0:
             # Can't draw anything yet
             return
 
-        # Convert meters to pixels
-        SCALE = 600.0 / (self.TABLE_LENGTH * 1.5)
+        # Create a new canvas
+        canvas = QtGui.QPixmap(600, 600)
+        canvas.fill(QtCore.Qt.gray)
 
-        pen = QtGui.QPen()
-        pen.setWidth(4)
-        pen.setBrush(QtCore.Qt.red)
+        odom_pen = QtGui.QPen()
+        odom_pen.setWidth(4)
+        odom_pen.setBrush(QtCore.Qt.blue)
 
-        paint = QtGui.QPainter(self.map.pixmap())
+        paint = QtGui.QPainter(canvas)
 
-        # Draw poses
-        paint.setPen(pen)
-        offset_x = 300 + self.TABLE_LENGTH * SCALE / 2.0
+        # Y is always cented in view (and on table)
+        # X needs to shift down a bit to center table in view
+        offset_x = 300 + self.TABLE_LENGTH * self.SCALE / 2.0
+
+        # Draw odometry poses
+        paint.setPen(odom_pen)
         for i in range(len(self.pose_x)):
-            x = int(SCALE * self.pose_x[i])
-            y = int(SCALE * self.pose_y[i])
+            x = int(self.SCALE * self.pose_x[i])
+            y = int(self.SCALE * self.pose_y[i])
             paint.drawPoint(300 - y, offset_x - x)
 
         # Draw table
         table_pen = QtGui.QPen()
-        pen.setWidth(4)
-        pen.setBrush(QtCore.Qt.green)
-        paint.setPen(pen)
-        x = self.TABLE_LENGTH * SCALE / 2.0
-        y = self.TABLE_WIDTH * SCALE / 2.0
+        table_pen.setWidth(4)
+        table_pen.setBrush(QtCore.Qt.green)
+        paint.setPen(table_pen)
+        x = self.TABLE_LENGTH * self.SCALE / 2.0
+        y = self.TABLE_WIDTH * self.SCALE / 2.0
         paint.drawRect(300 - y, 300 - x, 2 * y, 2 * x)
 
+        data_pen = QtGui.QPen()
+        data_pen.setWidth(4)
+        data_pen.setBrush(QtCore.Qt.red)
+
+        paint.setPen(data_pen)
+        for point in self.laser_data:
+            x = int(self.SCALE * point[0])
+            y = int(self.SCALE * point[1])
+            paint.drawPoint(300 - y, offset_x - x)
         paint.end()
 
-
-    def drawLidarScan(self):
-        # Convert millimeters to pixels
-        SCALE = 0.2
-
-        pen = QtGui.QPen()
-        pen.setWidth(4)
-        pen.setBrush(self.color)
-
-        paint = QtGui.QPainter(self.map.pixmap())
-        paint.setPen(pen)
-        for i in range(450):
-            angle = radians(self.laser_angle[i])
-            x = int(SCALE * self.laser_data[i] * sin(angle))
-            y = int(SCALE * self.laser_data[i] * cos(angle))
-            paint.drawPoint(300 + x, 300 - y)
-        paint.end()
+        self.map.setPixmap(canvas)
+        self.window.update()
 
     def getCliffValue(self, value):
         if value < 1500:
@@ -300,10 +304,15 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     gui = TableBotGUI()
 
-    # Read data at 10hz
+    # Request data at 10hz
     read_board = QtCore.QTimer()
-    read_board.timeout.connect(gui.update)
+    read_board.timeout.connect(gui.request_updates)
     read_board.start(100)
+
+    # Process data at 100hz
+    handle_packets = QtCore.QTimer()
+    handle_packets.timeout.connect(gui.handle_packets)
+    handle_packets.start(10)
 
     # Start refresh timer at 10hz
     update_map = QtCore.QTimer()

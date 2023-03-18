@@ -63,6 +63,7 @@ system_state_t system_state;
 struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
+uint32_t last_packet;
 
 #include "select.hpp"
 #include "behaviors.hpp"
@@ -106,6 +107,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   // Update return data
   return_ipaddr = *addr;
   return_port = port;
+  last_packet = system_state.time;
 
   // Send packet with just the table, no laser data
   udp_send_packet((unsigned char *) &system_state, sizeof(system_state) - 1800, return_port);
@@ -291,6 +293,13 @@ int main(void)
     if (length > 0)
     {
       latest_laser_packet = laser.packet;
+
+      // Send debugging packets
+      if (system_state.time - last_packet < 1000)
+      {
+        udp_send_packet((unsigned char *) &latest_laser_packet, sizeof(latest_laser_packet), return_port);
+      }
+
       /*
       // Parse packet into global view
       float angle = laser.packet.start_angle * 0.01f;
