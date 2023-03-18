@@ -364,8 +364,8 @@ void SysTick_Handler(void)
     else
     {
       // Motors have timed out
-      m1.set(0);
-      m2.set(0);
+      m1.disable();
+      m2.disable();
       m1_pid.reset();
       m2_pid.reset();
     }

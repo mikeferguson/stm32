@@ -78,8 +78,14 @@ public:
     EN::high();
   }
 
+  void disable()
+  {
+    EN::low();
+  }
+
   void set(int16_t pwm)
   {
+    EN::high();
     if (pwm >= 0)
     {
       if (pwm >= resolution_)
