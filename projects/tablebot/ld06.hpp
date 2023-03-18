@@ -49,7 +49,6 @@
 #define MAXIMUM_LASER_SPEED       3800
 
 #define MEASUREMENTS_PER_PACKET   12
-#define INVALID_ANGLE             45000
 
 /*
  * LD06 Packet structures

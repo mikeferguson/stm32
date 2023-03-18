@@ -59,8 +59,6 @@
 uint16_t behavior_id = 0;
 uint8_t behavior_state = 0;
 
-int last_laser_start_angle;
-
 typedef struct
 {
   float x;
@@ -93,6 +91,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
   static float last_pose_y;
   static float last_pose_th;
 
+  static uint32_t latest_scan;
   static uint32_t last_stable_stamp;
 
   if (id == MODE_UNSELECTED)
@@ -242,13 +241,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         else if (system_state.time - last_stable_stamp > 125)
         {
           behavior_state = PHASE2_ASSEMBLE_SCAN;
-          // Clear laser data
-          for (int i = 0; i < ASSEMBLED_SCAN_SIZE; ++i)
-          {
-            system_state.laser_data[i] = 0;
-            system_state.laser_angle[i] = INVALID_ANGLE;
-          }
-          last_laser_start_angle = -1;
+          latest_scan = assembler.scans_created;
         }
       }
       else
@@ -259,66 +252,9 @@ void run_behavior(uint16_t id, uint32_t stamp)
     }
     else if (behavior_state == PHASE2_ASSEMBLE_SCAN)
     {
-      // Compute in floating point and degrees to reduce discretization issues
-      float angle = latest_laser_packet.start_angle * 0.01f;
-      float end_angle = latest_laser_packet.end_angle * 0.01f;
-      float step = (end_angle - angle) / (MEASUREMENTS_PER_PACKET - 1);
-      if (angle > end_angle)
+      if (assembler.scans_created > latest_scan + 2)
       {
-        // This packet wraps around 0
-        step = (end_angle + 360.0f - angle) / (MEASUREMENTS_PER_PACKET - 1);
-      }
-
-      // Process packet if it is new (this loop can run faster than laser packets appear)
-      if (latest_laser_packet.start_angle != last_laser_start_angle)
-      {
-        // How many of these data points are new?
-        int new_data = 0;
-
-        for (int i = 0; i < MEASUREMENTS_PER_PACKET; ++i)
-        {
-          // Compute index within assembled scan
-          int idx = ((angle + 0.75f) / 360.0f) * (ASSEMBLED_SCAN_SIZE - 1);
-          if (idx >= ASSEMBLED_SCAN_SIZE) idx -= ASSEMBLED_SCAN_SIZE;
-          if (idx < 0) idx += ASSEMBLED_SCAN_SIZE;
-
-          if (system_state.laser_angle[idx] == INVALID_ANGLE)
-          {
-            // This is a new data point
-            ++new_data;
-            // Copy range measurement
-            system_state.laser_data[idx] = latest_laser_packet.data[i].range;
-            // Figure out exact angle
-            system_state.laser_angle[idx] = angle / 0.01f;  // Convert back to 0.01 degree steps
-            if (system_state.laser_angle[idx] > 36000)
-            {
-              system_state.laser_angle[idx] -= 36000;
-            }
-          }
-          angle += step;
-        }
-
-        // Note we have processed this packet
-        last_laser_start_angle = latest_laser_packet.start_angle;
-
-        if (new_data < 3)
-        {
-          // Have we analyzed the whole scan?
-          int empty_data = 0;
-          for (int i = 0; i < ASSEMBLED_SCAN_SIZE; ++i)
-          {
-            if (system_state.laser_angle[i] == INVALID_ANGLE)
-            {
-              ++empty_data;
-            }
-          }
-
-          if (empty_data < 20)
-          {
-            // We have filled in the whole scan
-            behavior_state = PHASE2_ANALYZE_SCAN;
-          }
-        }
+        behavior_state = PHASE2_ANALYZE_SCAN;
       }
     }
     else if (behavior_state == PHASE2_ANALYZE_SCAN)
@@ -339,8 +275,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
           laser_idx -= ASSEMBLED_SCAN_SIZE;
         }
 
-        float dist_m = system_state.laser_data[laser_idx] * 0.001f;
-        float angle = system_state.laser_angle[laser_idx] * 0.01f;
+        float dist_m = assembler.data[laser_idx] * 0.001f;
+        float angle = assembler.angles[laser_idx] * 0.01f;
 
         if (angle > 360.0f || dist_m < 0.0001f)
         {

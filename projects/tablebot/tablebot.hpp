@@ -152,9 +152,6 @@ inline void setup_gpio_ethernet()
   eth_mdc::mode(GPIO_ALTERNATE | GPIO_AF_ETH);
 }
 
-// We expect about 450 points per rotation (4500/10hz)
-#define ASSEMBLED_SCAN_SIZE     450
-
 // Storage of system data
 typedef struct
 {
@@ -194,10 +191,6 @@ typedef struct
   float pose_th;
 
   uint32_t last_motor_command;
-
-  // 360 Laser View
-  uint16_t laser_data[ASSEMBLED_SCAN_SIZE];
-  uint16_t laser_angle[ASSEMBLED_SCAN_SIZE];
 } system_state_t;
 
 // Encoder is E4P-100-079-D-H-T-B
