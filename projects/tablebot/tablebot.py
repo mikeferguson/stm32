@@ -42,11 +42,14 @@ class TableBotGUI:
     pose_y = list()
     pose_th = list()
 
+    # Table size in meters
+    # TODO: read this from firmware
     TABLE_LENGTH = 1.2192
     TABLE_WIDTH = TABLE_LENGTH / 2.0
 
     laser_data = list()
 
+    # Used to convert meters into pixels
     SCALE = 200.0
 
     def __init__(self):
@@ -229,53 +232,77 @@ class TableBotGUI:
         self.center_cliff.setText(self.getCliffValue(self.cliff_center))
         self.right_cliff.setText(self.getCliffValue(self.cliff_right))
 
-        if len(self.pose_x) == 0:
-            # Can't draw anything yet
-            return
-
-        # Create a new canvas
+        # Create a new canvas and painter
         canvas = QtGui.QPixmap(600, 600)
         canvas.fill(QtCore.Qt.gray)
-
-        odom_pen = QtGui.QPen()
-        odom_pen.setWidth(4)
-        odom_pen.setBrush(QtCore.Qt.blue)
-
         paint = QtGui.QPainter(canvas)
-
-        # Y is always cented in view (and on table)
-        # X needs to shift down a bit to center table in view
-        offset_x = 300 + self.TABLE_LENGTH * self.SCALE / 2.0
-
-        # Draw odometry poses
-        paint.setPen(odom_pen)
-        for i in range(len(self.pose_x)):
-            x = int(self.SCALE * self.pose_x[i])
-            y = int(self.SCALE * self.pose_y[i])
-            paint.drawPoint(300 - y, offset_x - x)
+        paint.setRenderHint(QtGui.QPainter.HighQualityAntialiasing)
 
         # Draw table
         table_pen = QtGui.QPen()
         table_pen.setWidth(4)
-        table_pen.setBrush(QtCore.Qt.green)
+        table_pen.setBrush(QtCore.Qt.darkGray)
         paint.setPen(table_pen)
-        x = self.TABLE_LENGTH * self.SCALE / 2.0
-        y = self.TABLE_WIDTH * self.SCALE / 2.0
-        paint.drawRect(300 - y, 300 - x, 2 * y, 2 * x)
+        paint.setBrush(QtGui.QBrush(QtCore.Qt.darkGray, QtCore.Qt.SolidPattern))
+        x = int(self.TABLE_LENGTH * self.SCALE / 2.0)
+        y = int(self.TABLE_WIDTH * self.SCALE / 2.0)
+        paint.drawRoundedRect(300 - y, 300 - x, 2 * y, 2 * x, 5, 5)
 
-        data_pen = QtGui.QPen()
-        data_pen.setWidth(4)
-        data_pen.setBrush(QtCore.Qt.red)
+        # If we have pose and laser data
+        if len(self.pose_x) > 0:
+            # Y is always cented in view (and on table)
+            # X needs to shift down a bit to center table in view
+            self.offset_x = int(300 + self.TABLE_LENGTH * self.SCALE / 2.0)
 
-        paint.setPen(data_pen)
-        for point in self.laser_data:
-            x = int(self.SCALE * point[0])
-            y = int(self.SCALE * point[1])
-            paint.drawPoint(300 - y, offset_x - x)
+            # Draw odometry poses
+            odom_pen = QtGui.QPen()
+            odom_pen.setWidth(4)
+            odom_pen.setBrush(QtCore.Qt.blue)
+            paint.setPen(odom_pen)
+            for i in range(len(self.pose_x)):
+                x = int(self.SCALE * self.pose_x[i])
+                y = int(self.SCALE * self.pose_y[i])
+                paint.drawPoint(300 - y, self.offset_x - x)
+
+            # Draw robot origin axis
+            self.drawAxis(self.pose_x[-1], self.pose_y[-1], self.pose_th[-1], paint)
+
+            # Draw laser data
+            data_pen = QtGui.QPen()
+            data_pen.setWidth(4)
+            data_pen.setBrush(QtCore.Qt.red)
+            paint.setPen(data_pen)
+            for point in self.laser_data:
+                x = int(self.SCALE * point[0])
+                y = int(self.SCALE * point[1])
+                paint.drawPoint(300 - y, self.offset_x - x)
+
         paint.end()
-
         self.map.setPixmap(canvas)
         self.window.update()
+
+    def drawAxis(self, x_m, y_m, th, paint):
+        length = self.SCALE * 0.2
+
+        x_pen = QtGui.QPen()
+        x_pen.setWidth(2)
+        x_pen.setBrush(QtCore.Qt.red)
+        paint.setPen(x_pen)
+
+        x = int(self.SCALE * x_m)
+        y = int(self.SCALE * y_m)
+        xx = x + int(length * cos(th))
+        yy = y + int(length * sin(th))
+        paint.drawLine(300 - y, self.offset_x - x, 300 - yy, self.offset_x - xx)
+
+        y_pen = QtGui.QPen()
+        y_pen.setWidth(2)
+        y_pen.setBrush(QtCore.Qt.green)
+        paint.setPen(y_pen)
+
+        xx = x + int(-length * sin(th))
+        yy = y + int(length * cos(th))
+        paint.drawLine(300 - y, self.offset_x - x, 300 - yy, self.offset_x - xx)
 
     def getCliffValue(self, value):
         if value < 1500:
