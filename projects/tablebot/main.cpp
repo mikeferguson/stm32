@@ -239,10 +239,10 @@ int main(void)
   right_cliff::mode(GPIO_INPUT_ANALOG);
 
   // Laser interface - temporarily disabled
-  //RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
-  //laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  //laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
-  //laser.init(&usart3);
+  RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
+  laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
+  laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
+  laser.init(&usart3);
 
   // Start button
   start_button::mode(GPIO_INPUT);
@@ -286,11 +286,12 @@ int main(void)
 
     // Attempt to read from laser data
     // From scope: this takes 2-8uS, and loop runs about 3.7khz (3/8/2023)
-    /*
     d6::high();
     int8_t length = laser.update(&usart3, system_state.time);
     if (length > 0)
     {
+      latest_laser_packet = laser.packet;
+      /*
       // Parse packet into global view
       float angle = laser.packet.start_angle * 0.01f;
       float end_angle = laser.packet.end_angle * 0.01f;
@@ -304,13 +305,13 @@ int main(void)
         system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
         angle += step;
       }
+      */
     }
     else if (length < 0)
     {
       laser.reset(&usart3);
     }
     d6::low();
-    */
 
     run_behavior(system_state.run_state, system_state.time);
   }

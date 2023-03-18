@@ -35,10 +35,18 @@
  *       driver is hardcoded to 12 readings per packet.
  *
  * Since each packet has 12 readings in it, we expect 375 packets per second
- * (each packet being 45 bytes). This is 16875 bytes per second.
+ * (each packet being 47 bytes). This is 17625 bytes per second.
  */
  #define EXPECTED_LENGTH_BYTE     0x2C
- #define EXPECTED_PACKET_LENGTH   (9 + 3 * 12)
+ #define EXPECTED_PACKET_LENGTH   (11 + 3 * 12)
+
+// Timeout in milliseconds
+#define LASER_TIMEOUT             10
+
+// Desire laser speed is 10hz - 3600
+#define DESIRED_LASER_SPEED       3600
+#define MINIMUM_LASER_SPEED       3400
+#define MAXIMUM_LASER_SPEED       3800
 
 /*
  * LD06 Packet structures
@@ -49,7 +57,7 @@ typedef struct __attribute__((packed))
   uint8_t confidence;       // Around 200 for white objects within 6m
 } ld06_measurement_t;
 
-typedef struct __attribute__((packed, aligned(sizeof(uint32_t))))
+typedef struct __attribute__((packed))
 {
   uint8_t start_byte;       // Always 0x54
   uint8_t length;           // Lower 5 bits are number of data measurements
@@ -57,6 +65,7 @@ typedef struct __attribute__((packed, aligned(sizeof(uint32_t))))
   uint16_t start_angle;     // Angle in 0.01 degree increments, 0 is forward
   ld06_measurement_t data[12];
   uint16_t end_angle;       // Angle in 0.01 degree increments, 0 is forward
+  uint16_t timestamp;       // In milliseconds
   uint8_t crc;
 } ld06_packet_t;
 
@@ -105,11 +114,8 @@ public:
   LD06()
   {
     state_ = BUS_READING_START;
-    timeout_ = 10;
-    packets_ = errors_ = timeouts_ = 0;
-
-    // Packet size is 9 + 3 * 12 = 45, then aligned to 32-bits
-    static_assert(sizeof(ld06_packet_t) == (9 + 3 * 12 + 3));
+    packets_ = errors_ = crc_errors_ = timeouts_ = 0;
+    static_assert(sizeof(ld06_packet_t) == (EXPECTED_PACKET_LENGTH));
   }
 
   void init(T* bus)
@@ -126,7 +132,8 @@ public:
     // Enable CH2
     TIM12->CCER = TIM_CCER_CC2E;
     // 40% should be about 10hz rotation
-    TIM12->CCR2  = 560;
+    control_pwm_ = 560;
+    TIM12->CCR2  = control_pwm_;
     TIM12->CR1 |= TIM_CR1_CEN;  // Enable
   }
 
@@ -151,8 +158,8 @@ public:
       if (state_ == BUS_READING_DATA)
       {
         // The most used state_, so we put it first.
-        unsigned char * x = (unsigned char *) &packet;
-        x[data_idx_++] = b;
+        unsigned char * data = (unsigned char *) &packet;
+        data[data_idx_++] = b;
         if (data_idx_ == EXPECTED_PACKET_LENGTH)
         {
           // Next state will be starting again
@@ -160,9 +167,9 @@ public:
 
           // Compute CRC
           uint8_t crc = 0;
-          for (unsigned int i = 0; i < EXPECTED_PACKET_LENGTH; ++i)
+          for (uint32_t i = 0; i < EXPECTED_PACKET_LENGTH - 1; i++)
           {
-            crc = ld06_crc_table[(crc ^ x[i]) & 0xff];
+            crc = ld06_crc_table[(crc ^ data[i]) & 0xff];
           }
 
           // Check CRC is correct
@@ -170,14 +177,23 @@ public:
           {
             ++packets_;
             last_speed_ = packet.radar_speed;
-            // TODO: Add feedback loop for PWM
+            if (last_speed_ < MINIMUM_LASER_SPEED)
+            {
+              control_pwm_ += 1;
+            }
+            else if (last_speed_ > MAXIMUM_LASER_SPEED)
+            {
+              control_pwm_ -= 1;
+            }
+            TIM12->CCR2 = control_pwm_;
             return EXPECTED_PACKET_LENGTH;
           }
 
-          // Else return -1 if bad, state to BUS_ERROR
-          ++errors_;
+          // Bad packet, return -1, set state to BUS_ERROR
+          ++crc_errors_;
+          bad_crc = crc;
           state_ = BUS_ERROR;
-          return -1;
+          return -2;
         }
       }
       else if (state_ == BUS_READING_START)
@@ -195,6 +211,8 @@ public:
         {
           // Not the right value - error
           state_ = BUS_ERROR;
+          ++errors_;
+          return -1;
         }
         // Reset data index
         data_idx_ = 2;
@@ -204,7 +222,7 @@ public:
     }
 
     // If we got here, no packet this time around, should we timeout?
-    if (ms > last_byte_ + timeout_)
+    if (ms > last_byte_ + LASER_TIMEOUT)
     {
       if (state_ != BUS_ERROR)
       {
@@ -230,21 +248,20 @@ public:
   }
 
   ld06_packet_t packet;
+  uint8_t bad_crc;
 
 private:
   uint8_t state_;
   uint8_t data_idx_;     // Index within data to write next byte
-
-  uint8_t checksum_;     // Scratch workspace for computing checksum
-
   uint32_t last_byte_;   // Timestamp of last byte
-  uint32_t timeout_;     // Timeout after which we abort packet
 
   uint32_t packets_;     // Error counters for debugging
   uint32_t timeouts_;
   uint32_t errors_;
+  uint32_t crc_errors_;
 
   uint16_t last_speed_;  // For control loop
+  uint16_t control_pwm_;
 };
 
 #endif  // _TABLEBOT_LD06_HPP_
