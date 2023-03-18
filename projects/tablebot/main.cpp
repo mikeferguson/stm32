@@ -65,6 +65,8 @@ struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
 uint32_t last_packet;
 
+#define NECK_SERVO_ID     13
+#include "ax12.hpp"
 #include "select.hpp"
 #include "behaviors.hpp"
 
@@ -161,7 +163,8 @@ int main(void)
   // Setup system state
   system_state.time = 0;
   system_state.run_state = MODE_UNSELECTED;
-  system_state.pose_x = 0.0f;
+  system_state.neck_angle = 0;
+  system_state.pose_x = 0.15f;
   system_state.pose_y = 0.0f;
   system_state.pose_th = 0.0f;
   system_state.last_motor_command = 0;
@@ -264,6 +267,9 @@ int main(void)
 
   __enable_irq();
   error::low();  // Done with setup
+
+  system_state.neck_angle = 512;
+  ax12_set_register2(&usart2_parser, &usart2, NECK_SERVO_ID, AX_GOAL_POSITION_L, system_state.neck_angle);
 
   while(1)
   {

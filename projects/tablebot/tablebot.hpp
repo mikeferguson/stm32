@@ -184,7 +184,7 @@ typedef struct
   int16_t motor2_current;
 
   uint16_t run_state;
-  uint16_t reserved;
+  uint16_t neck_angle;
 
   float pose_x;
   float pose_y;

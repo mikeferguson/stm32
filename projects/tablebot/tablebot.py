@@ -37,6 +37,7 @@ class TableBotGUI:
     motor2_current = 0
 
     run_state = 0
+    neck_angle = 0
 
     pose_x = list()
     pose_y = list()
@@ -78,14 +79,17 @@ class TableBotGUI:
         self.run_state_value = QtWidgets.QLabel(text="NONE")
         self.run_state_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
-        self.left_cliff = QtWidgets.QLabel(text="0")
-        self.left_cliff.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self.cliff_left_value = QtWidgets.QLabel(text="0")
+        self.cliff_left_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
-        self.center_cliff = QtWidgets.QLabel(text="0")
-        self.center_cliff.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self.cliff_center_value = QtWidgets.QLabel(text="0")
+        self.cliff_center_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
-        self.right_cliff = QtWidgets.QLabel(text="0")
-        self.right_cliff.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self.cliff_right_value = QtWidgets.QLabel(text="0")
+        self.cliff_right_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+        self.neck_angle_value = QtWidgets.QLabel(text="0")
+        self.neck_angle_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         # TODO: IMU state
         # TODO: motor state
@@ -108,11 +112,13 @@ class TableBotGUI:
         self.status_layout.addWidget(QtWidgets.QLabel(text="System State"), 3, 0)
         self.status_layout.addWidget(self.run_state_value, 3, 1)
         self.status_layout.addWidget(QtWidgets.QLabel(text="Left Cliff"), 4, 0)
-        self.status_layout.addWidget(self.left_cliff, 4, 1)
+        self.status_layout.addWidget(self.cliff_left_value, 4, 1)
         self.status_layout.addWidget(QtWidgets.QLabel(text="Center Cliff"), 5, 0)
-        self.status_layout.addWidget(self.center_cliff, 5, 1)
+        self.status_layout.addWidget(self.cliff_center_value, 5, 1)
         self.status_layout.addWidget(QtWidgets.QLabel(text="Right Cliff"), 6, 0)
-        self.status_layout.addWidget(self.right_cliff, 6, 1)
+        self.status_layout.addWidget(self.cliff_right_value, 6, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Neck Angle"), 7, 0)
+        self.status_layout.addWidget(self.neck_angle_value, 7, 1)
         self.right_column_layout.addLayout(self.status_layout)
         self.right_column_layout.addStretch()
 
@@ -174,7 +180,7 @@ class TableBotGUI:
                     self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
 
                     self.run_state = struct.unpack_from("<H", packet, 56)[0]
-                    # 58 is unused
+                    self.neck_angle = struct.unpack_from("<H", packet, 58)[0]
 
                     pose_x = struct.unpack_from("<f", packet, 60)[0]
                     pose_y = struct.unpack_from("<f", packet, 64)[0]
@@ -219,6 +225,9 @@ class TableBotGUI:
                     if len(self.laser_data) > 600:
                         self.laser_data = self.laser_data[-600:]
 
+                else:
+                    print("Got packet of length %i" % len(packet))
+
             except socket.error as err:
                 # Not an error to not have packets
                 break
@@ -228,9 +237,10 @@ class TableBotGUI:
         self.voltage_value.setText("%.3f" % self.system_voltage)
         self.current_value.setText("%.3f" % self.system_current)
         self.run_state_value.setText(self.getRunStateValue(self.run_state))
-        self.left_cliff.setText(self.getCliffValue(self.cliff_left))
-        self.center_cliff.setText(self.getCliffValue(self.cliff_center))
-        self.right_cliff.setText(self.getCliffValue(self.cliff_right))
+        self.cliff_left_value.setText(self.getCliffValue(self.cliff_left))
+        self.cliff_center_value.setText(self.getCliffValue(self.cliff_center))
+        self.cliff_right_value.setText(self.getCliffValue(self.cliff_right))
+        self.neck_angle_value.setText(str(self.neck_angle))
 
         # Create a new canvas and painter
         canvas = QtGui.QPixmap(600, 600)
