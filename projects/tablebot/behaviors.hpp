@@ -31,11 +31,11 @@
 #define _TABLEBOT_BEHAVIORS_HPP_
 
 // Phase 1 = drive to end of table and back
-#define BEHAVIOR_ID_PHASE_1   1
+#define BEHAVIOR_ID_PHASE_1       1
 // Phase 2 = find the cube, push it off the table
-#define BEHAVIOR_ID_PHASE_2   2
+#define BEHAVIOR_ID_PHASE_2       2
 // Phase 3 = find the cube, push it into the box
-#define BEHAVIOR_ID_PHASE_3   3
+#define BEHAVIOR_ID_PHASE_3       3
 
 // Phase 1 states
 #define PHASE1_DRIVE_TOWARDS_END  0
@@ -47,36 +47,24 @@
 #define PHASE1_BACKUP_DISTANCE    0.15f
 
 // Phase 2 states
-#define PHASE2_SWEEP_LASER        0
-#define PHASE2_WAIT_LASER         1
+#define PHASE2_SWEEP_NECK         0
+#define PHASE2_WAIT_NECK          1
 #define PHASE2_ASSEMBLE_SCAN      2
 #define PHASE2_ANALYZE_SCAN       3
 #define PHASE2_BLOCK_FOUND        4
 
 // TODO: find this value with laser
-#define TABLE_LENGTH      1.2192f
+#define TABLE_LENGTH              1.2192f
 
 uint16_t behavior_id = 0;
 uint8_t behavior_state = 0;
 
-typedef struct
-{
-  float x;
-  float y;
-  float z;
-} point_t;
+#include "segmentation.hpp"
 
-point_t line_points[100];
-
-typedef struct
-{
-  point_t start;
-  point_t end;
-  int points;
-} line_segment_t;
-
-point_t block;
-line_segment_t segments[10];
+#define MAX_POINTS 300
+#define MAX_SEGMENTS 10
+point_t line_points[MAX_POINTS];
+line_segment_t segments[MAX_SEGMENTS];
 
 void set_motors(int16_t left, int16_t right)
 {
@@ -121,6 +109,11 @@ void run_behavior(uint16_t id, uint32_t stamp)
 
   if (id == BEHAVIOR_ID_PHASE_1)
   {
+    /******************************************************
+     *                                                    *
+     *                      PHASE 1                       *
+     *                                                    *
+     ******************************************************/
     if (behavior_state == PHASE1_DRIVE_TOWARDS_END)
     {
       // If we see the cliff, stop and transition to next state
@@ -213,7 +206,12 @@ void run_behavior(uint16_t id, uint32_t stamp)
   }
   else if (id == BEHAVIOR_ID_PHASE_2)
   {
-    if (behavior_state == PHASE2_SWEEP_LASER)
+    /******************************************************
+     *                                                    *
+     *                      PHASE 2                       *
+     *                                                    *
+     ******************************************************/
+    if (behavior_state == PHASE2_SWEEP_NECK)
     {
       // Change laser angle as we search for block
       if (system_state.neck_angle > 450 || system_state.neck_angle < 375)
@@ -222,12 +220,12 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-        move_neck(system_state.neck_angle - 10);
+        move_neck(system_state.neck_angle - 5);
       }
-      behavior_state = PHASE2_WAIT_LASER;
+      behavior_state = PHASE2_WAIT_NECK;
       last_stable_stamp = 0;
     }
-    else if (behavior_state == PHASE2_WAIT_LASER)
+    else if (behavior_state == PHASE2_WAIT_NECK)
     {
       // Read neck angle
       int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
@@ -252,6 +250,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
     }
     else if (behavior_state == PHASE2_ASSEMBLE_SCAN)
     {
+      // Wait until a new scan is definitely assembled
       if (assembler.scans_created > latest_scan + 2)
       {
         behavior_state = PHASE2_ANALYZE_SCAN;
@@ -259,93 +258,22 @@ void run_behavior(uint16_t id, uint32_t stamp)
     }
     else if (behavior_state == PHASE2_ANALYZE_SCAN)
     {
-      // Determine where our neck is - AX12 has 1024 ticks over 300 degrees
-      float neck_angle = (512 - system_state.neck_angle) * (300.0f / 1023.0f);
+      int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, -0.1f, 0.2f);
 
-      float cos_neck, sin_neck;
-      arm_sin_cos_f32(neck_angle, &sin_neck, &cos_neck);
-
-      // Project points to table
-      int line_points_idx = 0;
-      for (int i = 300; i < 600; i += 2)
-      {
-        int laser_idx = i;
-        if (laser_idx >= ASSEMBLED_SCAN_SIZE)
-        {
-          laser_idx -= ASSEMBLED_SCAN_SIZE;
-        }
-
-        float dist_m = assembler.data[laser_idx] * 0.001f;
-        float angle = assembler.angles[laser_idx] * 0.01f;
-
-        if (angle > 360.0f || dist_m < 0.0001f)
-        {
-          // Not valid
-          continue;
-        }
-
-        float cos_angle, sin_angle;
-        arm_sin_cos_f32(-angle, &sin_angle, &cos_angle);
-
-        // Project to XY plane
-        float x = cos_angle * dist_m;
-        float y = sin_angle * dist_m;
-
-        // Now handle neck rotation
-        float xx = cos_neck * x;
-        float zz = -sin_neck * x + 0.127f;  // Neck is 5" off ground
-
-        if (zz < 0.2f && zz > -0.05f &&
-            y > -0.5f && y < 0.5f && x > 0.0f)
-        {
-          line_points[line_points_idx].x = xx;
-          line_points[line_points_idx].y = y;
-          line_points[line_points_idx].z = zz;
-          ++line_points_idx;
-        }
-      }
-
-      udp_send_packet((unsigned char *) &line_points, line_points_idx * 12, return_port);
+      udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port);
 
       // Now process segments
-      int segment_idx = 0;
-      int point_idx = 0;
-      segments[0].start = line_points[0];
-      segments[0].end = line_points[0];
-      segments[0].points = 1;
-      for (int i = 1; i < line_points_idx; ++i)
-      {
-        float dx = segments[segment_idx].end.x - line_points[i].x;
-        float dy = segments[segment_idx].end.y - line_points[i].y;
-
-        float d = dx * dx + dy * dy;
-        if (d < 0.0008f)
-        {
-          ++segments[segment_idx].points;
-          segments[segment_idx].end = line_points[i];
-        }
-        else
-        {
-          if (++segment_idx >= 10)
-          {
-            // Out of segments
-            break;
-          }
-          segments[segment_idx].start = line_points[i];
-          segments[segment_idx].end = line_points[i];
-          segments[segment_idx].points = 1;
-        }
-      }
-
-      if (segment_idx < 2)
+      int segment_ct = extract_segments(line_points, points_ct,
+                                        segments, MAX_SEGMENTS, 0.0008f);
+      if (segment_ct < 2)
       {
         // No block found
-        behavior_state = PHASE2_SWEEP_LASER;
+        behavior_state = PHASE2_SWEEP_NECK;
       }
       else
       {
         // we got a possible block
-        behavior_state = PHASE2_SWEEP_LASER; //PHASE2_BLOCK_FOUND;
+        behavior_state = PHASE2_SWEEP_NECK; //PHASE2_BLOCK_FOUND;
       }
     }
     else if (behavior_state == PHASE2_BLOCK_FOUND)
@@ -355,7 +283,11 @@ void run_behavior(uint16_t id, uint32_t stamp)
   }
   else if (id == BEHAVIOR_ID_PHASE_3)
   {
-
+    /******************************************************
+     *                                                    *
+     *                      PHASE 3                       *
+     *                                                    *
+     ******************************************************/
   }
 }
 

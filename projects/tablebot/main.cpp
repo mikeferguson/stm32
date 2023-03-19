@@ -334,8 +334,8 @@ void SysTick_Handler(void)
 
   // Get system/servo currents:
   //   ACS711: vcc/2 = 0A, 55mV/A
-  system_state.current = ((adc1.get_channel3()-2048.0f)/4096.0f) * 3.3f / 0.055f;
-  system_state.servo_current = ((adc1.get_channel2()-2048.0f)/4096.0f) * 3.3f / 0.055f;
+  system_state.current = ((adc1.get_channel3() - 2048.0f) / 4096.0f) * 3.3f / 0.055f;
+  system_state.servo_current = ((adc1.get_channel2() - 2048.0f) / 4096.0f) * 3.3f / 0.055f;
 
   // Analog channels
   system_state.cliff_left = adc1.get_channel4();
@@ -436,7 +436,6 @@ void SysTick_Handler(void)
     else if (system_state.time % 100 == 0)
       act::low();
   }
-
 
   // Start next conversion of voltage/current
   adc1.convert();
