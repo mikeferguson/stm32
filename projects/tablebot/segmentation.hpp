@@ -150,4 +150,38 @@ int extract_segments(point_t * points, int num_points,
   return ++segment_idx;
 }
 
+float get_segment_width_sq(line_segment_t * segment)
+{
+  float dx = segment->end.x - segment->start.x;
+  float dy = segment->end.y - segment->start.y;
+  return dx * dx + dy * dy;
+}
+
+void get_centroid(line_segment_t * segment, point_t * point)
+{
+  point->x = (segment->end.x + segment->start.x) / 2.0;
+  point->y = (segment->end.y + segment->start.y) / 2.0;
+  point->z = (segment->end.z + segment->start.z) / 2.0;
+}
+
+bool has_consensus(point_t * points, int num_points, float consensus_value)
+{
+  for (int i = 0; i < num_points; ++i)
+  {
+    for (int j = i + 1; j < num_points; ++j)
+    {
+      if (fabs(points[j].x - points[i].x) > consensus_value)
+      {
+        return false;
+      }
+      if (fabs(points[j].y - points[i].y) > consensus_value)
+      {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 #endif  // _TABLEBOT_SEGMENTATION_HPP_

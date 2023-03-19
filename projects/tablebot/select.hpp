@@ -43,11 +43,11 @@ int get_next_mode()
   return next_selection;
 }
 
-uint16_t select_mode()
+uint8_t select_mode()
 {
   static uint32_t last_unlevel_stamp = 0;
 
-  uint16_t mode = system_state.run_state;
+  uint8_t mode = system_state.run_state;
 
   if (mode == MODE_DONE)
   {

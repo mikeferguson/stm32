@@ -47,17 +47,18 @@
 #define PHASE1_BACKUP_DISTANCE    0.15f
 
 // Phase 2 states
-#define PHASE2_SWEEP_NECK         0
-#define PHASE2_WAIT_NECK          1
+#define PHASE2_SETUP_STUFF        0
+#define PHASE2_WAIT_STOPPED       1
 #define PHASE2_ASSEMBLE_SCAN      2
 #define PHASE2_ANALYZE_SCAN       3
-#define PHASE2_BLOCK_FOUND        4
+#define PHASE2_MOVE_FORWARD       4
+#define PHASE2_APPROACH_BLOCK     5
+#define PHASE2_PUSH_BLOCK         6
 
 // TODO: find this value with laser
 #define TABLE_LENGTH              1.2192f
 
 uint16_t behavior_id = 0;
-uint8_t behavior_state = 0;
 
 #include "segmentation.hpp"
 
@@ -65,12 +66,37 @@ uint8_t behavior_state = 0;
 #define MAX_SEGMENTS 10
 point_t line_points[MAX_POINTS];
 line_segment_t segments[MAX_SEGMENTS];
+point_t block_candidates[10];
+int num_block_candidates;
 
 void set_motors(int16_t left, int16_t right)
 {
   m1_pid.update_setpoint(left);
   m2_pid.update_setpoint(right);
   system_state.last_motor_command = system_state.time;
+}
+
+// Transfrom from point l (in local) to point g (in global)
+void transform_to_global(point_t * g, point_t * l)
+{
+  float cos_angle, sin_angle;
+  arm_sin_cos_f32(system_state.pose_th, &sin_angle, &cos_angle);
+
+  g->x = system_state.pose_x + (cos_angle * l->x - sin_angle * l->y);
+  g->y = system_state.pose_y + (sin_angle * l->x + cos_angle * l->y);
+}
+
+// Returns angle in degrees
+float simple_atan2(float x, float y)
+{
+  if (fabs(y) < 0.001f || fabs(x) < 0.001f)
+  {
+    return 0.0f;
+  }
+
+  // https://math.stackexchange.com/questions/1098487/atan2-faster-approximation
+  float z = y / x;
+  return z * (45.0f - (z - 1.0f) * (14.0f + 3.83f * z));
 }
 
 void run_behavior(uint16_t id, uint32_t stamp)
@@ -92,7 +118,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
   {
     // This is our first iteration through - reset things
     behavior_id = id;
-    behavior_state = 0;
+    system_state.behavior_state = 0;
 
     // Reset pose
     __disable_irq();
@@ -114,7 +140,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
      *                      PHASE 1                       *
      *                                                    *
      ******************************************************/
-    if (behavior_state == PHASE1_DRIVE_TOWARDS_END)
+    if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END)
     {
       // If we see the cliff, stop and transition to next state
       if (system_state.cliff_left > CLIFF_DETECTED ||
@@ -122,7 +148,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
           system_state.cliff_center > CLIFF_DETECTED)
       {
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
-        behavior_state = PHASE1_BACK_UP_A_BIT;
+        system_state.behavior_state = PHASE1_BACK_UP_A_BIT;
         set_motors(0, 0);
       }
       else if (system_state.pose_x > 0.8f * TABLE_LENGTH)
@@ -141,14 +167,14 @@ void run_behavior(uint16_t id, uint32_t stamp)
         set_motors(STANDARD_SPEED + adjustment, STANDARD_SPEED - adjustment);
       }
     }
-    else if (behavior_state == PHASE1_BACK_UP_A_BIT)
+    else if (system_state.behavior_state == PHASE1_BACK_UP_A_BIT)
     {
       if (abs(last_pose_x - system_state.pose_x) > PHASE1_BACKUP_DISTANCE)
       {
         // Done backing up - stop robot
         set_motors(0, 0);
         last_pose_th = system_state.pose_th;
-        behavior_state = PHASE1_TURN_IN_PLACE;
+        system_state.behavior_state = PHASE1_TURN_IN_PLACE;
       }
       else
       {
@@ -156,7 +182,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         set_motors(-SLOW_SPEED, -SLOW_SPEED);
       }
     }
-    else if (behavior_state == PHASE1_TURN_IN_PLACE)
+    else if (system_state.behavior_state == PHASE1_TURN_IN_PLACE)
     {
       float angle_error = last_pose_th + 3.14f - system_state.pose_th;
       if (abs(angle_error) < 0.025f)
@@ -164,7 +190,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         // Done rotating in place - stop robot
         set_motors(0, 0);
         last_pose_th = system_state.pose_th;
-        behavior_state = PHASE1_RETURN_TO_START;
+        system_state.behavior_state = PHASE1_RETURN_TO_START;
       }
       else
       {
@@ -177,7 +203,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         set_motors(-speed, +speed);
       } 
     }
-    else if (behavior_state == PHASE1_RETURN_TO_START)
+    else if (system_state.behavior_state == PHASE1_RETURN_TO_START)
     {
       // If we see the cliff, stop and transition to next state
       if (system_state.cliff_left > CLIFF_DETECTED ||
@@ -211,21 +237,17 @@ void run_behavior(uint16_t id, uint32_t stamp)
      *                      PHASE 2                       *
      *                                                    *
      ******************************************************/
-    if (behavior_state == PHASE2_SWEEP_NECK)
+    if (system_state.behavior_state == PHASE2_SETUP_STUFF)
     {
-      // Change laser angle as we search for block
-      if (system_state.neck_angle > 450 || system_state.neck_angle < 375)
-      {
-        move_neck(450);
-      }
-      else
-      {
-        move_neck(system_state.neck_angle - 5);
-      }
-      behavior_state = PHASE2_WAIT_NECK;
+      // Angle neck downwards, stop robot
+      move_neck(425);
+      set_motors(0, 0);
+
+      // Now wait for neck to stabilize
       last_stable_stamp = 0;
+      system_state.behavior_state = PHASE2_WAIT_STOPPED;
     }
-    else if (behavior_state == PHASE2_WAIT_NECK)
+    else if (system_state.behavior_state == PHASE2_WAIT_STOPPED)
     {
       // Read neck angle
       int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
@@ -236,49 +258,155 @@ void run_behavior(uint16_t id, uint32_t stamp)
         {
           last_stable_stamp = system_state.time;
         }
-        else if (system_state.time - last_stable_stamp > 125)
+        else if (system_state.time - last_stable_stamp > 250)
         {
-          behavior_state = PHASE2_ASSEMBLE_SCAN;
+          // We've been stopped at least 250ms
           latest_scan = assembler.scans_created;
+          system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
         }
       }
       else
       {
         // Command it again
         move_neck(system_state.neck_angle);
+        set_motors(0, 0);
       }
     }
-    else if (behavior_state == PHASE2_ASSEMBLE_SCAN)
+    else if (system_state.behavior_state == PHASE2_ASSEMBLE_SCAN)
     {
       // Wait until a new scan is definitely assembled
       if (assembler.scans_created > latest_scan + 2)
       {
-        behavior_state = PHASE2_ANALYZE_SCAN;
+        system_state.behavior_state = PHASE2_ANALYZE_SCAN;
       }
     }
-    else if (behavior_state == PHASE2_ANALYZE_SCAN)
+    else if (system_state.behavior_state == PHASE2_ANALYZE_SCAN)
     {
-      int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, -0.1f, 0.2f);
+      // Find all points on top of the table, less than 0.5m to either side of the robot
+      int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
 
+      // Send those points for debugging
       udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port);
 
       // Now process segments
       int segment_ct = extract_segments(line_points, points_ct,
                                         segments, MAX_SEGMENTS, 0.0008f);
-      if (segment_ct < 2)
+
+      // Process segments
+      num_block_candidates = 0;
+      for (int s = 0; s < segment_ct; ++s)
       {
-        // No block found
-        behavior_state = PHASE2_SWEEP_NECK;
+        double width_sq = get_segment_width_sq(&segments[s]);
+        // Block is 60mm wide - add margin and square it
+        if (width_sq < 0.0064f && segments[s].points > 3)
+        {
+          // Candidate
+          get_centroid(&segments[s], &block_candidates[num_block_candidates]);
+          if (++num_block_candidates)
+          {
+            break;
+          }
+        }
+      }
+
+      if (num_block_candidates == 1)
+      {
+        // Transform block to global coordinates
+        block_candidates[1] = block_candidates[0];
+        transform_to_global(&block_candidates[0], &block_candidates[1]);
+        // Now go push it
+        system_state.behavior_state = PHASE2_APPROACH_BLOCK;
+      }
+      else if (segment_ct == 0 || num_block_candidates == 0)
+      {
+        // No segments to select from - move forward
+        last_pose_x = system_state.pose_x;
+        system_state.behavior_state = PHASE2_MOVE_FORWARD;
       }
       else
       {
-        // we got a possible block
-        behavior_state = PHASE2_SWEEP_NECK; //PHASE2_BLOCK_FOUND;
+        // Inconclusive - scan again
+        latest_scan = assembler.scans_created;
+        system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
       }
     }
-    else if (behavior_state == PHASE2_BLOCK_FOUND)
+    else if (system_state.behavior_state == PHASE2_MOVE_FORWARD)
     {
-      // TODO: approach block
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
+      {
+        // ERROR - We shouldn't get here
+        set_motors(0, 0);
+        system_state.run_state = MODE_DONE;
+      }
+      else if (abs(system_state.pose_x - last_pose_x) > 0.1f)
+      {
+        // Moved a bit, stop the robot
+        set_motors(0, 0);
+        last_stable_stamp = 0;
+        system_state.behavior_state = PHASE2_WAIT_STOPPED;
+      }
+      else
+      {
+        set_motors(SLOW_SPEED, SLOW_SPEED);
+      }
+    }
+    else if (system_state.behavior_state == PHASE2_APPROACH_BLOCK ||
+             system_state.behavior_state == PHASE2_PUSH_BLOCK)
+    {
+      // Approach block
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
+      {
+        if (system_state.cliff_center > CLIFF_DETECTED)
+        {
+          // Definitely stop
+          system_state.run_state = MODE_DONE;
+          set_motors(0, 0);
+        }
+        else if (system_state.cliff_right > CLIFF_DETECTED)
+        {
+          // Rotate around right wheel
+          set_motors(SLOW_SPEED, 0);
+        }
+        else if (system_state.cliff_left > CLIFF_DETECTED)
+        {
+          // Rotate around left wheel
+          set_motors(0, SLOW_SPEED);
+        }
+      }
+      else if (system_state.behavior_state == PHASE2_PUSH_BLOCK)
+      {
+        // Just slow forward movement
+        set_motors(SLOW_SPEED, SLOW_SPEED);
+      }
+      else
+      {
+        // Approach block
+        // Have we reached the block?
+        float dx = block_candidates[0].x - system_state.pose_x;
+        float dy = block_candidates[0].y - system_state.pose_y;
+        float dist = dx * dx + dy * dy;
+        if (dist < 0.01f)
+        {
+          system_state.behavior_state = PHASE2_PUSH_BLOCK;
+        }
+        float yaw = simple_atan2(dx, dy) + system_state.pose_th;
+
+        // For debugging
+        system_state.target_dist = dist;
+        system_state.target_yaw = yaw;
+
+        // Error of 5 degrees in generates ~max_adjustment
+        int16_t max_adjustment = SLOW_SPEED * 0.2f;
+        int16_t adjustment = (yaw / 5.0f) * max_adjustment;
+        if (adjustment > max_adjustment) adjustment = max_adjustment;
+        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+        // Positive error = steer to the left
+        set_motors(SLOW_SPEED - adjustment, SLOW_SPEED + adjustment);
+      }
     }
   }
   else if (id == BEHAVIOR_ID_PHASE_3)

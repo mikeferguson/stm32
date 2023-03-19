@@ -183,12 +183,16 @@ typedef struct
   int16_t motor1_current;
   int16_t motor2_current;
 
-  uint16_t run_state;
+  uint8_t run_state;
+  uint8_t behavior_state;
   uint16_t neck_angle;
 
   float pose_x;
   float pose_y;
   float pose_th;
+
+  float target_dist;
+  float target_yaw;
 
   uint32_t last_motor_command;
 } system_state_t;

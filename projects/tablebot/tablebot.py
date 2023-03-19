@@ -37,6 +37,7 @@ class TableBotGUI:
     motor2_current = 0
 
     run_state = 0
+    behavior_state = 0
     neck_angle = 0
 
     pose_x = list()
@@ -80,6 +81,9 @@ class TableBotGUI:
         self.run_state_value = QtWidgets.QLabel(text="NONE")
         self.run_state_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
+        self.behavior_state_value = QtWidgets.QLabel(text="NONE")
+        self.behavior_state_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
         self.cliff_left_value = QtWidgets.QLabel(text="0")
         self.cliff_left_value.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
@@ -112,14 +116,16 @@ class TableBotGUI:
         self.status_layout.addWidget(self.current_value, 2, 1)
         self.status_layout.addWidget(QtWidgets.QLabel(text="System State"), 3, 0)
         self.status_layout.addWidget(self.run_state_value, 3, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Left Cliff"), 4, 0)
-        self.status_layout.addWidget(self.cliff_left_value, 4, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Center Cliff"), 5, 0)
-        self.status_layout.addWidget(self.cliff_center_value, 5, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Right Cliff"), 6, 0)
-        self.status_layout.addWidget(self.cliff_right_value, 6, 1)
-        self.status_layout.addWidget(QtWidgets.QLabel(text="Neck Angle"), 7, 0)
-        self.status_layout.addWidget(self.neck_angle_value, 7, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Behavior State"), 4, 0)
+        self.status_layout.addWidget(self.behavior_state_value, 4, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Left Cliff"), 5, 0)
+        self.status_layout.addWidget(self.cliff_left_value, 5, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Center Cliff"), 6, 0)
+        self.status_layout.addWidget(self.cliff_center_value, 6, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Right Cliff"), 7, 0)
+        self.status_layout.addWidget(self.cliff_right_value, 7, 1)
+        self.status_layout.addWidget(QtWidgets.QLabel(text="Neck Angle"), 8, 0)
+        self.status_layout.addWidget(self.neck_angle_value, 8, 1)
         self.right_column_layout.addLayout(self.status_layout)
         self.right_column_layout.addStretch()
 
@@ -152,7 +158,7 @@ class TableBotGUI:
                 # Remove header
                 packet = packet[4:]
 
-                if len(packet) == 76:
+                if len(packet) == 84:
                     # System state packet
                     self.system_time = struct.unpack_from("<L", packet, 0)[0]
                     self.system_voltage = struct.unpack_from("<f", packet, 4)[0]
@@ -180,12 +186,16 @@ class TableBotGUI:
                     self.motor1_current = struct.unpack_from("<h", packet, 52)[0]
                     self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
 
-                    self.run_state = struct.unpack_from("<H", packet, 56)[0]
+                    self.run_state = int(packet[56])
+                    self.behavior_state = int(packet[57])
                     self.neck_angle = struct.unpack_from("<H", packet, 58)[0]
 
                     pose_x = struct.unpack_from("<f", packet, 60)[0]
                     pose_y = struct.unpack_from("<f", packet, 64)[0]
                     pose_th = struct.unpack_from("<f", packet, 68)[0]
+
+                    self.target_pose = struct.unpack_from("<f", packet, 72)[0]
+                    self.target_yaw = struct.unpack_from("<f", packet, 76)[0]
 
                     if len(self.pose_x) == 0 or \
                             abs(pose_x - self.pose_x[-1]) > 0.01 or \
@@ -252,6 +262,7 @@ class TableBotGUI:
         self.voltage_value.setText("%.3f" % self.system_voltage)
         self.current_value.setText("%.3f" % self.system_current)
         self.run_state_value.setText(self.getRunStateValue(self.run_state))
+        self.behavior_state_value.setText(self.getBehaviorStateValue(self.behavior_state))
         self.cliff_left_value.setText(self.getCliffValue(self.cliff_left))
         self.cliff_center_value.setText(self.getCliffValue(self.cliff_center))
         self.cliff_right_value.setText(self.getCliffValue(self.cliff_right))
@@ -359,6 +370,36 @@ class TableBotGUI:
             return "DONE"
         else:
             return str(value)
+
+    def getBehaviorStateValue(self, value):
+        if self.run_state == 1:
+            # Phase 1 Behavior
+            if value == 0:
+                return "Drive to end"
+            elif value == 1:
+                return "Back up"
+            elif value == 2:
+                return "Turn Around"
+            elif value == 3:
+                return "Return to start"
+        elif self.run_state == 2:
+            # Phase 2 Behavior
+            if value == 0:
+                return "Setup Stuff"
+            elif value == 1:
+                return "Wait to Stop"
+            elif value == 2:
+                return "Assemble Scan"
+            elif value == 3:
+                return "Analyze Scan"
+            elif value == 4:
+                return "Move Forward"
+            elif value == 5:
+                return "Approach Block"
+            elif value == 6:
+                return "Push Block"
+        # Unknown
+        return "NONE"
 
 
 if __name__ == "__main__":
