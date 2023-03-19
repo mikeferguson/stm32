@@ -56,7 +56,6 @@ DynamixelParser<usart2_t> usart2_parser;
 usart3_t usart3;  // laser
 
 LD06<usart3_t> laser;
-ld06_packet_t latest_laser_packet;
 
 system_state_t system_state;
 
@@ -68,7 +67,9 @@ uint32_t last_packet;
 #define NECK_SERVO_ID     13
 #include "ax12.hpp"
 #include "select.hpp"
-#include "behaviors.hpp"
+
+#include "assembler.hpp"
+LaserAssembler assembler;
 
 // From IAP app note
 typedef  void (*pFunction)(void);
@@ -112,7 +113,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   last_packet = system_state.time;
 
   // Send packet with just the table, no laser data
-  udp_send_packet((unsigned char *) &system_state, sizeof(system_state) - 1800, return_port);
+  udp_send_packet((unsigned char *) &system_state, sizeof(system_state), return_port);
 
   if (p->len == 8 &&
       data[4] == 'B' &&
@@ -144,6 +145,9 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   // Free buffer
   pbuf_free(p);
 }
+
+// Located here so we can send packets from behaviors
+#include "behaviors.hpp"
 
 int udp_interface_init()
 {
@@ -268,8 +272,7 @@ int main(void)
   __enable_irq();
   error::low();  // Done with setup
 
-  system_state.neck_angle = 512;
-  ax12_set_register2(&usart2_parser, &usart2, NECK_SERVO_ID, AX_GOAL_POSITION_L, system_state.neck_angle);
+  move_neck(512);
 
   while(1)
   {
@@ -298,29 +301,14 @@ int main(void)
     int8_t length = laser.update(&usart3, system_state.time);
     if (length > 0)
     {
-      latest_laser_packet = laser.packet;
-
       // Send debugging packets
       if (system_state.time - last_packet < 1000)
       {
-        udp_send_packet((unsigned char *) &latest_laser_packet, sizeof(latest_laser_packet), return_port);
+        udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), return_port);
       }
 
-      /*
-      // Parse packet into global view
-      float angle = laser.packet.start_angle * 0.01f;
-      float end_angle = laser.packet.end_angle * 0.01f;
-      float step = (end_angle - angle) / (laser.packet.length - 1);
-
-      // Decide where to insert this data
-      int index = angle * 0.8f;
-      for (int i = 0; i < length; ++i)
-      {
-        system_state.laser_data[index + i] = laser.packet.data[i].range;
-        system_state.laser_angle[index + i] = angle * 100;  // Convert back to 0.01 degree steps
-        angle += step;
-      }
-      */
+      // Add to assembler
+      assembler.add_packet(&laser.packet);
     }
     else if (length < 0)
     {
@@ -376,8 +364,8 @@ void SysTick_Handler(void)
     else
     {
       // Motors have timed out
-      m1.set(0);
-      m2.set(0);
+      m1.disable();
+      m2.disable();
       m1_pid.reset();
       m2_pid.reset();
     }

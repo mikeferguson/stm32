@@ -191,11 +191,6 @@ typedef struct
   float pose_th;
 
   uint32_t last_motor_command;
-
-  // 360 Laser View
-  // We expect about 450 points per rotation (4500/10hz)
-  uint16_t laser_data[450];
-  uint16_t laser_angle[450];
 } system_state_t;
 
 // Encoder is E4P-100-079-D-H-T-B

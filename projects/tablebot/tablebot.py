@@ -49,6 +49,7 @@ class TableBotGUI:
     TABLE_WIDTH = TABLE_LENGTH / 2.0
 
     laser_data = list()
+    line_points = list()
 
     # Used to convert meters into pixels
     SCALE = 200.0
@@ -226,7 +227,21 @@ class TableBotGUI:
                         self.laser_data = self.laser_data[-600:]
 
                 else:
-                    print("Got packet of length %i" % len(packet))
+                    # Assume this is points
+                    self.line_points = list()
+                    points = int(len(packet) / 12)
+                    idx = 0
+                    for i in range(points):
+                        x = struct.unpack_from("<f", packet, idx)[0]
+                        y = struct.unpack_from("<f", packet, idx + 4)[0]
+                        z = struct.unpack_from("<f", packet, idx + 8)[0]
+
+                        # Get global coordinates
+                        gx = self.pose_x[-1] + (cos(self.pose_th[-1]) * x - sin(self.pose_th[-1]) * y)
+                        gy = self.pose_y[-1] + (sin(self.pose_th[-1]) * x + cos(self.pose_th[-1]) * y)
+
+                        idx += 12
+                        self.line_points.append([gx, gy, z])
 
             except socket.error as err:
                 # Not an error to not have packets
@@ -283,6 +298,16 @@ class TableBotGUI:
             data_pen.setBrush(QtCore.Qt.red)
             paint.setPen(data_pen)
             for point in self.laser_data:
+                x = int(self.SCALE * point[0])
+                y = int(self.SCALE * point[1])
+                paint.drawPoint(300 - y, self.offset_x - x)
+
+            # Draw line data if any
+            data_pen = QtGui.QPen()
+            data_pen.setWidth(4)
+            data_pen.setBrush(QtCore.Qt.green)
+            paint.setPen(data_pen)
+            for point in self.line_points:
                 x = int(self.SCALE * point[0])
                 y = int(self.SCALE * point[1])
                 paint.drawPoint(300 - y, self.offset_x - x)

@@ -128,4 +128,10 @@ void ax12_set_register2(P * parser, B * bus, uint8_t id, uint8_t addr, uint16_t 
   bus->write(buffer, 9);
 }
 
+void move_neck(uint16_t angle)
+{
+  system_state.neck_angle = angle;
+  ax12_set_register2(&usart2_parser, &usart2, NECK_SERVO_ID, AX_GOAL_POSITION_L, angle);
+}
+
 #endif  // _TABLEBOT_AX12_HPP_

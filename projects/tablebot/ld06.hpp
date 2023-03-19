@@ -37,8 +37,8 @@
  * Since each packet has 12 readings in it, we expect 375 packets per second
  * (each packet being 47 bytes). This is 17625 bytes per second.
  */
- #define EXPECTED_LENGTH_BYTE     0x2C
- #define EXPECTED_PACKET_LENGTH   (11 + 3 * 12)
+#define EXPECTED_LENGTH_BYTE      0x2C
+#define EXPECTED_PACKET_LENGTH    (11 + 3 * 12)
 
 // Timeout in milliseconds
 #define LASER_TIMEOUT             10
@@ -47,6 +47,8 @@
 #define DESIRED_LASER_SPEED       3600
 #define MINIMUM_LASER_SPEED       3400
 #define MAXIMUM_LASER_SPEED       3800
+
+#define MEASUREMENTS_PER_PACKET   12
 
 /*
  * LD06 Packet structures
