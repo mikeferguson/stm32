@@ -195,6 +195,10 @@ typedef struct
   float block_pose_y;
   float block_pose_z;
 
+  float goal_pose_x;
+  float goal_pose_y;
+  float goal_pose_z;
+
   float target_dist;
   float target_yaw;
 

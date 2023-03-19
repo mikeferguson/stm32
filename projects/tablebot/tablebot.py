@@ -8,6 +8,11 @@ import struct
 import time
 
 
+PACKET_STATUS = 0xff
+PACKET_LASER_SCAN = 0
+PACKET_PROJECTED_POINTS = 1
+PACKET_SEGMENT_POINTS = 2
+
 class TableBotGUI:
 
     system_time = 0
@@ -44,6 +49,14 @@ class TableBotGUI:
     pose_y = list()
     pose_th = list()
 
+    block_pose_x = 0
+    block_pose_y = 0
+    block_pose_z = 0
+
+    goal_pose_x = 0
+    goal_pose_y = 0
+    goal_pose_z = 0
+
     # Table size in meters
     # TODO: read this from firmware
     TABLE_LENGTH = 1.2192
@@ -51,6 +64,7 @@ class TableBotGUI:
 
     laser_data = list()
     line_points = list()
+    segment_points = list()
 
     # Used to convert meters into pixels
     SCALE = 200.0
@@ -101,7 +115,7 @@ class TableBotGUI:
 
         # State variables in vertical column on right of screen
         self.right_column = QtWidgets.QWidget()
-        self.right_column.setFixedWidth(250)
+        self.right_column.setFixedWidth(300)
         self.right_column_layout = QtWidgets.QVBoxLayout()
         self.right_column.setLayout(self.right_column_layout)
         self.right_column_layout.addWidget(self.state_label)
@@ -154,11 +168,12 @@ class TableBotGUI:
                 packet = self.conn.recv(1024)
 
                 # TODO confirm header
+                packet_type = packet[0]
 
                 # Remove header
                 packet = packet[4:]
 
-                if len(packet) == 96:
+                if packet_type == PACKET_STATUS:
                     # System state packet
                     self.system_time = struct.unpack_from("<L", packet, 0)[0]
                     self.system_voltage = struct.unpack_from("<f", packet, 4)[0]
@@ -198,8 +213,12 @@ class TableBotGUI:
                     self.block_pose_y = struct.unpack_from("<f", packet, 76)[0]
                     self.block_pose_z = struct.unpack_from("<f", packet, 80)[0]
 
-                    self.target_pose = struct.unpack_from("<f", packet, 84)[0]
-                    self.target_yaw = struct.unpack_from("<f", packet, 88)[0]
+                    self.goal_pose_x = struct.unpack_from("<f", packet, 84)[0]
+                    self.goal_pose_y = struct.unpack_from("<f", packet, 88)[0]
+                    self.goal_pose_z = struct.unpack_from("<f", packet, 92)[0]
+
+                    self.target_pose = struct.unpack_from("<f", packet, 96)[0]
+                    self.target_yaw = struct.unpack_from("<f", packet, 100)[0]
 
                     if len(self.pose_x) == 0 or \
                             abs(pose_x - self.pose_x[-1]) > 0.01 or \
@@ -210,7 +229,7 @@ class TableBotGUI:
                         self.pose_y.append(pose_y)
                         self.pose_th.append(pose_th)
 
-                elif len(packet) == 47:
+                elif packet_type == PACKET_LASER_SCAN:
                     if len(self.pose_x) == 0:
                         # Need a pose before we process laser data
                         continue
@@ -242,10 +261,10 @@ class TableBotGUI:
 
                 else:
                     # Assume this is points
-                    self.line_points = list()
-                    points = int(len(packet) / 12)
+                    points = list()
+                    num_points = int(len(packet) / 12)
                     idx = 0
-                    for i in range(points):
+                    for i in range(num_points):
                         x = struct.unpack_from("<f", packet, idx)[0]
                         y = struct.unpack_from("<f", packet, idx + 4)[0]
                         z = struct.unpack_from("<f", packet, idx + 8)[0]
@@ -255,7 +274,13 @@ class TableBotGUI:
                         gy = self.pose_y[-1] + (sin(self.pose_th[-1]) * x + cos(self.pose_th[-1]) * y)
 
                         idx += 12
-                        self.line_points.append([gx, gy, z])
+                        points.append([gx, gy, z])
+
+                    if packet_type == PACKET_PROJECTED_POINTS:
+                        self.line_points = points
+
+                    elif packet_type == PACKET_SEGMENT_POINTS:
+                        self.segment_points = points
 
             except socket.error as err:
                 # Not an error to not have packets
@@ -307,6 +332,14 @@ class TableBotGUI:
             # Draw robot origin axis
             self.drawAxis(self.pose_x[-1], self.pose_y[-1], self.pose_th[-1], paint)
 
+            # Draw goal
+            if self.goal_pose_z > 0.0:
+                self.drawBox(self.goal_pose_x, self.goal_pose_y, QtCore.Qt.red, paint)
+
+            # Draw block
+            if self.block_pose_z > 0.0:
+                self.drawBox(self.block_pose_x, self.block_pose_y, QtCore.Qt.yellow, paint)
+
             # Draw laser data
             data_pen = QtGui.QPen()
             data_pen.setWidth(4)
@@ -323,6 +356,16 @@ class TableBotGUI:
             data_pen.setBrush(QtCore.Qt.green)
             paint.setPen(data_pen)
             for point in self.line_points:
+                x = int(self.SCALE * point[0])
+                y = int(self.SCALE * point[1])
+                paint.drawPoint(300 - y, self.offset_x - x)
+
+            # Draw segment points if any
+            data_pen = QtGui.QPen()
+            data_pen.setWidth(6)
+            data_pen.setBrush(QtCore.Qt.yellow)
+            paint.setPen(data_pen)
+            for point in self.segment_points:
                 x = int(self.SCALE * point[0])
                 y = int(self.SCALE * point[1])
                 paint.drawPoint(300 - y, self.offset_x - x)
@@ -353,6 +396,23 @@ class TableBotGUI:
         xx = x + int(-length * sin(th))
         yy = y + int(length * cos(th))
         paint.drawLine(300 - y, self.offset_x - x, 300 - yy, self.offset_x - xx)
+
+    def drawBox(self, x_m, y_m, color, paint):
+        size = self.SCALE * 0.06
+
+        x_pen = QtGui.QPen()
+        x_pen.setWidth(2)
+        x_pen.setBrush(color)
+        paint.setPen(x_pen)
+
+        x = int(self.SCALE * x_m) - int(size / 2)
+        y = int(self.SCALE * y_m) - int(size / 2)
+        xx = x + int(size)
+        yy = y + int(size)
+        paint.drawLine(300 - y, self.offset_x - x, 300 - y, self.offset_x - xx)
+        paint.drawLine(300 - y, self.offset_x - x, 300 - yy, self.offset_x - x)
+        paint.drawLine(300 - yy, self.offset_x - x, 300 - yy, self.offset_x - xx)
+        paint.drawLine(300 - y, self.offset_x - xx, 300 - yy, self.offset_x - xx)
 
     def getCliffValue(self, value):
         if value < 1500:
@@ -401,6 +461,26 @@ class TableBotGUI:
             elif value == 5:
                 return "Approach Block"
             elif value == 6:
+                return "Push Block"
+        elif self.run_state == 3:
+            # Phase 3 Behavior
+            if value == 0:
+                return "Setup Stuff"
+            elif value == 1:
+                return "Locating Goal"
+            elif value == 2:
+                return "Locating Block"
+            elif value == 3:
+                return "Wait to Stop"
+            elif value == 4:
+                return "Assemble Scan"
+            elif value == 5:
+                return "Analyze Scan"
+            elif value == 6:
+                return "Move Forward"
+            elif value == 7:
+                return "Approach Block"
+            elif value == 8:
                 return "Push Block"
         # Unknown
         return "NONE"
