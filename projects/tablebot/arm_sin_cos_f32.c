@@ -218,8 +218,12 @@ void arm_sin_cos_f32(
     n--;
   }
 
-  /* Map input value to [0 1] */
+  /* Map input value to [0 1) */
   in = in - (float32_t) n;
+  if (in >= 1.0f)
+  {
+    in = 0.0f;
+  }
 
   /* Calculation of index of the table */
   findex = (float32_t) FAST_MATH_TABLE_SIZE * in;
@@ -230,9 +234,9 @@ void arm_sin_cos_f32(
   fract = findex - (float32_t) indexS;
 
   /* Read two nearest values of input value from the cos & sin tables */
-  f1 = sinTable_f32[indexC+0];
+  f1 = sinTable_f32[indexC];
   f2 = sinTable_f32[(indexC+1) % FAST_MATH_TABLE_SIZE];
-  d1 = -sinTable_f32[indexS+0];
+  d1 = -sinTable_f32[indexS];
   d2 = -sinTable_f32[(indexS+1) % FAST_MATH_TABLE_SIZE];
 
   Dn = 0.0122718463030f; // delta between the two points (fixed), in this case 2*pi/FAST_MATH_TABLE_SIZE
@@ -242,12 +246,12 @@ void arm_sin_cos_f32(
   temp = fract*temp + d1*Dn;
 
   /* Calculation of cosine value */
-  *pCosVal = fract*Df + f1;
+  *pCosVal = fract*temp + f1;
 
   /* Read two nearest values of input value from the cos & sin tables */
-  f1 = sinTable_f32[indexS+0];
+  f1 = sinTable_f32[indexS];
   f2 = sinTable_f32[(indexS+1) % FAST_MATH_TABLE_SIZE];
-  d1 = sinTable_f32[indexC+0];
+  d1 = sinTable_f32[indexC];
   d2 = sinTable_f32[(indexC+1) % FAST_MATH_TABLE_SIZE];
 
   Df = f2 - f1; // delta between the values of the functions
@@ -256,7 +260,7 @@ void arm_sin_cos_f32(
   temp = fract*temp + d1*Dn;
   
   /* Calculation of sine value */
-  *pSinVal = fract*Df + f1;
+  *pSinVal = fract*temp + f1;
 }
 /**    
  * @} end of SinCos group    
