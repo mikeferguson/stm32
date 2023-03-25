@@ -45,6 +45,7 @@
 #define PHASE1_BACK_UP_A_BIT      2
 #define PHASE1_TURN_IN_PLACE      3
 #define PHASE1_RETURN_TO_START    4
+#define PHASE1_DONE               5
 
 // Distance to back up before making in-place 180 degree turn
 #define PHASE1_BACKUP_DISTANCE    0.15f
@@ -295,7 +296,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
          move_neck(425);
       }
     }
-    else if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END)
+    else if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END ||
+             system_state.behavior_state == PHASE1_RETURN_TO_START)
     {
       // If we see the cliff, stop and transition to next state
       if (system_state.cliff_left > CLIFF_DETECTED ||
@@ -303,13 +305,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
           system_state.cliff_center > CLIFF_DETECTED)
       {
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
-        system_state.behavior_state = PHASE1_BACK_UP_A_BIT;
+        ++system_state.behavior_state;
         set_motors(0, 0);
       }
       else
       {
-        // No cliff yet
-        if (assembler.scans_created > latest_scan)
+        // Cliff sensors haven't triggered - can laser still see the table?
+        if (max_speed > SLOW_SPEED && assembler.scans_created > latest_scan)
         {
           // New laser scan to inspect - take only points right in front of us
           int points_ct = project_points(line_points, MAX_POINTS, true, 0.1f, -0.1f, 0.2f);
@@ -319,17 +321,29 @@ void run_behavior(uint16_t id, uint32_t stamp)
 
           if (points_ct < 5)
           {
+            // We've lost the table - SLOW DOWN!
             max_speed = SLOW_SPEED;
           }
 
-          // Drive forward, keeping robot centered on table
-          // Error of 0.05m in Y axis generates ~max_adjustment
-          int16_t adjustment = system_state.pose_y * 600;
-          int16_t max_adjustment = max_speed * 0.2f;
-          if (adjustment > max_adjustment) adjustment = max_adjustment;
-          if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+          // Note that scan has been processed
+          latest_scan = assembler.scans_created;
+        }
+
+        // Drive forward, keeping robot centered on table
+        // Error of 0.05m in Y axis generates ~max_adjustment
+        int16_t adjustment = system_state.pose_y * 600;
+        int16_t max_adjustment = max_speed * 0.2f;
+        if (adjustment > max_adjustment) adjustment = max_adjustment;
+        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+        if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END)
+        {
           // Moving with axis, so positive error = steer to the right
           set_motors(max_speed + adjustment, max_speed - adjustment);
+        }
+        else
+        {
+          // Moving against axis, so positive error = steer to the left
+          set_motors(max_speed - adjustment, max_speed + adjustment);
         }
       }
     }
@@ -355,7 +369,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
       {
         // Done rotating in place - stop robot
         set_motors(0, 0);
-        last_pose_th = system_state.pose_th;
+        max_speed = STANDARD_SPEED;
+        latest_scan = assembler.scans_created + 1;
         system_state.behavior_state = PHASE1_RETURN_TO_START;
       }
       else
@@ -367,33 +382,11 @@ void run_behavior(uint16_t id, uint32_t stamp)
         if (speed < MIN_SPEED) speed = MIN_SPEED;
         // Turn in positive direction (to the left)
         set_motors(-speed, +speed);
-      } 
+      }
     }
-    else if (system_state.behavior_state == PHASE1_RETURN_TO_START)
+    else if (system_state.behavior_state == PHASE1_DONE)
     {
-      // If we see the cliff, stop and transition to next state
-      if (system_state.cliff_left > CLIFF_DETECTED ||
-          system_state.cliff_right > CLIFF_DETECTED ||
-          system_state.cliff_center > CLIFF_DETECTED)
-      {
-        system_state.run_state = MODE_DONE;
-        set_motors(0, 0);
-      }
-      else if (system_state.pose_x < 0.3f * TABLE_LENGTH)
-      {
-        set_motors(SLOW_SPEED, SLOW_SPEED);
-      }
-      else
-      {
-        // Else drive forward, keeping robot centered on table
-        // Error of 0.05m in Y axis generates ~max_adjustment
-        int16_t adjustment = system_state.pose_y * 600;
-        int16_t max_adjustment = STANDARD_SPEED * 0.2f;
-        if (adjustment > max_adjustment) adjustment = max_adjustment;
-        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
-        // Moving against axis, so positive error = steer to the left
-        set_motors(STANDARD_SPEED - adjustment, STANDARD_SPEED + adjustment);
-      }
+      system_state.run_state = MODE_DONE;
     }
   }
   else if (id == BEHAVIOR_ID_PHASE_2)

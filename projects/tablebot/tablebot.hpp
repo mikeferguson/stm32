@@ -221,6 +221,7 @@ typedef struct
 #define SLOW_SPEED        75
 // Standard speed is just under 10cm/sec for starters
 #define STANDARD_SPEED    150
+#define FAST_SPEED        225
 // Max speed is 200RPM * 73mm diameter wheel = 0.243 m/s
 #define MAX_SPEED         400
 
