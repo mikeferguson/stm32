@@ -439,12 +439,14 @@ class TableBotGUI:
         if self.run_state == 1:
             # Phase 1 Behavior
             if value == 0:
-                return "Drive to end"
+                return "Setup stuff"
             elif value == 1:
-                return "Back up"
+                return "Drive to end"
             elif value == 2:
-                return "Turn Around"
+                return "Back up"
             elif value == 3:
+                return "Turn Around"
+            elif value == 4:
                 return "Return to start"
         elif self.run_state == 2:
             # Phase 2 Behavior

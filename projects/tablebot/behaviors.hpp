@@ -40,10 +40,11 @@
 // Phase 1 states
 // This is a straight forward state machine - we move forward
 // through the states and never backwards
-#define PHASE1_DRIVE_TOWARDS_END  0
-#define PHASE1_BACK_UP_A_BIT      1
-#define PHASE1_TURN_IN_PLACE      2
-#define PHASE1_RETURN_TO_START    3
+#define PHASE1_SETUP_STUFF        0
+#define PHASE1_DRIVE_TOWARDS_END  1
+#define PHASE1_BACK_UP_A_BIT      2
+#define PHASE1_TURN_IN_PLACE      3
+#define PHASE1_RETURN_TO_START    4
 
 // Distance to back up before making in-place 180 degree turn
 #define PHASE1_BACKUP_DISTANCE    0.15f
@@ -211,6 +212,28 @@ float approach_target(point_t * target)
   return system_state.target_dist;
 }
 
+// Verify that neck has reached the goal
+// Returns > 0 if true
+int verify_neck(uint32_t * last_stable_stamp, uint32_t stop_time = 250)
+{
+  int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
+  if ((neck_angle > 0) && (neck_angle - system_state.neck_angle < 5) && (system_state.neck_angle - neck_angle < 5))
+  {
+    // Has settled - has a new laser scan started?
+    if (*last_stable_stamp == 0)
+    {
+      *last_stable_stamp = system_state.time;
+      return 0;
+    }
+    else if (system_state.time - *last_stable_stamp > stop_time)
+    {
+      // We've been stopped long enough
+      return 1;
+    }
+  }
+  return 0;
+}
+
 void run_behavior(uint16_t id, uint32_t stamp)
 {
   static float last_pose_x;
@@ -219,6 +242,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
 
   static uint32_t latest_scan;
   static uint32_t last_stable_stamp;
+
+  static uint32_t max_speed;
 
   if (id == MODE_UNSELECTED)
   {
@@ -231,6 +256,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
     // This is our first iteration through - reset things
     behavior_id = id;
     system_state.behavior_state = 0;
+    last_stable_stamp = 0;
 
     // Reset pose
     __disable_irq();
@@ -252,7 +278,24 @@ void run_behavior(uint16_t id, uint32_t stamp)
      *                      PHASE 1                       *
      *                                                    *
      ******************************************************/
-    if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END)
+    if (system_state.behavior_state == PHASE1_SETUP_STUFF)
+    {
+      // Angle neck downwards
+      system_state.neck_angle = 425;
+
+      // Is neck there yet?
+      if (verify_neck(&last_stable_stamp) > 0)
+      {
+        latest_scan = assembler.scans_created + 1;
+        max_speed = STANDARD_SPEED;
+        system_state.behavior_state = PHASE1_DRIVE_TOWARDS_END;
+      }
+      else
+      {
+         move_neck(425);
+      }
+    }
+    else if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END)
     {
       // If we see the cliff, stop and transition to next state
       if (system_state.cliff_left > CLIFF_DETECTED ||
@@ -263,20 +306,31 @@ void run_behavior(uint16_t id, uint32_t stamp)
         system_state.behavior_state = PHASE1_BACK_UP_A_BIT;
         set_motors(0, 0);
       }
-      else if (system_state.pose_x > 0.8f * TABLE_LENGTH)
-      {
-        set_motors(SLOW_SPEED, SLOW_SPEED);
-      }
       else
       {
-        // Else drive forward, keeping robot centered on table
-        // Error of 0.05m in Y axis generates ~max_adjustment
-        int16_t adjustment = system_state.pose_y * 600;
-        int16_t max_adjustment = STANDARD_SPEED * 0.2f;
-        if (adjustment > max_adjustment) adjustment = max_adjustment;
-        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
-        // Moving with axis, so positive error = steer to the right
-        set_motors(STANDARD_SPEED + adjustment, STANDARD_SPEED - adjustment);
+        // No cliff yet
+        if (assembler.scans_created > latest_scan)
+        {
+          // New laser scan to inspect - take only points right in front of us
+          int points_ct = project_points(line_points, MAX_POINTS, true, 0.1f, -0.1f, 0.2f);
+
+          // Send those points for debugging
+          udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+
+          if (points_ct < 5)
+          {
+            max_speed = SLOW_SPEED;
+          }
+
+          // Drive forward, keeping robot centered on table
+          // Error of 0.05m in Y axis generates ~max_adjustment
+          int16_t adjustment = system_state.pose_y * 600;
+          int16_t max_adjustment = max_speed * 0.2f;
+          if (adjustment > max_adjustment) adjustment = max_adjustment;
+          if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+          // Moving with axis, so positive error = steer to the right
+          set_motors(max_speed + adjustment, max_speed - adjustment);
+        }
       }
     }
     else if (system_state.behavior_state == PHASE1_BACK_UP_A_BIT)
@@ -362,20 +416,10 @@ void run_behavior(uint16_t id, uint32_t stamp)
     else if (system_state.behavior_state == PHASE2_WAIT_STOPPED)
     {
       // Read neck angle
-      int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
-      if ((neck_angle > 0) && (neck_angle - system_state.neck_angle < 5) && (system_state.neck_angle - neck_angle < 5))
+      if (verify_neck(&last_stable_stamp) > 0)
       {
-        // Has settled - has a new laser scan started?
-        if (last_stable_stamp == 0)
-        {
-          last_stable_stamp = system_state.time;
-        }
-        else if (system_state.time - last_stable_stamp > 250)
-        {
-          // We've been stopped at least 250ms
-          latest_scan = assembler.scans_created;
-          system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
-        }
+        latest_scan = assembler.scans_created;
+        system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
       }
       else
       {
@@ -556,20 +600,10 @@ void run_behavior(uint16_t id, uint32_t stamp)
     else if (system_state.behavior_state == PHASE3_WAIT_STOPPED)
     {
       // Read neck angle
-      int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
-      if ((neck_angle > 0) && (neck_angle - system_state.neck_angle < 5) && (system_state.neck_angle - neck_angle < 5))
+      if (verify_neck(&last_stable_stamp) > 0)
       {
-        // Has settled - has a new laser scan started?
-        if (last_stable_stamp == 0)
-        {
-          last_stable_stamp = system_state.time;
-        }
-        else if (system_state.time - last_stable_stamp > 250)
-        {
-          // We've been stopped at least 250ms
-          latest_scan = assembler.scans_created;
-          system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
-        }
+        latest_scan = assembler.scans_created;
+        system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
       }
       else
       {
