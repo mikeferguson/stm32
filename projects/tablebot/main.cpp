@@ -71,16 +71,21 @@ uint32_t last_packet;
 #include "assembler.hpp"
 LaserAssembler assembler;
 
+#define PACKET_STATUS               0xff
+#define PACKET_LASER_SCAN           0
+#define PACKET_PROJECTED_POINTS     1
+#define PACKET_SEGMENT_POINTS       2
+
 // From IAP app note
 typedef  void (*pFunction)(void);
 
-void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port)
+void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port, uint8_t type = PACKET_STATUS)
 {
-  struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
+  struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 5, PBUF_RAM);
   unsigned char * x = (unsigned char *) p_send->payload;
 
   // ethernet header
-  *x++ = 0xff; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
+  *x++ = type; *x++ = 'B'; *x++ = 'O'; *x++ = 'T';
 
   // copy payload
   for(int i = 0; i < len; ++i)
@@ -304,7 +309,7 @@ int main(void)
       // Send debugging packets
       if (system_state.time - last_packet < 1000)
       {
-        udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), return_port);
+        udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), return_port, PACKET_LASER_SCAN);
       }
 
       // Add to assembler

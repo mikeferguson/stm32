@@ -60,6 +60,21 @@
 #define PHASE2_APPROACH_BLOCK     5
 #define PHASE2_PUSH_BLOCK         6
 
+// Phase 3 states
+// This is the most complex of the state machines
+//  * Wait->Assemble->Analyze is reused for both finding the goal and the block
+//  * Selection of goal or block is based on the state of block/goal_pose variables
+//  * At the end of the Approach state, we will refind the goal before going into Push
+#define PHASE3_SETUP_STUFF        0
+#define PHASE3_LOCATE_GOAL        1
+#define PHASE3_LOCATE_BLOCK       2
+#define PHASE3_WAIT_STOPPED       3
+#define PHASE3_ASSEMBLE_SCAN      4
+#define PHASE3_ANALYZE_SCAN       5
+#define PHASE3_MOVE_FORWARD       6
+#define PHASE3_APPROACH_BLOCK     7
+#define PHASE3_PUSH_BLOCK         8
+
 // TODO: find this value with laser
 #define TABLE_LENGTH              1.2192f
 
@@ -75,9 +90,9 @@ line_segment_t segments[MAX_SEGMENTS];
 
 #define MAX_CANDIDATES 10
 point_t candidates[MAX_CANDIDATES];
-int num_candidates;
 
 point_t block_pose;
+point_t goal_pose;
 
 void set_motors(int16_t left, int16_t right)
 {
@@ -184,7 +199,7 @@ float approach_target(point_t * target)
 {
   compute_heading_and_dist(target);
 
-  // Error of 5 degrees in generates ~max_adjustment
+  // Error of 5 degrees generates ~max_adjustment
   int16_t max_adjustment = SLOW_SPEED * 0.2f;
   int16_t adjustment = (system_state.target_yaw / 5.0f) * max_adjustment;
   if (adjustment > max_adjustment) adjustment = max_adjustment;
@@ -383,14 +398,14 @@ void run_behavior(uint16_t id, uint32_t stamp)
       int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
 
       // Send those points for debugging
-      udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port);
+      udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
 
       // Now process segments
       int segment_ct = extract_segments(line_points, points_ct,
                                         segments, MAX_SEGMENTS, 0.0008f);
 
       // Process segments
-      num_candidates = 0;
+      int num_candidates = 0;
       for (int s = 0; s < segment_ct; ++s)
       {
         double width_sq = get_segment_width_sq(&segments[s]);
@@ -499,6 +514,248 @@ void run_behavior(uint16_t id, uint32_t stamp)
      *                      PHASE 3                       *
      *                                                    *
      ******************************************************/
+    if (system_state.behavior_state == PHASE3_SETUP_STUFF)
+    {
+      // Set neck horizontal, stop robot
+      move_neck(512);
+      set_motors(0, 0);
+
+      // Clear everything
+      block_pose.x = 0.0f;
+      block_pose.y = 0.0f;
+      block_pose.z = -1.0f;
+
+      goal_pose.x = 0.0f;
+      goal_pose.y = 0.0f;
+      goal_pose.z = -1.0f;
+
+      // Now wait for neck to stabilize
+      last_stable_stamp = 0;
+      system_state.behavior_state = PHASE3_WAIT_STOPPED;
+    }
+    else if (system_state.behavior_state == PHASE3_LOCATE_GOAL)
+    {
+      // Set neck horizontal, stop robot
+      move_neck(512);
+      set_motors(0, 0);
+
+      // Now wait for neck to stabilize
+      last_stable_stamp = 0;
+      system_state.behavior_state = PHASE3_WAIT_STOPPED;
+    }
+    else if (system_state.behavior_state == PHASE3_LOCATE_BLOCK)
+    {
+      // Set neck downward, stop robot
+      move_neck(425);
+      set_motors(0, 0);
+
+      // Now wait for neck to stabilize
+      last_stable_stamp = 0;
+      system_state.behavior_state = PHASE3_WAIT_STOPPED;
+    }
+    else if (system_state.behavior_state == PHASE3_WAIT_STOPPED)
+    {
+      // Read neck angle
+      int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
+      if ((neck_angle > 0) && (neck_angle - system_state.neck_angle < 5) && (system_state.neck_angle - neck_angle < 5))
+      {
+        // Has settled - has a new laser scan started?
+        if (last_stable_stamp == 0)
+        {
+          last_stable_stamp = system_state.time;
+        }
+        else if (system_state.time - last_stable_stamp > 250)
+        {
+          // We've been stopped at least 250ms
+          latest_scan = assembler.scans_created;
+          system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
+        }
+      }
+      else
+      {
+        // Command it again
+        move_neck(system_state.neck_angle);
+        set_motors(0, 0);
+      }
+    }
+    else if (system_state.behavior_state == PHASE3_ASSEMBLE_SCAN)
+    {
+      // Wait until a new scan is definitely assembled
+      if (assembler.scans_created > latest_scan + 2)
+      {
+        system_state.behavior_state = PHASE3_ANALYZE_SCAN;
+      }
+    }
+    else if (system_state.behavior_state == PHASE3_ANALYZE_SCAN)
+    {
+      // Find all points on top of the table, less than 0.5m to either side of the robot
+      int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
+
+      // Send those points for debugging
+      udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+
+      // Now process segments
+      int segment_ct = extract_segments(line_points, points_ct,
+                                        segments, MAX_SEGMENTS, 0.0008f);
+
+      int num_candidates = 0;
+      int selected_segment = 0;
+      if (goal_pose.z < 0.0f)
+      {
+        // We are looking for the goal
+        for (int s = 0; s < segment_ct; ++s)
+        {
+          double width_sq = get_segment_width_sq(&segments[s]);
+          // Block is 60mm wide - add margin and square it
+          if (width_sq > 0.0625f && segments[s].points > 3)
+          {
+            // Candidate
+            selected_segment = s;
+            get_centroid(&segments[s], &candidates[num_candidates]);
+            if (++num_candidates >= MAX_CANDIDATES)
+            {
+              break;
+            }
+          }
+        }
+
+        if (num_candidates == 0)
+        {
+          // No segments to select from - retry assembling scan
+          last_pose_x = system_state.pose_x;
+          system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
+        }
+        else
+        {
+          // Send those points for debugging
+          line_segment_t & s = segments[selected_segment];
+          udp_send_packet((unsigned char *) &line_points[s.start_idx], s.points * 12, return_port, PACKET_SEGMENT_POINTS);
+
+          // Transform goal to global coordinates
+          transform_to_global(&goal_pose, &candidates[0]);
+
+          if (block_pose.z < 0.0f)
+          {
+            // Now find block
+            system_state.behavior_state = PHASE3_LOCATE_BLOCK;
+          }
+          else
+          {
+            // We already have the block - turn torwards the goal
+            if (fabs(turn_to_target(&goal_pose)) <= 5.0f)
+            {
+              system_state.behavior_state = PHASE3_PUSH_BLOCK;
+            }
+            else
+            {
+              // Assemble another scan
+              goal_pose.z = -1.0f;
+              system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
+            }
+          }
+        }
+      }
+      else
+      {
+        // We are looking for the block
+        for (int s = 0; s < segment_ct; ++s)
+        {
+          double width_sq = get_segment_width_sq(&segments[s]);
+          // Block is 60mm wide - add margin and square it
+          if (width_sq < 0.008f && segments[s].points > 3)
+          {
+            // Candidate
+            get_centroid(&segments[s], &candidates[num_candidates]);
+            if (++num_candidates >= MAX_CANDIDATES)
+            {
+              break;
+            }
+          }
+        }
+
+        if (num_candidates == 0)
+        {
+          // No segments to select from - move forward
+          last_pose_x = system_state.pose_x;
+          system_state.behavior_state = PHASE3_MOVE_FORWARD;
+        }
+        else
+        {
+          // Transform block to global coordinates
+          transform_to_global(&block_pose, &candidates[0]);
+          system_state.block_pose_x = block_pose.x;
+          system_state.block_pose_y = block_pose.y;
+          system_state.block_pose_z = block_pose.z;
+
+          // Now go push it
+          if (fabs(turn_to_target(&block_pose)) <= 5.0f)
+          {
+            system_state.behavior_state = PHASE3_APPROACH_BLOCK;
+          }
+          else
+          {
+            // Assemble another scan
+            system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
+          }
+        }
+      }
+    }
+    else if (system_state.behavior_state == PHASE3_MOVE_FORWARD)
+    {
+      float dist = move_forward_slowly(last_pose_x, 0.075f);
+      if (dist < 0.0f)
+      {
+        // ERROR - We shouldn't get here
+        system_state.run_state = MODE_DONE;
+      }
+      else if (dist > 0.075f)
+      {
+        // Moved a bit, stop the robot
+        last_stable_stamp = 0;
+        system_state.behavior_state = PHASE3_WAIT_STOPPED;
+      }
+    }
+    else if (system_state.behavior_state == PHASE3_APPROACH_BLOCK)
+    {
+      // Approach block
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED)
+      {
+        // We shouldn't really get here
+        set_motors(0, 0);
+      }
+      else
+      {
+        // Approach block
+        if (approach_target(&block_pose) < 0.005f)
+        {
+          // Stop and find the goal again
+          set_motors(0, 0);
+          goal_pose.z = -1.0f;
+          system_state.behavior_state = PHASE3_LOCATE_GOAL;
+        }
+      }
+    }
+    else if (system_state.behavior_state == PHASE3_PUSH_BLOCK)
+    {
+      // Approach block
+      if (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED)
+      {
+        // We shouldn't really get here
+        set_motors(0, 0);
+      }
+      else
+      {
+        // Approach block
+        if (approach_target(&goal_pose) < 0.01f)
+        {
+          set_motors(0, 0);
+          system_state.run_state = MODE_DONE;
+        }
+      }
+    }
   }
 }
 

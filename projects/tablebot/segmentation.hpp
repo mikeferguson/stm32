@@ -43,6 +43,7 @@ typedef struct
 {
   point_t start;
   point_t end;
+  int start_idx;
   int points;
 } line_segment_t;
 
@@ -118,6 +119,7 @@ int extract_segments(point_t * points, int num_points,
   // Create a first segment
   segments[0].start = points[0];
   segments[0].end = points[0];
+  segments[0].start_idx = point_idx;
   segments[0].points = 1;
 
   for (int i = 1; i < num_points; ++i)
@@ -142,6 +144,7 @@ int extract_segments(point_t * points, int num_points,
       // Create new segment
       segments[segment_idx].start = points[i];
       segments[segment_idx].end = points[i];
+      segments[segment_idx].start_idx = point_idx;
       segments[segment_idx].points = 1;
     }
   }
