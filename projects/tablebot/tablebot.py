@@ -158,7 +158,7 @@ class TableBotGUI:
                 # Remove header
                 packet = packet[4:]
 
-                if len(packet) == 84:
+                if len(packet) == 96:
                     # System state packet
                     self.system_time = struct.unpack_from("<L", packet, 0)[0]
                     self.system_voltage = struct.unpack_from("<f", packet, 4)[0]
@@ -194,8 +194,12 @@ class TableBotGUI:
                     pose_y = struct.unpack_from("<f", packet, 64)[0]
                     pose_th = struct.unpack_from("<f", packet, 68)[0]
 
-                    self.target_pose = struct.unpack_from("<f", packet, 72)[0]
-                    self.target_yaw = struct.unpack_from("<f", packet, 76)[0]
+                    self.block_pose_x = struct.unpack_from("<f", packet, 72)[0]
+                    self.block_pose_y = struct.unpack_from("<f", packet, 76)[0]
+                    self.block_pose_z = struct.unpack_from("<f", packet, 80)[0]
+
+                    self.target_pose = struct.unpack_from("<f", packet, 84)[0]
+                    self.target_yaw = struct.unpack_from("<f", packet, 88)[0]
 
                     if len(self.pose_x) == 0 or \
                             abs(pose_x - self.pose_x[-1]) > 0.01 or \

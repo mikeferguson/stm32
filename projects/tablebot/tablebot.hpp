@@ -191,6 +191,10 @@ typedef struct
   float pose_y;
   float pose_th;
 
+  float block_pose_x;
+  float block_pose_y;
+  float block_pose_z;
+
   float target_dist;
   float target_yaw;
 

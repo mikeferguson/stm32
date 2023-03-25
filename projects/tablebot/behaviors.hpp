@@ -38,6 +38,8 @@
 #define BEHAVIOR_ID_PHASE_3       3
 
 // Phase 1 states
+// This is a straight forward state machine - we move forward
+// through the states and never backwards
 #define PHASE1_DRIVE_TOWARDS_END  0
 #define PHASE1_BACK_UP_A_BIT      1
 #define PHASE1_TURN_IN_PLACE      2
@@ -47,6 +49,9 @@
 #define PHASE1_BACKUP_DISTANCE    0.15f
 
 // Phase 2 states
+// This state machine is a bit more complex than Phase 1
+//  * We iterate Wait->Assemble->Analyze->Move multiple times until we find the block
+//  * Once the block is found we Approach->Push one time and then are finished
 #define PHASE2_SETUP_STUFF        0
 #define PHASE2_WAIT_STOPPED       1
 #define PHASE2_ASSEMBLE_SCAN      2
@@ -63,11 +68,16 @@ uint16_t behavior_id = 0;
 #include "segmentation.hpp"
 
 #define MAX_POINTS 300
-#define MAX_SEGMENTS 10
 point_t line_points[MAX_POINTS];
+
+#define MAX_SEGMENTS 10
 line_segment_t segments[MAX_SEGMENTS];
-point_t block_candidates[10];
-int num_block_candidates;
+
+#define MAX_CANDIDATES 10
+point_t candidates[MAX_CANDIDATES];
+int num_candidates;
+
+point_t block_pose;
 
 void set_motors(int16_t left, int16_t right)
 {
@@ -84,19 +94,106 @@ void transform_to_global(point_t * g, point_t * l)
 
   g->x = system_state.pose_x + (cos_angle * l->x - sin_angle * l->y);
   g->y = system_state.pose_y + (sin_angle * l->x + cos_angle * l->y);
+  g->z = l->z;
 }
 
 // Returns angle in degrees
 float simple_atan2(float x, float y)
 {
-  if (fabs(y) < 0.001f || fabs(x) < 0.001f)
+  if (fabs(y) < 0.001f)
   {
     return 0.0f;
   }
 
   // https://math.stackexchange.com/questions/1098487/atan2-faster-approximation
   float z = y / x;
+  if (z < 0.0f)
+  {
+    z *= -1.0f;
+    return -(z * (45.0f - (z - 1.0f) * (14.0f + 3.83f * z)));
+  }
+
   return z * (45.0f - (z - 1.0f) * (14.0f + 3.83f * z));
+}
+
+// Move forward unless there is a cliff or we have surpassed limit distance
+// Returns distance traveled since last_pose_x or negative if there is a cliff
+float move_forward_slowly(float last_pose_x, float limit)
+{
+  float dist = abs(system_state.pose_x - last_pose_x);
+
+  if (system_state.cliff_left > CLIFF_DETECTED ||
+      system_state.cliff_right > CLIFF_DETECTED ||
+      system_state.cliff_center > CLIFF_DETECTED)
+  {
+    set_motors(0, 0);
+    return -1.0f;
+  }
+  else if (dist > limit)
+  {
+    // Moved a bit, stop the robot
+    set_motors(0, 0);
+  }
+  else
+  {
+    set_motors(SLOW_SPEED, SLOW_SPEED);
+  }
+  return dist;
+}
+
+// Compute the heading and distance to target
+// Values are stored in system_state
+void compute_heading_and_dist(point_t * target)
+{
+  float dx = target->x - system_state.pose_x;
+  float dy = target->y - system_state.pose_y;
+
+  system_state.target_dist = dx * dx + dy * dy;
+
+  // Note: yaw is in degrees
+  system_state.target_yaw = simple_atan2(dx, dy) - system_state.pose_th;
+}
+
+// Turn towards a target
+// Returns angular error
+float turn_to_target(point_t * target)
+{
+  compute_heading_and_dist(target);
+
+  if (system_state.target_yaw > 5.0f)
+  {
+    // In place turn to point at the target
+    set_motors(-MIN_SPEED, MIN_SPEED);
+  }
+  else if (system_state.target_yaw < -5.0f)
+  {
+    // In place turn to point at the target
+    set_motors(MIN_SPEED, -MIN_SPEED);
+  }
+  else
+  {
+    set_motors(0, 0);
+  }
+
+  return system_state.target_yaw;
+}
+
+// Move towards target pose
+// Returns distance to target
+float approach_target(point_t * target)
+{
+  compute_heading_and_dist(target);
+
+  // Error of 5 degrees in generates ~max_adjustment
+  int16_t max_adjustment = SLOW_SPEED * 0.2f;
+  int16_t adjustment = (system_state.target_yaw / 5.0f) * max_adjustment;
+  if (adjustment > max_adjustment) adjustment = max_adjustment;
+  if (adjustment < -max_adjustment) adjustment = -max_adjustment;
+  // Positive angular error = steer to the left
+  set_motors(SLOW_SPEED - adjustment, SLOW_SPEED + adjustment);
+
+  // Return distance to target
+  return system_state.target_dist;
 }
 
 void run_behavior(uint16_t id, uint32_t stamp)
@@ -293,31 +390,23 @@ void run_behavior(uint16_t id, uint32_t stamp)
                                         segments, MAX_SEGMENTS, 0.0008f);
 
       // Process segments
-      num_block_candidates = 0;
+      num_candidates = 0;
       for (int s = 0; s < segment_ct; ++s)
       {
         double width_sq = get_segment_width_sq(&segments[s]);
         // Block is 60mm wide - add margin and square it
-        if (width_sq < 0.0064f && segments[s].points > 3)
+        if (width_sq < 0.008f && segments[s].points > 3)
         {
           // Candidate
-          get_centroid(&segments[s], &block_candidates[num_block_candidates]);
-          if (++num_block_candidates)
+          get_centroid(&segments[s], &candidates[num_candidates]);
+          if (++num_candidates >= MAX_CANDIDATES)
           {
             break;
           }
         }
       }
 
-      if (num_block_candidates == 1)
-      {
-        // Transform block to global coordinates
-        block_candidates[1] = block_candidates[0];
-        transform_to_global(&block_candidates[0], &block_candidates[1]);
-        // Now go push it
-        system_state.behavior_state = PHASE2_APPROACH_BLOCK;
-      }
-      else if (segment_ct == 0 || num_block_candidates == 0)
+      if (segment_ct == 0 || num_candidates == 0)
       {
         // No segments to select from - move forward
         last_pose_x = system_state.pose_x;
@@ -325,31 +414,36 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-        // Inconclusive - scan again
-        latest_scan = assembler.scans_created;
-        system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
+        // Transform block to global coordinates
+        transform_to_global(&block_pose, &candidates[0]);
+        system_state.block_pose_x = block_pose.x;
+        system_state.block_pose_y = block_pose.y;
+        system_state.block_pose_z = block_pose.z;
+
+        // Now go push it
+        if (fabs(turn_to_target(&block_pose)) <= 5.0f)
+        {
+          system_state.behavior_state = PHASE2_APPROACH_BLOCK;
+        }
+        else
+        {
+          // Assemble another scan
+          system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
+        }
       }
     }
     else if (system_state.behavior_state == PHASE2_MOVE_FORWARD)
     {
-      if (system_state.cliff_left > CLIFF_DETECTED ||
-          system_state.cliff_right > CLIFF_DETECTED ||
-          system_state.cliff_center > CLIFF_DETECTED)
+      float dist = move_forward_slowly(last_pose_x, 0.075f);
+      if (dist < 0.0f)
       {
         // ERROR - We shouldn't get here
-        set_motors(0, 0);
         system_state.run_state = MODE_DONE;
       }
-      else if (abs(system_state.pose_x - last_pose_x) > 0.1f)
+      else if (dist > 0.075f)
       {
-        // Moved a bit, stop the robot
-        set_motors(0, 0);
         last_stable_stamp = 0;
         system_state.behavior_state = PHASE2_WAIT_STOPPED;
-      }
-      else
-      {
-        set_motors(SLOW_SPEED, SLOW_SPEED);
       }
     }
     else if (system_state.behavior_state == PHASE2_APPROACH_BLOCK ||
@@ -360,7 +454,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
           system_state.cliff_right > CLIFF_DETECTED ||
           system_state.cliff_center > CLIFF_DETECTED)
       {
-        if (system_state.cliff_center > CLIFF_DETECTED)
+        if (system_state.cliff_right > CLIFF_DETECTED &&
+            system_state.cliff_left > CLIFF_DETECTED)
         {
           // Definitely stop
           system_state.run_state = MODE_DONE;
@@ -369,12 +464,17 @@ void run_behavior(uint16_t id, uint32_t stamp)
         else if (system_state.cliff_right > CLIFF_DETECTED)
         {
           // Rotate around right wheel
-          set_motors(SLOW_SPEED, 0);
+          set_motors(MIN_SPEED, 0);
         }
         else if (system_state.cliff_left > CLIFF_DETECTED)
         {
           // Rotate around left wheel
-          set_motors(0, SLOW_SPEED);
+          set_motors(0, MIN_SPEED);
+        }
+        else
+        {
+          // Block is blocking our center cliff sensor...
+          set_motors(MIN_SPEED, MIN_SPEED);
         }
       }
       else if (system_state.behavior_state == PHASE2_PUSH_BLOCK)
@@ -385,27 +485,10 @@ void run_behavior(uint16_t id, uint32_t stamp)
       else
       {
         // Approach block
-        // Have we reached the block?
-        float dx = block_candidates[0].x - system_state.pose_x;
-        float dy = block_candidates[0].y - system_state.pose_y;
-        float dist = dx * dx + dy * dy;
-        if (dist < 0.01f)
+        if (approach_target(&block_pose) < 0.01f)
         {
           system_state.behavior_state = PHASE2_PUSH_BLOCK;
         }
-        float yaw = simple_atan2(dx, dy) + system_state.pose_th;
-
-        // For debugging
-        system_state.target_dist = dist;
-        system_state.target_yaw = yaw;
-
-        // Error of 5 degrees in generates ~max_adjustment
-        int16_t max_adjustment = SLOW_SPEED * 0.2f;
-        int16_t adjustment = (yaw / 5.0f) * max_adjustment;
-        if (adjustment > max_adjustment) adjustment = max_adjustment;
-        if (adjustment < -max_adjustment) adjustment = -max_adjustment;
-        // Positive error = steer to the left
-        set_motors(SLOW_SPEED - adjustment, SLOW_SPEED + adjustment);
       }
     }
   }
