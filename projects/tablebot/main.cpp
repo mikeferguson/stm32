@@ -356,7 +356,8 @@ void SysTick_Handler(void)
     system_state.motor2_vel = m2_enc.read_speed();
 
     // Update PID and set motor commands
-    if (system_state.time - system_state.last_motor_command < 100)
+    if (system_state.time - system_state.last_motor_command < 100 &&
+        system_state.last_motor_command > 100)  // Avoid lurch on restart
     {
       m1.set(m1_pid.update_pid(system_state.motor1_vel));
       m2.set(m2_pid.update_pid(system_state.motor2_vel));
