@@ -135,7 +135,7 @@ void LwIP_Pkt_Handle(void)
   * @param  localtime the current LocalTime value
   * @retval None
   */
-void LwIP_Periodic_Handle(uint32_t localtime)
+uint32_t LwIP_Periodic_Handle(uint32_t localtime)
 {
   if (ethernet_state.connected_)
   {
@@ -169,6 +169,10 @@ void LwIP_Periodic_Handle(uint32_t localtime)
     {
       netif_set_up(&netif);
       ethernet_state.connected_ = 1;
+    }
+    else
+    {
+      return ETH_ERROR;
     }
   }
 
@@ -211,6 +215,8 @@ void LwIP_Periodic_Handle(uint32_t localtime)
     dhcp_coarse_tmr();
   }
 #endif
+
+  return ETH_SUCCESS;
 }
 
 #ifdef USE_DHCP

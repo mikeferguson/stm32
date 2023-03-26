@@ -14,7 +14,7 @@ enum {PHY_ADDRESS = 1};
 
 void LwIP_Init(void);
 void LwIP_Pkt_Handle(void);
-void LwIP_Periodic_Handle(uint32_t localtime);
+uint32_t LwIP_Periodic_Handle(uint32_t localtime);
 uint32_t Ethernet_Init(void);
 
 void send_raw_packet();

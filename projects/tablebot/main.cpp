@@ -279,9 +279,13 @@ int main(void)
 
   move_neck(512);
 
+  bool disable_eth = false;
   while(1)
   {
-    LwIP_Periodic_Handle(system_state.time);
+    if (!disable_eth && (LwIP_Periodic_Handle(system_state.time) == ETH_ERROR))
+    {
+      disable_eth = true;
+    }
 
     if (imu.update(system_state.time))
     {
