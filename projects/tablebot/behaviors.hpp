@@ -189,7 +189,7 @@ bool cliff_detected()
 
 // Move forward unless there is a cliff or we have surpassed limit distance
 // Returns distance traveled since last_pose_x or negative if there is a cliff
-float move_forward_slowly(float last_pose_x, float limit)
+float move_forward(uint16_t speed, float last_pose_x, float limit)
 {
   float dist = abs(system_state.pose_x - last_pose_x);
 
@@ -205,7 +205,7 @@ float move_forward_slowly(float last_pose_x, float limit)
   }
   else
   {
-    set_motors(SLOW_SPEED, SLOW_SPEED);
+    set_motors(speed, speed);
   }
   return dist;
 }
@@ -298,6 +298,20 @@ bool verify_neck(uint32_t * last_stable_stamp, uint32_t stop_time = 250)
   return false;
 }
 
+// Make sure table is visible to laser
+int is_table_present()
+{
+  // Inspect only points right in front of us
+  int points_ct = project_points(line_points, MAX_POINTS, true, 0.1f, -0.1f, 0.2f);
+  if (points_ct < 5)
+  {
+    // Not enough - call table missing
+    return 0;
+  }
+
+  return points_ct;
+}
+
 void run_behavior(uint16_t id, uint32_t stamp)
 {
   static float last_pose_x;
@@ -341,6 +355,9 @@ void run_behavior(uint16_t id, uint32_t stamp)
     goal_pose.x = 0.0f;
     goal_pose.y = 0.0f;
     goal_pose.z = -1.0f;
+
+    // Go fast if we can
+    max_speed = STANDARD_SPEED;
   }
 
   if (id == BEHAVIOR_ID_PHASE_1)
@@ -359,7 +376,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       if (verify_neck(&last_stable_stamp))
       {
         latest_scan = assembler.scans_created + 1;
-        max_speed = STANDARD_SPEED;
+        max_speed = FAST_SPEED;
         system_state.behavior_state = PHASE1_DRIVE_TOWARDS_END;
       }
       else
@@ -382,13 +399,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
         // Cliff sensors haven't triggered - can laser still see the table?
         if (max_speed > SLOW_SPEED && assembler.scans_created > latest_scan)
         {
-          // New laser scan to inspect - take only points right in front of us
-          int points_ct = project_points(line_points, MAX_POINTS, true, 0.1f, -0.1f, 0.2f);
-
-          // Send those points for debugging
-          udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
-
-          if (points_ct < 5)
+          int points_ct = is_table_present();
+          if (points_ct > 0)
+          {
+            // Send those points for debugging
+            udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+          }
+          else
           {
             // We've lost the table - SLOW DOWN!
             max_speed = SLOW_SPEED;
@@ -439,7 +456,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       {
         // Done rotating in place - stop robot
         set_motors(0, 0);
-        max_speed = STANDARD_SPEED;
+        max_speed = FAST_SPEED;
         latest_scan = assembler.scans_created + 1;
         system_state.behavior_state = PHASE1_RETURN_TO_START;
       }
@@ -486,7 +503,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
     else if (system_state.behavior_state == PHASE2_DRIVE_AND_SCAN)
     {
       // Continue moving forward
-      if (move_forward_slowly(last_pose_x, 10.0f) < 0.0f)
+      if (move_forward(max_speed, last_pose_x, 10.0f) < 0.0f)
       {
         // We reached end of table without finding the block - go back and try to find it again
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
@@ -496,6 +513,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
       {
         // Note that we are processing this scan
         latest_scan = assembler.scans_created;
+
+        // Make sure the table is still there
+        if (is_table_present() == 0)
+        {
+          // We've lost the table - SLOW DOWN!
+          max_speed = SLOW_SPEED;
+        }
 
         // Find all points on top of the table, less than 0.5m to either side of the robot
         int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
@@ -565,6 +589,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         set_motors(0, 0);
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
         latest_scan = assembler.scans_created + 1;
+        max_speed = STANDARD_SPEED;
         system_state.behavior_state = PHASE2_DRIVE_AND_SCAN;
       }
       else
@@ -667,7 +692,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
     else if (system_state.behavior_state == PHASE3_DRIVE_AND_SCAN)
     {
       // Continue moving forward (if looking for block)
-      if (goal_pose.z > 0.0f && move_forward_slowly(last_pose_x, 10.0f) < 0.0f)
+      if (goal_pose.z > 0.0f && move_forward(max_speed, last_pose_x, 10.0f) < 0.0f)
       {
         // We reached end of table without finding the block -- shouldn't get here
         system_state.run_state = MODE_DONE;
@@ -676,6 +701,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
       {
         // Note that we are processing this scan
         latest_scan = assembler.scans_created;
+
+        // Make sure the table is still there
+        if (is_table_present() == 0)
+        {
+          // We've lost the table - SLOW DOWN!
+          max_speed = SLOW_SPEED;
+        }
 
         // Find all points on top of the table, less than 0.5m to either side of the robot
         int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
