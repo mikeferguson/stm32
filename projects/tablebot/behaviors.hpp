@@ -51,21 +51,20 @@
 
 // Distance to back up before making in-place 180 degree turn
 #define PHASE1_BACKUP_DISTANCE    0.15f
+#define PHASE2_BACKUP_DISTANCE    0.15f
 
 // Phase 2 states
 // This state machine is a bit more complex than Phase 1
-//  * We iterate Wait->Assemble->Analyze->Move multiple times until we find the block
-//  * Once the block is found we Approach->Push one time and then are finished
-#define PHASE2_SETUP_STUFF        0
-#define PHASE2_WAIT_STOPPED       1
-#define PHASE2_ASSEMBLE_SCAN      2
-#define PHASE2_ANALYZE_SCAN       3
-#define PHASE2_MOVE_FORWARD       4
-#define PHASE2_TURN_TO_BLOCK      5
-#define PHASE2_APPROACH_BLOCK     6
-#define PHASE2_PUSH_BLOCK         7
-#define PHASE2_BACK_UP_A_BIT      8
-#define PHASE2_TURN_IN_PLACE      9
+//  * Normal operation would be Setup->Drive->Turn->Approach->Push
+//  * If we encounter the end of the table during Drive,
+//    we will do Backup->Turn-in-Place->Drive
+#define PHASE2_SETUP_NECK         0
+#define PHASE2_DRIVE_FORWARD      1
+#define PHASE2_TURN_TO_BLOCK      2
+#define PHASE2_APPROACH_BLOCK     3
+#define PHASE2_PUSH_BLOCK         4
+#define PHASE2_BACK_UP_A_BIT      5
+#define PHASE2_TURN_IN_PLACE      6
 
 // Phase 3 states
 // This is the most complex of the state machines
@@ -472,103 +471,83 @@ void run_behavior(uint16_t id, uint32_t stamp)
      *                      PHASE 2                       *
      *                                                    *
      ******************************************************/
-    if (system_state.behavior_state == PHASE2_SETUP_STUFF)
+    if (system_state.behavior_state == PHASE2_SETUP_NECK)
     {
-      // Angle neck downwards, stop robot
-      move_neck(425);
-      set_motors(0, 0);
+      // Angle neck downwards
+      system_state.neck_angle = 425;
 
-      // Now wait for neck to stabilize
-      system_state.behavior_state = PHASE2_WAIT_STOPPED;
-    }
-    else if (system_state.behavior_state == PHASE2_WAIT_STOPPED)
-    {
-      // Read neck angle
+      // Is neck there yet?
       if (verify_neck(&last_stable_stamp))
       {
-        latest_scan = assembler.scans_created;
-        system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
+        last_pose_x = system_state.pose_x;  // Cache the X position along table
+        latest_scan = assembler.scans_created + 1;
+        system_state.behavior_state = PHASE2_DRIVE_FORWARD;
       }
       else
       {
-        // Command it again
         move_neck(system_state.neck_angle);
-        set_motors(0, 0);
       }
     }
-    else if (system_state.behavior_state == PHASE2_ASSEMBLE_SCAN)
+    else if (system_state.behavior_state == PHASE2_DRIVE_FORWARD)
     {
-      // Wait until a new scan is definitely assembled
-      if (assembler.scans_created > latest_scan + 2)
-      {
-        system_state.behavior_state = PHASE2_ANALYZE_SCAN;
-      }
-    }
-    else if (system_state.behavior_state == PHASE2_ANALYZE_SCAN)
-    {
-      // Find all points on top of the table, less than 0.5m to either side of the robot
-      int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
-
-      // Send those points for debugging
-      udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
-
-      // Now process segments
-      int segment_ct = extract_segments(line_points, points_ct,
-                                        segments, MAX_SEGMENTS, 0.0008f);
-
-      // Process segments
-      int num_candidates = 0;
-      for (int s = 0; s < segment_ct; ++s)
-      {
-        double width_sq = get_segment_width_sq(&segments[s]);
-        // Block is 60mm wide - add margin and square it
-        if (width_sq < 0.01f && segments[s].points > 3)
-        {
-          // Candidate
-          get_centroid(&segments[s], &candidates[num_candidates]);
-          if (++num_candidates >= MAX_CANDIDATES)
-          {
-            break;
-          }
-        }
-      }
-
-      if (num_candidates == 0)
-      {
-        // No segments to select from - move forward
-        last_pose_x = system_state.pose_x;
-        system_state.behavior_state = PHASE2_MOVE_FORWARD;
-      }
-      else
-      {
-        // Transform block to global coordinates
-        transform_to_global(&block_pose, &candidates[0]);
-        system_state.block_pose_x = block_pose.x;
-        system_state.block_pose_y = block_pose.y;
-        system_state.block_pose_z = block_pose.z;
-
-        // Now align to the block
-        system_state.behavior_state = PHASE2_TURN_TO_BLOCK;
-      }
-    }
-    else if (system_state.behavior_state == PHASE2_MOVE_FORWARD)
-    {
-      float dist = move_forward_slowly(last_pose_x, 0.075f);
-      if (dist < 0.0f)
+      // Continue moving forward
+      if (move_forward_slowly(last_pose_x, 10.0f) < 0.0f)
       {
         // We reached end of table without finding the block - go back and try to find it again
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
         system_state.behavior_state = PHASE2_BACK_UP_A_BIT;
       }
-      else if (dist > 0.075f)
+      else if (assembler.scans_created > latest_scan)
       {
-        last_stable_stamp = 0;
-        system_state.behavior_state = PHASE2_WAIT_STOPPED;
+        // Note that we are processing this scan
+        latest_scan = assembler.scans_created;
+
+        // Find all points on top of the table, less than 0.5m to either side of the robot
+        int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
+
+        // Send those points for debugging
+        udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+
+        // Now process segments
+        int segment_ct = extract_segments(line_points, points_ct,
+                                          segments, MAX_SEGMENTS, 0.0008f);
+
+        // Process segments
+        int num_candidates = 0;
+        for (int s = 0; s < segment_ct; ++s)
+        {
+          double width_sq = get_segment_width_sq(&segments[s]);
+          // Block is 60mm wide - add margin and square it
+          if (width_sq < 0.01f && segments[s].points > 3)
+          {
+            // Candidate
+            get_centroid(&segments[s], &candidates[num_candidates]);
+            if (++num_candidates >= MAX_CANDIDATES)
+            {
+              break;
+            }
+          }
+        }
+
+        if (num_candidates > 0)
+        {
+          // Stop robot
+          set_motors(0, 0);
+
+          // Transform block to global coordinates
+          transform_to_global(&block_pose, &candidates[0]);
+          system_state.block_pose_x = block_pose.x;
+          system_state.block_pose_y = block_pose.y;
+          system_state.block_pose_z = block_pose.z;
+
+          // Now align to the block
+          system_state.behavior_state = PHASE2_TURN_TO_BLOCK;
+        }
       }
     }
     else if (system_state.behavior_state == PHASE2_BACK_UP_A_BIT)
     {
-      if (abs(last_pose_x - system_state.pose_x) > PHASE1_BACKUP_DISTANCE)
+      if (abs(last_pose_x - system_state.pose_x) > PHASE2_BACKUP_DISTANCE)
       {
         // Done backing up - stop robot
         set_motors(0, 0);
@@ -577,7 +556,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-        // Backup
+        // Backup slowly
         set_motors(-SLOW_SPEED, -SLOW_SPEED);
       }
     }
@@ -589,9 +568,9 @@ void run_behavior(uint16_t id, uint32_t stamp)
       {
         // Done rotating in place - stop robot
         set_motors(0, 0);
-        max_speed = STANDARD_SPEED;
+        last_pose_x = system_state.pose_x;  // Cache the X position along table length
         latest_scan = assembler.scans_created + 1;
-        system_state.behavior_state = PHASE1_RETURN_TO_START;
+        system_state.behavior_state = PHASE2_DRIVE_FORWARD;
       }
       else
       {
@@ -646,13 +625,9 @@ void run_behavior(uint16_t id, uint32_t stamp)
         // Just slow forward movement
         set_motors(SLOW_SPEED, SLOW_SPEED);
       }
-      else
+      else if (approach_target(&block_pose) < 0.01f)
       {
-        // Approach block
-        if (approach_target(&block_pose) < 0.01f)
-        {
-          system_state.behavior_state = PHASE2_PUSH_BLOCK;
-        }
+        system_state.behavior_state = PHASE2_PUSH_BLOCK;
       }
     }
   }
