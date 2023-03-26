@@ -462,7 +462,7 @@ class TableBotGUI:
             if value == 0:
                 return "Setup Neck"
             elif value == 1:
-                return "Drive Forward"
+                return "Drive and Scan"
             elif value == 2:
                 return "Turn to Block"
             elif value == 3:
@@ -476,22 +476,20 @@ class TableBotGUI:
         elif self.run_state == 3:
             # Phase 3 Behavior
             if value == 0:
-                return "Setup Stuff"
+                return "Setup to Locate Goal"
             elif value == 1:
-                return "Locating Goal"
+                return "Setup to Locate Block"
             elif value == 2:
-                return "Locating Block"
+                return "Drive and Scan"
             elif value == 3:
-                return "Wait to Stop"
+                return "Turn To Block"
             elif value == 4:
-                return "Assemble Scan"
-            elif value == 5:
-                return "Analyze Scan"
-            elif value == 6:
-                return "Move Forward"
-            elif value == 7:
                 return "Approach Block"
-            elif value == 8:
+            elif value == 5:
+                return "Turn to Table End"
+            elif value == 6:
+                return "Turn to Goal"
+            elif value == 7:
                 return "Push Block"
         # Unknown
         return "NONE"
