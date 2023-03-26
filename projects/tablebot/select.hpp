@@ -35,18 +35,26 @@
 #define MODE_UNSELECTED     0
 #define MODE_DONE           255
 
+// Current state of robot
+int current_selection = -1;
+
 // Next state (once selected)
 int next_selection = -1;
 
+uint32_t select_stamp = 0;
+
 int get_next_mode()
 {
+  if (current_selection > 0 && system_state.time - select_stamp > 1000)
+  {
+    return current_selection;
+  }
+
   return next_selection;
 }
 
 uint8_t select_mode()
 {
-  static uint32_t last_unlevel_stamp = 0;
-
   uint8_t mode = system_state.run_state;
 
   if (mode == MODE_DONE)
@@ -54,8 +62,9 @@ uint8_t select_mode()
     // If we are done, but then rotated away from vertical, re-enter unselected
     if (system_state.accel_z < 2000)
     {
+      current_selection = -1;
       next_selection = -1;
-      last_unlevel_stamp = system_state.time;
+      select_stamp = system_state.time;
       mode = MODE_UNSELECTED;
     }
   }
@@ -64,14 +73,24 @@ uint8_t select_mode()
   {
     if (system_state.accel_z > 3000)
     {
-      // Robot is mostly right side up
+      // Robot is somewhat right side up - certainly not tipped enough to trigger a state
+      if (current_selection > 0)
+      {
+        if (system_state.time - select_stamp > 1000)
+        {
+          // Selection was held for at least 1 second
+          next_selection = current_selection;
+        }
+        current_selection = 0;
+        select_stamp = system_state.time;
+      }
 
       if (system_state.accel_x > 3000 || system_state.accel_x < -3000 ||
           system_state.accel_y > 3000 || system_state.accel_y < -3000 ||
           system_state.accel_z < 7000)
       {
         // Not level enough
-        last_unlevel_stamp = system_state.time;
+        select_stamp = system_state.time;
       }
 
       if (system_state.cliff_left > CLIFF_DETECTED ||
@@ -79,11 +98,11 @@ uint8_t select_mode()
           system_state.cliff_center > CLIFF_DETECTED)
       {
         // Not on the table
-        last_unlevel_stamp = system_state.time;
+        select_stamp = system_state.time;
       }
 
-      // Have we been level and on table for 3 seconds?
-      if (system_state.time - last_unlevel_stamp > 3000 && next_selection > 0)
+      // Have we been level and on table for 1 seconds?
+      if (system_state.time - select_stamp > 1000 && next_selection > 0)
       {
         // We are level and on a table
         mode = next_selection;
@@ -92,20 +111,29 @@ uint8_t select_mode()
     else if (system_state.accel_x < -7000)
     {
       // Robot - left side up side
-      next_selection = 1;
-      last_unlevel_stamp = system_state.time;
+      if (current_selection != 1)
+      {
+        current_selection = 1;
+        select_stamp = system_state.time;
+      }
     }
     else if (system_state.accel_x > 7000)
     {
       // Robot right side up
-      next_selection = 2;
-      last_unlevel_stamp = system_state.time;
+      if (current_selection != 2)
+      {
+        current_selection = 2;
+        select_stamp = system_state.time;
+      }
     }
     else if (system_state.accel_y > 7000)
     {
       // Robot front side up
-      next_selection = 3;
-      last_unlevel_stamp = system_state.time;
+      if (current_selection != 3)
+      {
+        current_selection = 3;
+        select_stamp = system_state.time;
+      }
     }
   }
 
