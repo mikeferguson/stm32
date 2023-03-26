@@ -201,8 +201,16 @@ class TableBotGUI:
                     self.motor1_current = struct.unpack_from("<h", packet, 52)[0]
                     self.motor2_current = struct.unpack_from("<h", packet, 54)[0]
 
-                    self.run_state = int(packet[56])
-                    self.behavior_state = int(packet[57])
+                    run_state = int(packet[56])
+                    if run_state != self.run_state:
+                        print("Switching to %s" % self.getRunStateValue(run_state))
+                        self.run_state = run_state
+
+                    behavior_state = int(packet[57])
+                    if behavior_state != self.behavior_state:
+                        print("Switching to %s" % self.getBehaviorStateValue(behavior_state))
+                        self.behavior_state = behavior_state
+
                     self.neck_angle = struct.unpack_from("<H", packet, 58)[0]
 
                     pose_x = struct.unpack_from("<f", packet, 60)[0]
@@ -224,7 +232,7 @@ class TableBotGUI:
                             abs(pose_x - self.pose_x[-1]) > 0.01 or \
                             abs(pose_y - self.pose_y[-1]) > 0.01 or \
                             abs(pose_th - self.pose_th[-1]) > 0.1:
-                        print(pose_x, pose_y, pose_th)
+                        print(pose_x, pose_y, pose_th, self.target_yaw)
                         self.pose_x.append(pose_x)
                         self.pose_y.append(pose_y)
                         self.pose_th.append(pose_th)
@@ -461,9 +469,15 @@ class TableBotGUI:
             elif value == 4:
                 return "Move Forward"
             elif value == 5:
-                return "Approach Block"
+                return "Turn to Block"
             elif value == 6:
+                return "Approach Block"
+            elif value == 7:
                 return "Push Block"
+            elif value == 8:
+                return "Back Up"
+            elif value == 9:
+                return "Turn Around"
         elif self.run_state == 3:
             # Phase 3 Behavior
             if value == 0:

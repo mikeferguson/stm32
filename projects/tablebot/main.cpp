@@ -180,9 +180,9 @@ int main(void)
 
   // Setup drive motors
   m1_pid.set_max_step(10);
-  m1_pid.set_gains(5.0, 0.0, 0.2, 400.0);
+  m1_pid.set_gains(4.0, 0.0, 0.15, 400.0);
   m2_pid.set_max_step(10);
-  m2_pid.set_gains(5.0, 0.0, 0.2, 400.0);
+  m2_pid.set_gains(4.0, 0.0, 0.15, 400.0);
 
   NVIC_SetPriorityGrouping(3);
 
@@ -388,7 +388,7 @@ void SysTick_Handler(void)
       system_state.pose_x += cos_th * d;
       system_state.pose_y += sin_th * d;
     }
-    system_state.pose_th += dth;
+    system_state.pose_th = angle_wrap(system_state.pose_th + dth);
   }
 
   // Control LED

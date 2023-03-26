@@ -59,8 +59,11 @@
 #define PHASE2_ASSEMBLE_SCAN      2
 #define PHASE2_ANALYZE_SCAN       3
 #define PHASE2_MOVE_FORWARD       4
-#define PHASE2_APPROACH_BLOCK     5
-#define PHASE2_PUSH_BLOCK         6
+#define PHASE2_TURN_TO_BLOCK      5
+#define PHASE2_APPROACH_BLOCK     6
+#define PHASE2_PUSH_BLOCK         7
+#define PHASE2_BACK_UP_A_BIT      8
+#define PHASE2_TURN_IN_PLACE      9
 
 // Phase 3 states
 // This is the most complex of the state machines
@@ -107,7 +110,7 @@ void set_motors(int16_t left, int16_t right)
 void transform_to_global(point_t * g, point_t * l)
 {
   float cos_angle, sin_angle;
-  arm_sin_cos_f32(system_state.pose_th, &sin_angle, &cos_angle);
+  arm_sin_cos_f32(system_state.pose_th * 57.2958f, &sin_angle, &cos_angle);
 
   g->x = system_state.pose_x + (cos_angle * l->x - sin_angle * l->y);
   g->y = system_state.pose_y + (sin_angle * l->x + cos_angle * l->y);
@@ -115,15 +118,8 @@ void transform_to_global(point_t * g, point_t * l)
 }
 
 // Returns angle in degrees
-float simple_atan2(float x, float y)
+float simple_arctan(float z)
 {
-  if (fabs(y) < 0.001f)
-  {
-    return 0.0f;
-  }
-
-  // https://math.stackexchange.com/questions/1098487/atan2-faster-approximation
-  float z = y / x;
   if (z < 0.0f)
   {
     z *= -1.0f;
@@ -131,6 +127,61 @@ float simple_atan2(float x, float y)
   }
 
   return z * (45.0f - (z - 1.0f) * (14.0f + 3.83f * z));
+}
+
+// Returns angle in degrees
+float simple_atan2(float x, float y)
+{
+  if (fabs(y) < 0.001f)
+  {
+    if (x < 0.0f)
+    {
+      return 180.0f;
+    }
+    return 0.0f;
+  }
+
+  if (fabs(x) < 0.001f)
+  {
+    if (y < 0.0f)
+    {
+      return 270.0f;
+    }
+    return 90.0f;
+  }
+
+  // https://math.stackexchange.com/questions/1098487/atan2-faster-approximation
+  float z = y / x;
+  if (fabs(z) < 1.0f)
+  {
+    if (x > 0.0f)
+    {
+      return simple_arctan(z);
+    }
+    return simple_arctan(z) + 180.0f;
+  }
+  else
+  {
+    if (y > 0.0f)
+    {
+      return 90 - simple_arctan(x / y);
+    }
+    return -90 - simple_arctan(x / y);
+  }
+}
+
+// Angle wrap in radians
+float angle_wrap(float angle)
+{
+  if (angle > 3.14159265359f)
+  {
+    return angle - 2.0f * 3.14159265359f;
+  }
+  else if (angle < -3.14159265359f)
+  {
+    return angle + 2.0f * 3.14159265359f;
+  }
+  return angle;
 }
 
 // Move forward unless there is a cliff or we have surpassed limit distance
@@ -167,8 +218,20 @@ void compute_heading_and_dist(point_t * target)
 
   system_state.target_dist = dx * dx + dy * dy;
 
-  // Note: yaw is in degrees
-  system_state.target_yaw = simple_atan2(dx, dy) - system_state.pose_th;
+  // Note: yaw is in degrees, but system_state.pose_th is in radians
+  float yaw = simple_atan2(dx, dy) - (system_state.pose_th * 57.2958f);
+
+  // Keep it +/- 180 degrees
+  while (yaw < 180.0f)
+  {
+    yaw += 360.0f;
+  }
+  while (yaw > 180.0f)
+  {
+    yaw -= 360.0f;
+  }
+
+  system_state.target_yaw = yaw;
 }
 
 // Turn towards a target
@@ -270,6 +333,10 @@ void run_behavior(uint16_t id, uint32_t stamp)
     last_pose_x = system_state.pose_x;
     last_pose_y = system_state.pose_y;
     last_pose_th = system_state.pose_th;
+
+    // Clear block and goal poses
+    block_pose.z = -1.0f;
+    goal_pose.z = -1.0f;
   }
 
   if (id == BEHAVIOR_ID_PHASE_1)
@@ -365,6 +432,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
     else if (system_state.behavior_state == PHASE1_TURN_IN_PLACE)
     {
       float angle_error = last_pose_th + 3.14f - system_state.pose_th;
+      angle_error = angle_wrap(angle_error);
       if (abs(angle_error) < 0.025f)
       {
         // Done rotating in place - stop robot
@@ -447,7 +515,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       {
         double width_sq = get_segment_width_sq(&segments[s]);
         // Block is 60mm wide - add margin and square it
-        if (width_sq < 0.008f && segments[s].points > 3)
+        if (width_sq < 0.01f && segments[s].points > 3)
         {
           // Candidate
           get_centroid(&segments[s], &candidates[num_candidates]);
@@ -458,7 +526,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         }
       }
 
-      if (segment_ct == 0 || num_candidates == 0)
+      if (num_candidates == 0)
       {
         // No segments to select from - move forward
         last_pose_x = system_state.pose_x;
@@ -472,16 +540,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
         system_state.block_pose_y = block_pose.y;
         system_state.block_pose_z = block_pose.z;
 
-        // Now go push it
-        if (fabs(turn_to_target(&block_pose)) <= 5.0f)
-        {
-          system_state.behavior_state = PHASE2_APPROACH_BLOCK;
-        }
-        else
-        {
-          // Assemble another scan
-          system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
-        }
+        // Now align to the block
+        system_state.behavior_state = PHASE2_TURN_TO_BLOCK;
       }
     }
     else if (system_state.behavior_state == PHASE2_MOVE_FORWARD)
@@ -489,8 +549,9 @@ void run_behavior(uint16_t id, uint32_t stamp)
       float dist = move_forward_slowly(last_pose_x, 0.075f);
       if (dist < 0.0f)
       {
-        // ERROR - We shouldn't get here
-        system_state.run_state = MODE_DONE;
+        // We reached end of table without finding the block - go back and try to find it again
+        last_pose_x = system_state.pose_x;  // Cache the X position along table length
+        system_state.behavior_state = PHASE2_BACK_UP_A_BIT;
       }
       else if (dist > 0.075f)
       {
@@ -498,7 +559,46 @@ void run_behavior(uint16_t id, uint32_t stamp)
         system_state.behavior_state = PHASE2_WAIT_STOPPED;
       }
     }
-    else if (system_state.behavior_state == PHASE2_APPROACH_BLOCK ||
+    else if (system_state.behavior_state == PHASE2_BACK_UP_A_BIT)
+    {
+      if (abs(last_pose_x - system_state.pose_x) > PHASE1_BACKUP_DISTANCE)
+      {
+        // Done backing up - stop robot
+        set_motors(0, 0);
+        last_pose_th = system_state.pose_th;
+        system_state.behavior_state = PHASE2_TURN_IN_PLACE;
+      }
+      else
+      {
+        // Backup
+        set_motors(-SLOW_SPEED, -SLOW_SPEED);
+      }
+    }
+    else if (system_state.behavior_state == PHASE2_TURN_IN_PLACE)
+    {
+      float angle_error = last_pose_th + 3.14f - system_state.pose_th;
+      angle_error = angle_wrap(angle_error);
+      if (abs(angle_error) < 0.025f)
+      {
+        // Done rotating in place - stop robot
+        set_motors(0, 0);
+        max_speed = STANDARD_SPEED;
+        latest_scan = assembler.scans_created + 1;
+        system_state.behavior_state = PHASE1_RETURN_TO_START;
+      }
+      else
+      {
+        // Rotate based on error - slow down as we approach goal angle
+        int16_t speed = angle_error * 75;
+        if (speed < 0) speed = -speed;
+        if (speed > SLOW_SPEED) speed = SLOW_SPEED;
+        if (speed < MIN_SPEED) speed = MIN_SPEED;
+        // Turn in positive direction (to the left)
+        set_motors(-speed, +speed);
+      }
+    }
+    else if (system_state.behavior_state == PHASE2_TURN_TO_BLOCK ||
+             system_state.behavior_state == PHASE2_APPROACH_BLOCK ||
              system_state.behavior_state == PHASE2_PUSH_BLOCK)
     {
       // Approach block
@@ -510,8 +610,8 @@ void run_behavior(uint16_t id, uint32_t stamp)
             system_state.cliff_left > CLIFF_DETECTED)
         {
           // Definitely stop
-          system_state.run_state = MODE_DONE;
           set_motors(0, 0);
+          system_state.run_state = MODE_DONE;
         }
         else if (system_state.cliff_right > CLIFF_DETECTED)
         {
@@ -527,6 +627,13 @@ void run_behavior(uint16_t id, uint32_t stamp)
         {
           // Block is blocking our center cliff sensor...
           set_motors(MIN_SPEED, MIN_SPEED);
+        }
+      }
+      else if (system_state.behavior_state == PHASE2_TURN_TO_BLOCK)
+      {
+        if (fabs(turn_to_target(&block_pose)) <= 5.0f)
+        {
+          system_state.behavior_state = PHASE2_APPROACH_BLOCK;
         }
       }
       else if (system_state.behavior_state == PHASE2_PUSH_BLOCK)
