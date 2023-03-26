@@ -30,6 +30,8 @@
 #ifndef _TABLEBOT_BEHAVIORS_HPP_
 #define _TABLEBOT_BEHAVIORS_HPP_
 
+#include <stdbool.h>
+
 // Phase 1 = drive to end of table and back
 #define BEHAVIOR_ID_PHASE_1       1
 // Phase 2 = find the cube, push it off the table
@@ -184,15 +186,20 @@ float angle_wrap(float angle)
   return angle;
 }
 
+bool cliff_detected()
+{
+  return (system_state.cliff_left > CLIFF_DETECTED ||
+          system_state.cliff_right > CLIFF_DETECTED ||
+          system_state.cliff_center > CLIFF_DETECTED);
+}
+
 // Move forward unless there is a cliff or we have surpassed limit distance
 // Returns distance traveled since last_pose_x or negative if there is a cliff
 float move_forward_slowly(float last_pose_x, float limit)
 {
   float dist = abs(system_state.pose_x - last_pose_x);
 
-  if (system_state.cliff_left > CLIFF_DETECTED ||
-      system_state.cliff_right > CLIFF_DETECTED ||
-      system_state.cliff_center > CLIFF_DETECTED)
+  if (cliff_detected())
   {
     set_motors(0, 0);
     return -1.0f;
@@ -276,9 +283,8 @@ float approach_target(point_t * target)
   return system_state.target_dist;
 }
 
-// Verify that neck has reached the goal
-// Returns > 0 if true
-int verify_neck(uint32_t * last_stable_stamp, uint32_t stop_time = 250)
+// Verify that neck has reached the goal and we have a new scan at that angle
+bool verify_neck(uint32_t * last_stable_stamp, uint32_t stop_time = 250)
 {
   int neck_angle = ax12_get_register(&usart2_parser, &usart2, NECK_SERVO_ID, AX_PRESENT_POSITION_L, 2);
   if ((neck_angle > 0) && (neck_angle - system_state.neck_angle < 5) && (system_state.neck_angle - neck_angle < 5))
@@ -287,15 +293,15 @@ int verify_neck(uint32_t * last_stable_stamp, uint32_t stop_time = 250)
     if (*last_stable_stamp == 0)
     {
       *last_stable_stamp = system_state.time;
-      return 0;
+      return false;
     }
     else if (system_state.time - *last_stable_stamp > stop_time)
     {
       // We've been stopped long enough
-      return 1;
+      return true;
     }
   }
-  return 0;
+  return false;
 }
 
 void run_behavior(uint16_t id, uint32_t stamp)
@@ -335,7 +341,11 @@ void run_behavior(uint16_t id, uint32_t stamp)
     last_pose_th = system_state.pose_th;
 
     // Clear block and goal poses
+    block_pose.x = 0.0f;
+    block_pose.y = 0.0f;
     block_pose.z = -1.0f;
+    goal_pose.x = 0.0f;
+    goal_pose.y = 0.0f;
     goal_pose.z = -1.0f;
   }
 
@@ -352,7 +362,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       system_state.neck_angle = 425;
 
       // Is neck there yet?
-      if (verify_neck(&last_stable_stamp) > 0)
+      if (verify_neck(&last_stable_stamp))
       {
         latest_scan = assembler.scans_created + 1;
         max_speed = STANDARD_SPEED;
@@ -360,16 +370,14 @@ void run_behavior(uint16_t id, uint32_t stamp)
       }
       else
       {
-         move_neck(425);
+        move_neck(system_state.neck_angle);
       }
     }
     else if (system_state.behavior_state == PHASE1_DRIVE_TOWARDS_END ||
              system_state.behavior_state == PHASE1_RETURN_TO_START)
     {
       // If we see the cliff, stop and transition to next state
-      if (system_state.cliff_left > CLIFF_DETECTED ||
-          system_state.cliff_right > CLIFF_DETECTED ||
-          system_state.cliff_center > CLIFF_DETECTED)
+      if (cliff_detected())
       {
         last_pose_x = system_state.pose_x;  // Cache the X position along table length
         ++system_state.behavior_state;
@@ -471,13 +479,12 @@ void run_behavior(uint16_t id, uint32_t stamp)
       set_motors(0, 0);
 
       // Now wait for neck to stabilize
-      last_stable_stamp = 0;
       system_state.behavior_state = PHASE2_WAIT_STOPPED;
     }
     else if (system_state.behavior_state == PHASE2_WAIT_STOPPED)
     {
       // Read neck angle
-      if (verify_neck(&last_stable_stamp) > 0)
+      if (verify_neck(&last_stable_stamp))
       {
         latest_scan = assembler.scans_created;
         system_state.behavior_state = PHASE2_ASSEMBLE_SCAN;
@@ -602,9 +609,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
              system_state.behavior_state == PHASE2_PUSH_BLOCK)
     {
       // Approach block
-      if (system_state.cliff_left > CLIFF_DETECTED ||
-          system_state.cliff_right > CLIFF_DETECTED ||
-          system_state.cliff_center > CLIFF_DETECTED)
+      if (cliff_detected())
       {
         if (system_state.cliff_right > CLIFF_DETECTED &&
             system_state.cliff_left > CLIFF_DETECTED)
@@ -664,17 +669,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
       move_neck(512);
       set_motors(0, 0);
 
-      // Clear everything
-      block_pose.x = 0.0f;
-      block_pose.y = 0.0f;
-      block_pose.z = -1.0f;
-
-      goal_pose.x = 0.0f;
-      goal_pose.y = 0.0f;
-      goal_pose.z = -1.0f;
-
       // Now wait for neck to stabilize
-      last_stable_stamp = 0;
       system_state.behavior_state = PHASE3_WAIT_STOPPED;
     }
     else if (system_state.behavior_state == PHASE3_LOCATE_GOAL)
@@ -700,7 +695,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
     else if (system_state.behavior_state == PHASE3_WAIT_STOPPED)
     {
       // Read neck angle
-      if (verify_neck(&last_stable_stamp) > 0)
+      if (verify_neck(&last_stable_stamp))
       {
         latest_scan = assembler.scans_created;
         system_state.behavior_state = PHASE3_ASSEMBLE_SCAN;
@@ -851,43 +846,32 @@ void run_behavior(uint16_t id, uint32_t stamp)
     }
     else if (system_state.behavior_state == PHASE3_APPROACH_BLOCK)
     {
-      // Approach block
       if (system_state.cliff_left > CLIFF_DETECTED ||
           system_state.cliff_right > CLIFF_DETECTED)
       {
         // We shouldn't really get here
         set_motors(0, 0);
       }
-      else
+      else if (approach_target(&block_pose) < 0.005f)
       {
-        // Approach block
-        if (approach_target(&block_pose) < 0.005f)
-        {
-          // Stop and find the goal again
-          set_motors(0, 0);
-          goal_pose.z = -1.0f;
-          system_state.behavior_state = PHASE3_LOCATE_GOAL;
-        }
+        // Stop and find the goal again
+        set_motors(0, 0);
+        goal_pose.z = -1.0f;
+        system_state.behavior_state = PHASE3_LOCATE_GOAL;
       }
     }
     else if (system_state.behavior_state == PHASE3_PUSH_BLOCK)
     {
-      // Approach block
       if (system_state.cliff_left > CLIFF_DETECTED ||
-          system_state.cliff_right > CLIFF_DETECTED ||
-          system_state.cliff_center > CLIFF_DETECTED)
+          system_state.cliff_right > CLIFF_DETECTED)
       {
         // We shouldn't really get here
         set_motors(0, 0);
       }
-      else
+      else if (approach_target(&goal_pose) < 0.01f)
       {
-        // Approach block
-        if (approach_target(&goal_pose) < 0.01f)
-        {
-          set_motors(0, 0);
-          system_state.run_state = MODE_DONE;
-        }
+        set_motors(0, 0);
+        system_state.run_state = MODE_DONE;
       }
     }
   }
