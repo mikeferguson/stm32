@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from math import radians, sin, cos
+from math import radians, sin, cos, pi
 import random
 import socket
 import struct
@@ -248,7 +248,8 @@ class TableBotGUI:
                     step = (end_angle - start_angle) / 11.0
 
                     for i in range(12):
-                        angle = -radians(start_angle)
+                        # Laser is mounted backwards
+                        angle = pi - radians(start_angle)
 
                         range_m = (struct.unpack_from("<H", packet, 6 + (i * 3))[0]) * 0.001
                         x = range_m * cos(angle)

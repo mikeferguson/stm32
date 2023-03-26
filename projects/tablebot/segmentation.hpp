@@ -66,11 +66,8 @@ int project_points(point_t * points, int max_points, bool project_neck,
   // Project points to table
   for (int i = 0; i < ASSEMBLED_SCAN_SIZE; ++i)
   {
-    // Offset our index so we start processing in the back half of the scan
-    int laser_idx = (i + (ASSEMBLED_SCAN_SIZE / 2)) % ASSEMBLED_SCAN_SIZE;
-
-    float dist_m = assembler.data[laser_idx] * 0.001f;
-    float angle = assembler.angles[laser_idx] * 0.01f;
+    float dist_m = assembler.data[i] * 0.001f;
+    float angle = assembler.angles[i] * 0.01f;
 
     if (angle > 360.0f || dist_m < 0.0001f || dist_m > 3.0f)
     {
@@ -79,7 +76,7 @@ int project_points(point_t * points, int max_points, bool project_neck,
     }
 
     float cos_angle, sin_angle;
-    arm_sin_cos_f32(-angle, &sin_angle, &cos_angle);
+    arm_sin_cos_f32(180.0f - angle, &sin_angle, &cos_angle);
 
     // Project to XY plane
     float x = cos_angle * dist_m;
