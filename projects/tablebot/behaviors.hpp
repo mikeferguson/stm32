@@ -302,7 +302,7 @@ bool verify_neck(uint32_t * last_stable_stamp, uint32_t stop_time = 250)
 int is_table_present()
 {
   // Inspect only points right in front of us
-  int points_ct = project_points(line_points, MAX_POINTS, true, 0.1f, -0.1f, 0.2f);
+  int points_ct = project_points(line_points, MAX_POINTS, true, 0.0f, 3.0f, 0.1f, -0.1f, 0.2f);
   if (points_ct < 5)
   {
     // Not enough - call table missing
@@ -522,7 +522,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         }
 
         // Find all points on top of the table, less than 0.5m to either side of the robot
-        int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
+        int points_ct = project_points(line_points, MAX_POINTS, true, 0.0f, 3.0f, 0.5f, 0.0f, 0.2f);
 
         // Send those points for debugging
         udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
@@ -710,7 +710,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         }
 
         // Find all points on top of the table, less than 0.5m to either side of the robot
-        int points_ct = project_points(line_points, MAX_POINTS, true, 0.5f, 0.0f, 0.2f);
+        int points_ct = project_points(line_points, MAX_POINTS, true, 0.15f, 3.0f, 0.5f, 0.0f, 0.2f);
 
         // Send those points for debugging
         udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);

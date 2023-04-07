@@ -57,6 +57,8 @@ class TableBotGUI:
     goal_pose_y = 0
     goal_pose_z = 0
 
+    version = None
+
     # Table size in meters
     # TODO: read this from firmware
     TABLE_LENGTH = 1.2192
@@ -227,6 +229,11 @@ class TableBotGUI:
 
                     self.target_pose = struct.unpack_from("<f", packet, 96)[0]
                     self.target_yaw = struct.unpack_from("<f", packet, 100)[0]
+
+                    version = struct.unpack_from("<L", packet, 104)[0]
+                    if self.version != version:
+                        self.version = version
+                        print("Version: %i" % version)
 
                     if len(self.pose_x) == 0 or \
                             abs(pose_x - self.pose_x[-1]) > 0.01 or \

@@ -50,7 +50,7 @@ typedef struct
 // Projects the points from the assembler
 // Returns the number of points projected
 int project_points(point_t * points, int max_points, bool project_neck,
-                   float limit_y, float min_z, float max_z)
+                   float min_x, float max_x, float limit_y, float min_z, float max_z)
 {
   float cos_neck = 1.0f, sin_neck = 0.0f;
   if (project_neck)
@@ -86,8 +86,9 @@ int project_points(point_t * points, int max_points, bool project_neck,
     float xx = cos_neck * x;
     float zz = -sin_neck * x + 0.127f;  // Neck is 5" off ground
 
-    if (zz < max_z && zz > min_z &&
-        y > -limit_y && y < limit_y && x > 0.0f)
+    if (xx < max_x && xx > min_x &&
+        zz < max_z && zz > min_z &&
+        y > -limit_y && y < limit_y)
     {
       points[points_idx].x = xx;
       points[points_idx].y = y;
@@ -133,6 +134,23 @@ int extract_segments(point_t * points, int num_points,
     }
     else
     {
+      // If we skip this point (as noise) does the segment continue?
+      int next = i + 1;
+      if (next < num_points)
+      {
+        dx = segments[segment_idx].end.x - points[next].x;
+        dy = segments[segment_idx].end.y - points[next].y;
+        d = dx * dx + dy * dy;
+        if (d < jump_distance_squared)
+        {
+          // Add to current segment
+          segments[segment_idx].end = points[i];
+          ++segments[segment_idx].points;
+          continue;
+        }
+      }
+
+      // Can't make the segment continue
       if (++segment_idx >= max_segments)
       {
         // Out of segments to fill

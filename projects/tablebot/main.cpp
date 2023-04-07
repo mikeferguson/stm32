@@ -177,6 +177,7 @@ int main(void)
   system_state.pose_y = 0.0f;
   system_state.pose_th = 0.0f;
   system_state.last_motor_command = 0;
+  system_state.version = 100;
 
   // Setup drive motors
   m1_pid.set_max_step(10);

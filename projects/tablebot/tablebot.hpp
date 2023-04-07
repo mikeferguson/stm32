@@ -202,6 +202,7 @@ typedef struct
   float target_dist;
   float target_yaw;
 
+  uint32_t version;
   uint32_t last_motor_command;
 } system_state_t;
 
