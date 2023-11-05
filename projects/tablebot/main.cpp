@@ -253,7 +253,7 @@ int main(void)
   center_cliff::mode(GPIO_INPUT_ANALOG);
   right_cliff::mode(GPIO_INPUT_ANALOG);
 
-  // Laser interface - temporarily disabled
+  // Laser interface
   RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
   laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
   laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);

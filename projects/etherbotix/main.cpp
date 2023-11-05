@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020, Michael E. Ferguson
+ * Copyright (c) 2012-2023, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -356,6 +356,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
               // Set baud, start usart
               registers.usart3_baud = data[i + 6 + j];
               user_io_usart3_init();
+              usart3_port = port;
             }
             else if (write_addr + j == REG_USART3_CHAR)
             {
@@ -711,7 +712,19 @@ int main(void)
     }
     registers.imu_flags = imu.get_flags();
 
-    if (user_io_usart3_active_ && registers.usart3_char != 255)
+    if (user_io_laser_active_)
+    {
+      int8_t length = laser.update(&usart3, registers.system_time);
+      if (length > 0)
+      {
+        udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), usart3_port);
+      }
+      else if (length < 0)
+      {
+        laser.reset(&usart3);
+      }
+    }
+    else if (user_io_usart3_active_ && registers.usart3_char != 255)
     {
       while (1)
       {

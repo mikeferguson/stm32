@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018, Michael E. Ferguson
+ * Copyright (c) 2014-2023, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,13 +30,19 @@
 #ifndef _ETHERBOTIX_USER_IO_HPP_
 #define _ETHERBOTIX_USER_IO_HPP_
 
+#include "ld06.hpp"
+
 // user_io stuff is only called from the main while() loop, so
 // we don't have to worry about the register table changing.
 
 usart3_t usart3;
 
+// Laser uses both USART3 and TIM12
+LD06<usart3_t> laser;
+
 // State of user IO
 uint8_t user_io_usart3_active_;
+uint8_t user_io_laser_active_;
 uint8_t user_io_spi2_active_;
 uint8_t user_io_tim9_active_;
 uint8_t user_io_tim12_active_;
@@ -49,6 +55,7 @@ inline void user_io_init()
 {
   // Disable everything
   user_io_usart3_active_ = 0;
+  user_io_laser_active_ = 0;
   user_io_spi2_active_ = 0;
   user_io_tim9_active_ = 0;
   user_io_tim12_active_ = 0;
@@ -226,6 +233,28 @@ inline void user_io_set_direction()
 }
 
 /******************************************************************************
+ * LD06 Lidar
+ */
+
+inline bool user_io_ld06_init()
+{
+  user_io_laser_active_ = 1;
+
+  // Uses USART3 and TIM12
+  RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
+
+  // Only using USART3 RX
+  d4::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
+  user_io_pin_status_ |= (1 << 4);
+
+  d5::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
+  user_io_pin_status_ |= (1<<5);
+
+  laser.init(&usart3);
+  return true;
+}
+
+/******************************************************************************
  * USER USART
  */
 
@@ -252,11 +281,19 @@ inline bool user_io_usart3_init()
     baud = 2500000;
   else if (registers.usart3_baud == 252)
     baud = 3000000;
+  else if (registers.usart3_baud == 255)
+  {
+    // Enable LD-06 laser
+    user_io_usart3_active_ = 0;
+    user_io_tim12_active_ = 0;
+    return user_io_ld06_init();
+  }
   else
   {
     // Unsupported baud, turn off usart3
     registers.usart3_baud = 0;
     user_io_usart3_active_ = 0;
+    user_io_laser_active_ = 0;
 
     d3::mode(GPIO_INPUT);
     user_io_pin_status_ &= ~(1 << 3);
@@ -275,6 +312,7 @@ inline bool user_io_usart3_init()
   RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
   usart3.init(baud, 8);
   user_io_usart3_active_ = 1;
+  user_io_laser_active_ = 0;
   return true;
 }
 
@@ -313,7 +351,12 @@ inline uint8_t user_io_usart3_read(uint8_t * data, uint8_t max_len)
 
 inline bool user_io_tim12_init()
 {
-  if (registers.tim12_mode == 1)  // Count on external clock
+  if (user_io_laser_active_)
+  {
+    // Cannot enable tim12 if laser is active
+    registers.tim12_mode = 0;
+  }
+  else if (registers.tim12_mode == 1)  // Count on external clock
   {
     // Turn on clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM12EN;
@@ -345,7 +388,6 @@ inline uint16_t user_io_tim12_get_count()
   else
     return 0;
 }
-
 
 /******************************************************************************
  * Feedback

@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _TABLEBOT_LD06_HPP_
-#define _TABLEBOT_LD06_HPP_
+#ifndef _LD06_HPP_
+#define _LD06_HPP_
 
 /*
  * NOTE: Each packet from laser is max 107 bytes per datasheet - but ROS
@@ -264,4 +264,4 @@ private:
   uint16_t control_pwm_;
 };
 
-#endif  // _TABLEBOT_LD06_HPP_
+#endif  // _LD06_HPP_

@@ -20,7 +20,7 @@ The Etherbotix has 2 leds:
 
 ## User IO
 
-| Pin     | Analog In   | Digital In | Digital Out | SPI    | USART   | TIM9  | TIM12  |
+| Pin     | Analog In   | Digital In | Digital Out | SPI    | USART3  | TIM9  | TIM12  |
 |---------|-------------|------------|-------------|--------|---------|-------|--------|
 | A0      | Yes, 12-bit |            | Yes         |        |         |       |        |
 | A1      | Yes, 12-bit |            | Yes         | MOSI   |         |       |        |
