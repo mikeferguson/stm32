@@ -588,7 +588,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 5;
+  registers.version = 6;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in
