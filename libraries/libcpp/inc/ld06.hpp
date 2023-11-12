@@ -178,6 +178,8 @@ public:
           if (crc == packet.crc)
           {
             ++packets_;
+            // Disabled because scan is more stable when PWM is open loop
+            /*
             last_speed_ = packet.radar_speed;
             if (last_speed_ < MINIMUM_LASER_SPEED)
             {
@@ -188,6 +190,7 @@ public:
               control_pwm_ -= 1;
             }
             TIM12->CCR2 = control_pwm_;
+            */
             return EXPECTED_PACKET_LENGTH;
           }
 

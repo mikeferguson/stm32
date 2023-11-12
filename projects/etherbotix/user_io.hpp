@@ -238,6 +238,12 @@ inline void user_io_set_direction()
 
 inline bool user_io_ld06_init()
 {
+  if (user_io_laser_active_)
+  {
+    // Don't re-init the laser if already active - this slows the laser
+    return true;
+  }
+
   user_io_laser_active_ = 1;
 
   // Uses USART3 and TIM12
