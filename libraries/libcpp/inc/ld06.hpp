@@ -179,7 +179,6 @@ public:
           {
             ++packets_;
             // Disabled because scan is more stable when PWM is open loop
-            /*
             last_speed_ = packet.radar_speed;
             if (last_speed_ < MINIMUM_LASER_SPEED)
             {
@@ -190,7 +189,6 @@ public:
               control_pwm_ -= 1;
             }
             TIM12->CCR2 = control_pwm_;
-            */
             return EXPECTED_PACKET_LENGTH;
           }
 
@@ -249,6 +247,11 @@ public:
 
     // Go idle, on next parse last_byte will be reinitialized to current time
     state_ = BUS_READING_START;
+  }
+
+  uint16_t get_control_pwm()
+  {
+    return control_pwm_;
   }
 
   ld06_packet_t packet;

@@ -823,6 +823,12 @@ void SysTick_Handler(void)
     }
   }
 
+  // Update laser, if active
+  if (user_io_laser_active_)
+  {
+    registers.tim12_mode = laser.get_control_pwm();
+  }
+
   // Toggle LED
   if (registers.system_time - last_packet < 500)
   {
