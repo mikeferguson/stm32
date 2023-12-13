@@ -291,15 +291,15 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
             {
               // TODO
             }
-            else if (write_addr + j == REG_DIGITAL_OUT)
-            {
-              registers.digital_out = data[i + 6 + j];
-              user_io_set_output();
-            }
             else if (write_addr + j == REG_DIGITAL_DIR)
             {
               registers.digital_dir = data[i + 6 + j];
               user_io_set_direction();
+            }
+            else if (write_addr + j == REG_DIGITAL_OUT)
+            {
+              registers.digital_out = data[i + 6 + j];
+              user_io_set_output();
             }
             else if (write_addr + j == REG_LED)
             {
@@ -588,7 +588,7 @@ int main(void)
 
   // Setup register table data
   registers.model_number = 301;  // Arbotix was 300
-  registers.version = 6;
+  registers.version = 7;
   registers.id = 253;
   registers.baud_rate = 1;  // 1mbps
   registers.digital_dir = 0;  // all in

@@ -97,71 +97,37 @@ inline bool user_io_pin_in_use(uint8_t pin)
   return ((user_io_pin_status_ & (1 << pin)) > 0);
 }
 
+template<typename T, unsigned int pin>
+inline void pin_io_set_output()
+{
+  if (registers.digital_out & (1 << pin))
+  {
+    // Set to high / pullup
+    if (registers.digital_dir & (1 << pin))
+    {
+      T::high();
+    }
+    else
+    {
+      T::pullup();
+    }
+  }
+  else
+  {
+    T::low();
+  }
+}
+
 inline void user_io_set_output()
 {
-  if (!user_io_pin_in_use(0))
-  {
-    if (registers.digital_out & 0x01)
-      a0_sense::high();
-    else
-      a0_sense::low();
-  }
-
-  if (!user_io_pin_in_use(1))
-  {
-    if (registers.digital_out & 0x02)
-      a1_sense::high();
-    else
-      a1_sense::low();
-  }
-
-  if (!user_io_pin_in_use(2))
-  {
-    if (registers.digital_out & 0x04)
-      a2_sense::high();
-    else
-      a2_sense::low();
-  }
-
-  if (!user_io_pin_in_use(3))
-  {
-    if (registers.digital_out & 0x08)
-      d3::high();
-    else
-      d3::low();
-  }
-
-  if (!user_io_pin_in_use(4))
-  {
-    if (registers.digital_out & 0x10)
-      d4::high();
-    else
-      d4::low();
-  }
-
-  if (!user_io_pin_in_use(5))
-  {
-    if (registers.digital_out & 0x20)
-      d5::high();
-    else
-      d5::low();
-  }
-
-  if (!user_io_pin_in_use(6))
-  {
-    if (registers.digital_out & 0x40)
-      d6::high();
-    else
-      d6::low();
-  }
-
-  if (!user_io_pin_in_use(7))
-  {
-    if (registers.digital_out & 0x80)
-      d7::high();
-    else
-      d7::low();
-  }
+  if (!user_io_pin_in_use(0)) pin_io_set_output<a0_sense, 0>();
+  if (!user_io_pin_in_use(1)) pin_io_set_output<a1_sense, 1>();
+  if (!user_io_pin_in_use(2)) pin_io_set_output<a2_sense, 2>();
+  if (!user_io_pin_in_use(3)) pin_io_set_output<d3, 3>();
+  if (!user_io_pin_in_use(4)) pin_io_set_output<d4, 4>();
+  if (!user_io_pin_in_use(5)) pin_io_set_output<d5, 5>();
+  if (!user_io_pin_in_use(6)) pin_io_set_output<d6, 6>();
+  if (!user_io_pin_in_use(7)) pin_io_set_output<d7, 7>();
 }
 
 inline void user_io_set_direction()
