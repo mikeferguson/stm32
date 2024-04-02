@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2023, Michael E. Ferguson
+ * Copyright (c) 2012-2024, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,6 +39,7 @@
 
 #include "mini_imu9.hpp"
 #include "md01.hpp"
+#include "motor_trace.hpp"
 #include "encoder.hpp"
 #include "usart_dma.hpp"
 #include "analog_sampler.hpp"
@@ -51,35 +52,69 @@ Md01<TIM1_BASE, m1_a, m1_b, m1_en> m1;
 Md01<TIM8_BASE, m2_a, m2_b, m2_en> m2;
 Encoder<TIM4_BASE> m1_enc;
 Encoder<TIM3_BASE> m2_enc;
+MotorTrace<1000> m1_trace;
+MotorTrace<1000> m2_trace;
+usart1_t usart1;
 usart2_t usart2;
+DynamixelParser<usart1_t> usart1_parser;
 DynamixelParser<usart2_t> usart2_parser;
-usart3_t usart3;  // laser
-
-LD06<usart3_t> laser;
 
 system_state_t system_state;
+registers_t registers;
+uint32_t last_packet;  // Timestamp of last packet
+uint32_t last_motor_cmd;  // Timestamp of last motor command
+
+#include "user_io.hpp"
+
+// Setup the baud rate of dynamixel ports
+int set_dynamixel_baud(uint8_t value)
+{
+  uint32_t baud = 0;
+  if (value == 1)
+    baud = 1000000;
+  else if (value == 3)
+    baud = 500000;
+  else if (value == 34)
+    baud = 57600;
+  else if (value == 250)
+    baud = 2250000;
+  else if (value == 251)
+    baud = 2500000;
+  else if (value == 252)
+    baud = 3000000;
+  else
+    return -1;  // Unsupported baud rate
+
+  usart1.init(baud, 8);
+  usart2.init(baud, 8);
+  registers.baud_rate = value;
+  return 1;
+}
 
 struct udp_pcb *eth_udp = NULL;  // The actual UDP port
 struct ip_addr return_ipaddr;  // The IP to return stuff to
 uint16_t return_port;  // Port to return stuff to
-uint32_t last_packet;
+uint16_t usart3_port;  // Port to return usart3 packets to (if usart3_char != 255)
+uint8_t usart3_string[256];
+uint8_t usart3_len;
 
 #define NECK_SERVO_ID     13
 #include "ax12.hpp"
 #include "select.hpp"
+bool tablebot_mode;
 
 #include "assembler.hpp"
 LaserAssembler assembler;
 
-#define PACKET_STATUS               0xff
-#define PACKET_LASER_SCAN           0
-#define PACKET_PROJECTED_POINTS     1
-#define PACKET_SEGMENT_POINTS       2
+#define TABLEBOT_PACKET_STATUS               0xff
+#define TABLEBOT_PACKET_LASER_SCAN           0
+#define TABLEBOT_PACKET_PROJECTED_POINTS     1
+#define TABLEBOT_PACKET_SEGMENT_POINTS       2
 
 // From IAP app note
 typedef  void (*pFunction)(void);
 
-void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port, uint8_t type = PACKET_STATUS)
+void udp_send_packet(uint8_t * packet, uint32_t len, uint16_t port, uint8_t type = TABLEBOT_PACKET_STATUS)
 {
   struct pbuf * p_send = pbuf_alloc(PBUF_TRANSPORT, len + 5, PBUF_RAM);
   unsigned char * x = (unsigned char *) p_send->payload;
@@ -108,6 +143,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
        (p->len != p->tot_len) ||
        (data[0] != 0xff) || (data[1] != 'B') || (data[2] != 'O') || (data[3] != 'T'))
   {
+    ++registers.packets_bad;
     pbuf_free(p);
     return;
   }
@@ -117,38 +153,476 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   return_port = port;
   last_packet = system_state.time;
 
-  // Send packet with just the table, no laser data
-  udp_send_packet((unsigned char *) &system_state, sizeof(system_state), return_port);
-
-  if (p->len == 8 &&
-      data[4] == 'B' &&
-      data[5] == 'O' &&
-      data[6] == 'O' &&
-      data[7] == 'T')
+  if (tablebot_mode)
   {
-    // Disable interrupts before jumping
-    __disable_irq();
+    // Send packet with just the table, no laser data
+    udp_send_packet((unsigned char *) &system_state, sizeof(system_state), return_port);
 
-    // Disable motor driver
-    m1_pwm::mode(GPIO_INPUT);
-    m2_pwm::mode(GPIO_INPUT);
-    m1_en::mode(GPIO_INPUT);
-    m2_en::mode(GPIO_INPUT);
+    if (p->len == 8 &&
+        data[4] == 'B' &&
+        data[5] == 'O' &&
+        data[6] == 'O' &&
+        data[7] == 'T')
+    {
+      // Disable interrupts before jumping
+      __disable_irq();
 
-    // Turn off LED
-    act::low();
+      // Disable motor driver
+      m1_pwm::mode(GPIO_INPUT);
+      m2_pwm::mode(GPIO_INPUT);
+      m1_en::mode(GPIO_INPUT);
+      m2_en::mode(GPIO_INPUT);
 
-    // Jump into bootloader
-    force_bootloader::mode(GPIO_OUTPUT);
-    force_bootloader::low();
-    uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
-    pFunction Jump_To_Application = (pFunction) JumpAddress;
-    __set_MSP(*(__IO uint32_t*)0x08000000);
-    Jump_To_Application();
+      // Turn off LED
+      act::low();
+
+      // Jump into bootloader
+      force_bootloader::mode(GPIO_OUTPUT);
+      force_bootloader::low();
+      uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
+      pFunction Jump_To_Application = (pFunction) JumpAddress;
+      __set_MSP(*(__IO uint32_t*)0x08000000);
+      Jump_To_Application();
+    }
+
+    // Free buffer
+    pbuf_free(p);
+  }
+
+  // Traditional Etherbotix Mode
+
+  // For each packet
+  size_t i = 4;
+  while (i < p->len)
+  {
+    if ((data[i] != 0xff) || (data[i + 1] != 0xff))
+    {
+      // Packet has become corrupted?
+      ++registers.packets_bad;
+      pbuf_free(p);
+      return;
+    }
+
+    uint8_t id = data[i + 2];
+    uint8_t len = data[i + 3];
+    uint8_t instruction = data[i + 4];
+
+    if (id == ETHERBOTIX_ID)
+    {
+      // Process packets for self
+      if (instruction == DYN_READ_DATA)
+      {
+        uint8_t read_addr = data[i + 5];
+        uint8_t read_len = data[i + 6];
+
+        // Update anything that isn't periodically updated
+        user_io_update();
+
+        uint8_t packet[256];
+        packet[0] = 0xff;
+        packet[1] = 0xff;
+        packet[2] = ETHERBOTIX_ID;
+        packet[3] = read_len + 2;
+        packet[4] = read_addr;  // we transmit address instead of error
+        packet[5 + read_len] = ETHERBOTIX_ID + read_len + 2 + read_addr;  // Init checksum
+
+        if (read_addr >= 128)
+        {
+          if (read_addr == DEVICE_UNIQUE_ID)
+          {
+            // Read the unique ID of the chip (See RM0090 39.1)
+            uint8_t * id_data = (uint8_t *) 0x1fff7a10;
+            for (int j = 0; j < read_len; ++j)
+            {
+              packet[5 + j] = *(id_data++);
+              packet[5 + read_len] += packet[5+j];
+            }
+          }
+          else if (read_addr == DEVICE_M1_TRACE)
+          {
+            read_len = m1_trace.get(&packet[5], read_len);
+            // Set checksum
+            packet[3] = read_len + 2;
+            packet[5 + read_len] = ETHERBOTIX_ID + read_len + 2 + read_addr;
+            for (size_t j = 0; j < read_len; ++j)
+            {
+              packet[5 + read_len] += packet[5 + j];
+            }
+          }
+          else if (read_addr == DEVICE_M2_TRACE)
+          {
+            read_len = m2_trace.get(&packet[5], read_len);
+            // Set checksum
+            packet[3] = read_len + 2;
+            packet[5 + read_len] = ETHERBOTIX_ID + read_len + 2 + read_addr;
+            for (size_t j = 0; j < read_len; ++j)
+            {
+              packet[5 + read_len] += packet[5 + j];
+            }
+          }
+        }
+        else
+        {
+          // Disable interrupts so we don't slice things like encoder values
+          __disable_irq();
+          // Copy packet data
+          uint8_t * reg_data = (uint8_t *) &registers;
+          reg_data += read_addr;
+          for (int j = 0; j < read_len; ++j)
+          {
+            packet[5 + j] = *(reg_data++);
+            packet[5 + read_len] += packet[5 + j];
+          }
+          __enable_irq();
+        }
+
+        packet[5 + read_len] = 255 - packet[5 + read_len];  // Compute checksum
+        udp_send_packet(packet, read_len + 6, port);
+      }
+      else if (instruction == DYN_WRITE_DATA)
+      {
+        uint8_t write_addr = data[i + 5];
+        if (write_addr >= 128)
+        {
+          // This is a device, write all data to single place
+          if (write_addr == DEVICE_USART3_DATA)
+          {
+            user_io_usart3_write(&data[i + 6], len - 3);
+          }
+          else if (write_addr == DEVICE_SPI2_DATA)
+          {
+            // TODO
+          }
+          else if (write_addr == DEVICE_BOOTLOADER)
+          {
+            if (len == 7 &&
+                data[i + 6] == 'B' &&
+                data[i + 7] == 'O' &&
+                data[i + 8] == 'O' &&
+                data[i + 9] == 'T')
+            {
+              // Disable interrupts before jumping
+              __disable_irq();
+
+              // Disable motor driver
+              m1_pwm::mode(GPIO_INPUT);
+              m2_pwm::mode(GPIO_INPUT);
+              m1_en::mode(GPIO_INPUT);
+              m2_en::mode(GPIO_INPUT);
+
+              // Set all IO low/input
+              user_io_deinit();
+
+              // Jump into bootloader
+              force_bootloader::mode(GPIO_OUTPUT);
+              force_bootloader::low();
+              uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
+              pFunction Jump_To_Application = (pFunction) JumpAddress;
+              __set_MSP(*(__IO uint32_t*)0x08000000);
+              Jump_To_Application();
+            }
+          }
+          else if (write_addr == DEVICE_M1_TRACE)
+          {
+            m1_trace.stop_tracing();
+          }
+          else if (write_addr == DEVICE_M2_TRACE)
+          {
+            m2_trace.stop_tracing();
+          }
+        }
+        else
+        {
+          int j = 0;
+          bool update_gains = false;
+          while (j < len - 3)
+          {
+            if (write_addr + j == REG_BAUD_RATE)
+            {
+              // Update baud rate
+              uint8_t baud = data[i + 6 + j];
+              set_dynamixel_baud(baud);
+            }
+            else if (write_addr + j == REG_DELAY_TIME)
+            {
+              // TODO
+            }
+            else if (write_addr + j == REG_DIGITAL_DIR)
+            {
+              registers.digital_dir = data[i + 6 + j];
+              user_io_set_direction();
+            }
+            else if (write_addr + j == REG_DIGITAL_OUT)
+            {
+              registers.digital_out = data[i + 6 + j];
+              user_io_set_output();
+            }
+            else if (write_addr + j == REG_LED)
+            {
+              registers.led = data[i + 6 + j];
+              if (data[i + 6 + j] > 0)
+                error::high();
+              else
+                error::low();
+            }
+            else if (write_addr + j == REG_MOTOR_PERIOD)
+            {
+              if (data[i + 6 + j ] > 0 && data[i + 6 + j] < 100)
+                registers.motor_period = data[i + 6 + j];
+            }
+            else if (write_addr + j == REG_MOTOR_MAX_STEP)
+            {
+              registers.motor_max_step = data[i + 6 + j] + (data[i + 7 + j] << 8);
+              __disable_irq();
+              m1_pid.set_max_step(registers.motor_max_step);
+              m2_pid.set_max_step(registers.motor_max_step);
+              __enable_irq();
+              ++j;  // uses 2 bytes
+            }
+            else if (write_addr + j == REG_MOTOR1_VEL)
+            {
+              // Write 16-bit setpoint
+              int16_t v = data[i + 6 + j] + (data[i + 7 + j] << 8);
+              __disable_irq();
+              m1_pid.update_setpoint(v);
+              __enable_irq();
+              last_motor_cmd = registers.system_time;
+              ++j;  // uses 2 bytes
+            }
+            else if (write_addr + j == REG_MOTOR2_VEL)
+            {
+              // Write 16-bit setpoint
+              int16_t v = data[i + 6 + j] + (data[i + 7 + j] << 8);
+              __disable_irq();
+              m2_pid.update_setpoint(v);
+              __enable_irq();
+              last_motor_cmd = registers.system_time;
+              ++j;  // uses 2 bytes
+            }
+            else if (write_addr + j >= REG_MOTOR1_KP &&
+                     write_addr + j < REG_ACC_X)
+            {
+              // Updating gains
+              uint8_t * reg_data = (uint8_t *) &registers;
+              reg_data[write_addr + j] = data[i + 6 + j];
+              update_gains = true;
+            }
+            else if (write_addr + j == REG_USART3_BAUD)
+            {
+              // Set baud, start usart
+              registers.usart3_baud = data[i + 6 + j];
+              user_io_usart3_init();
+              usart3_port = port;
+            }
+            else if (write_addr + j == REG_USART3_CHAR)
+            {
+              // Set terminating character & return port, reset length of string
+              registers.usart3_char = data[i + 6 + j];
+              usart3_len = 0;
+              usart3_port = port;
+            }
+            else if (write_addr + j == REG_TIM12_MODE)
+            {
+              registers.tim12_mode = data[i + 6 + j];
+              user_io_tim12_init();
+            }
+            else if (write_addr + j == REG_SPI2_BAUD)
+            {
+              // TODO Set baud rate of SPI2
+            }
+            else
+            {
+              // INSTRUCTION ERROR on invalid write?
+            }
+            ++j;
+          }
+          if (update_gains)
+          {
+            // Stop motors
+            m1_pid.reset();
+            m2_pid.reset();
+
+            // Actually update gains
+            m1_pid.set_gains(registers.motor1_kp, registers.motor1_kd,
+                             registers.motor1_ki, registers.motor1_windup);
+            m2_pid.set_gains(registers.motor2_kp, registers.motor2_kd,
+                             registers.motor2_ki, registers.motor2_windup);
+          }
+        }
+      }
+    }
+    else  // Pass through to servos
+    {
+      // Make sure any previous packets are done sending
+      while (!(usart1.done() && usart2.done()))
+        ;
+
+      // Reset parsers
+      usart1_parser.reset(&usart1);
+      usart2_parser.reset(&usart2);
+
+      if (instruction == DYN_READ_DATA)
+      {
+        // Blast packet to each bus
+        usart1.write(&data[i], len + 4);
+        usart2.write(&data[i], len + 4);
+
+        // Wait for send to complete
+        while (!(usart1.done() && usart2.done()))
+          ;
+
+        // Wait for response on at least one bus
+        while (true)
+        {
+          int8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
+          if (p1 > 0)
+          {
+            // Got a packet
+            uint8_t packet[256];
+            packet[0] = 0xff;
+            packet[1] = 0xff;
+            packet[2] = usart1_parser.packet.id;
+            packet[3] = usart1_parser.packet.length;
+            packet[4] = usart1_parser.packet.instr_status;
+            for (int j = 0; j < usart1_parser.packet.length-2; ++j)
+              packet[5+j] = usart1_parser.packet.parameters[j];
+            packet[3+usart1_parser.packet.length] = usart1_parser.packet.checksum;
+            udp_send_packet(packet, usart1_parser.packet.length + 4, port);
+            break;
+          }
+
+          int8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
+          if (p2 > 0)
+          {
+            // Got a packet
+            uint8_t packet[256];
+            packet[0] = 0xff;
+            packet[1] = 0xff;
+            packet[2] = usart2_parser.packet.id;
+            packet[3] = usart2_parser.packet.length;
+            packet[4] = usart2_parser.packet.instr_status;
+            for (int j = 0; j < usart2_parser.packet.length-2; ++j)
+              packet[5+j] = usart2_parser.packet.parameters[j];
+            packet[3+usart2_parser.packet.length] = usart2_parser.packet.checksum;
+            udp_send_packet(packet, usart2_parser.packet.length + 4, port);
+            break;
+          }
+
+          if (p1 < 0 && p2 < 0)
+          {
+            // Timeout or other error
+            break;
+          }
+        }
+      }
+      else if (instruction == DYN_SYNC_READ)
+      {
+        // What to read
+        uint8_t read_addr = data[i+5];  // First parameter is the read address
+        uint8_t read_len = data[i+6];   // Second parameter is # of bytes to read
+
+        // Single response packet to send back to PC from several servo packets
+        uint8_t packet[256];
+        packet[0] = 0xff;
+        packet[1] = 0xff;
+        packet[2] = 0xfe;  // broadcast
+        packet[3] = 2 + (read_len*(len-4));
+        packet[4] = read_addr;  // we transmit address instead of error
+        uint8_t packet_idx = 5;
+        uint8_t packet_chk = packet[2] + packet[3] + packet[4];
+
+        // Read data from each servo
+        for (int j = 2; j < len-2; ++j)
+        {
+          uint8_t pkt[256];
+          pkt[0] = 0xff;
+          pkt[1] = 0xff;
+          pkt[2] = data[i+5+j];  // ID of this servo
+          pkt[3] = 4;  // len remaining
+          pkt[4] = DYN_READ_DATA;
+          pkt[5] = read_addr;
+          pkt[6] = read_len;
+          uint8_t chk = 0;
+          for (int p = 2; p < 7;p++)
+            chk += pkt[p];
+          pkt[7] = 255 - chk;
+
+          // Reset parsers
+          usart1_parser.reset(&usart1);
+          usart2_parser.reset(&usart2);
+
+          // Send read to each bus
+          usart1.write(pkt, 8);
+          usart2.write(pkt, 8);
+
+          // Wait for send to complete
+          while (!(usart1.done() && usart2.done()))
+            ;
+
+          // Wait for response on at least one bus
+          while (true)
+          {
+            int8_t p1 = usart1_parser.parse(&usart1, registers.system_time);
+            if (p1 > 0)
+            {
+              // Got a packet
+              for (uint8_t k = 0; k < read_len; ++k)
+              {
+                packet[packet_idx++] = usart1_parser.packet.parameters[k];
+                packet_chk += usart1_parser.packet.parameters[k];
+              }
+              break;
+            }
+
+            int8_t p2 = usart2_parser.parse(&usart2, registers.system_time);
+            if (p2 > 0)
+            {
+              // Got a packet
+              for (uint8_t k = 0; k < read_len; ++k)
+              {
+                packet[packet_idx++] = usart2_parser.packet.parameters[k];
+                packet_chk += usart2_parser.packet.parameters[k];
+              }
+              break;
+            }
+
+            if (p1 < 0 && p2 < 0)
+            {
+              // Timeout or other error
+              for (uint8_t k = 0; k < read_len; ++k)
+              {
+                packet[packet_idx++] = 0xff;  // 0xffff is not a valid servo position
+                packet_chk += 0xff;
+              }
+              break;
+            }
+          }  // end while wait for packet
+        }  // end for each servo
+
+        packet[packet_idx++] = 255-packet_chk;
+        udp_send_packet(packet, packet_idx, port);
+      }
+      else if (instruction == DYN_WRITE_DATA ||
+               instruction == DYN_SYNC_WRITE)
+      {
+        // Blast packet to each bus
+        usart1.write(&data[i], len + 4);
+        usart2.write(&data[i], len + 4);
+
+        // Wait for send to complete
+        while (!(usart1.done() && usart2.done()))
+          ;
+
+        // No need to wait for response
+      }
+    }
+
+    i += len + 4;
   }
 
   // Free buffer
   pbuf_free(p);
+  ++registers.packets_recv;
 }
 
 // Located here so we can send packets from behaviors
@@ -169,7 +643,35 @@ int udp_interface_init()
 
 int main(void)
 {
-  // Setup system state
+  // TODO save/load register table from flash
+
+  // Setup register table data
+  registers.model_number = 301;  // Arbotix was 300
+  registers.version = 7;
+  registers.id = 253;
+  registers.baud_rate = 1;  // 1mbps
+  registers.digital_dir = 0;  // all in
+  registers.digital_out = 0;
+  registers.system_time = last_packet = last_motor_cmd = 0;
+  registers.motor_period = 10;  // 10mS period = 100hz
+  registers.motor_max_step = 10;
+  registers.motor1_kp = registers.motor2_kp = 1.0;
+  registers.motor1_kd = registers.motor2_kd = 0;
+  registers.motor1_ki = registers.motor2_ki = 0.1;
+  registers.motor1_windup = registers.motor2_windup = 400;
+  registers.usart3_baud = 34;  // 56700
+  registers.usart3_char = 255;  // No terminating character
+  registers.packets_recv = registers.packets_bad = 0;
+
+  m1_pid.set_max_step(registers.motor_max_step);
+  m1_pid.set_gains(registers.motor1_kp, registers.motor1_kd,
+                   registers.motor1_ki, registers.motor1_windup);
+  m2_pid.set_max_step(registers.motor_max_step);
+  m2_pid.set_gains(registers.motor2_kp, registers.motor2_kd,
+                   registers.motor2_ki, registers.motor2_windup);
+
+  // Setup system state for tablebot
+  tablebot_mode = false;  // Not enabled by default
   system_state.time = 0;
   system_state.run_state = MODE_UNSELECTED;
   system_state.neck_angle = 0;
@@ -178,12 +680,6 @@ int main(void)
   system_state.pose_th = 0.0f;
   system_state.last_motor_command = 0;
   system_state.version = 100;
-
-  // Setup drive motors
-  m1_pid.set_max_step(10);
-  m1_pid.set_gains(4.0, 0.0, 0.15, 400.0);
-  m2_pid.set_max_step(10);
-  m2_pid.set_gains(4.0, 0.0, 0.15, 400.0);
 
   NVIC_SetPriorityGrouping(3);
 
@@ -198,17 +694,38 @@ int main(void)
   error::mode(GPIO_OUTPUT);
   error::high();  // Hold error high during setup
 
+  // Check state of start button - if held - enable tablebot mode
+  d7::mode(GPIO_INPUT);
+  d7::pullup();
+  if (d7::value() == 0)
+  {
+    tablebot_mode = true;
+
+    // Setup drive motors
+    m1_pid.set_max_step(10);
+    m1_pid.set_gains(4.0, 0.0, 0.15, 400.0);
+    m2_pid.set_max_step(10);
+    m2_pid.set_gains(4.0, 0.0, 0.15, 400.0);
+
+    registers.motor_period = MOTOR_PERIOD;
+  }
+
   // Setup ethernet
   setup_gpio_ethernet();
 
   // Setup serial
   RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN | RCC_AHB1ENR_DMA2EN;
+  RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+  usart1_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART1);
+  usart1_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART1);
+  NVIC_SetPriority(USART1_IRQn, 1);
+  NVIC_EnableIRQ(USART1_IRQn);
   RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
   usart2_tx::mode(GPIO_ALTERNATE | GPIO_AF_USART2);
   usart2_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART2);
   NVIC_SetPriority(USART2_IRQn, 1);
   NVIC_EnableIRQ(USART2_IRQn);
-  usart2.init(1000000, 8);
+  set_dynamixel_baud(registers.baud_rate);
 
   // Setup motors
   RCC->APB2ENR |= RCC_APB2ENR_TIM1EN | RCC_APB2ENR_TIM8EN;
@@ -248,25 +765,21 @@ int main(void)
   m1_sense::mode(GPIO_INPUT_ANALOG);
   m2_sense::mode(GPIO_INPUT_ANALOG);
 
-  // Initialize cliff sensor pins
-  left_cliff::mode(GPIO_INPUT_ANALOG);
-  center_cliff::mode(GPIO_INPUT_ANALOG);
-  right_cliff::mode(GPIO_INPUT_ANALOG);
+  if (tablebot_mode)
+  {
+    // Initialize cliff sensor pins
+    a0_sense::mode(GPIO_INPUT_ANALOG);
+    a1_sense::mode(GPIO_INPUT_ANALOG);
+    a2_sense::mode(GPIO_INPUT_ANALOG);
 
-  // Laser interface
-  RCC->APB1ENR |= RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM12EN;
-  laser_rx::mode(GPIO_ALTERNATE | GPIO_AF_USART3);
-  laser_pwm::mode(GPIO_ALTERNATE | GPIO_AF_TIM12);
-  laser.init(&usart3);
+    // Laser interface
+    user_io_ld06_init();
 
-  // Start button
-  start_button::mode(GPIO_INPUT);
-  start_button::low();
-
-  // Unused IO
-  d3::mode(GPIO_INPUT);
-  // Temporarily used for timing debugging
-  d6::mode(GPIO_OUTPUT);
+    // Unused IO
+    d3::mode(GPIO_INPUT);
+    // Temporarily used for timing debugging
+    d6::mode(GPIO_OUTPUT);
+  }
 
   // Setup systick
   SysTick_Config(SystemCoreClock/1000);
@@ -278,55 +791,124 @@ int main(void)
   __enable_irq();
   error::low();  // Done with setup
 
-  move_neck(512);
+  if (tablebot_mode) move_neck(512);
 
   bool disable_eth = false;
   while(1)
   {
     if (!disable_eth && (LwIP_Periodic_Handle(system_state.time) == ETH_ERROR))
     {
-      disable_eth = true;
+      if (tablebot_mode) disable_eth = true;
     }
 
-    if (imu.update(system_state.time))
+    if (tablebot_mode)
     {
-      system_state.accel_x = imu.accel_data.x;
-      system_state.accel_y = imu.accel_data.y;
-      system_state.accel_z = imu.accel_data.z;
-
-      system_state.gyro_x = imu.gyro_data.x;
-      system_state.gyro_y = imu.gyro_data.y;
-      system_state.gyro_z = imu.gyro_data.z;
-
-      system_state.mag_x = imu.mag_data.x;
-      system_state.mag_y = imu.mag_data.y;
-      system_state.mag_z = imu.mag_data.z;
-    }
-
-    system_state.run_state = select_mode();
-
-    // Attempt to read from laser data
-    // From scope: this takes 2-8uS, and loop runs about 3.7khz (3/8/2023)
-    d6::high();
-    int8_t length = laser.update(&usart3, system_state.time);
-    if (length > 0)
-    {
-      // Send debugging packets
-      if (system_state.time - last_packet < 1000)
+      if (imu.update(system_state.time))
       {
-        udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), return_port, PACKET_LASER_SCAN);
+        system_state.accel_x = imu.accel_data.x;
+        system_state.accel_y = imu.accel_data.y;
+        system_state.accel_z = imu.accel_data.z;
+
+        system_state.gyro_x = imu.gyro_data.x;
+        system_state.gyro_y = imu.gyro_data.y;
+        system_state.gyro_z = imu.gyro_data.z;
+
+        system_state.mag_x = imu.mag_data.x;
+        system_state.mag_y = imu.mag_data.y;
+        system_state.mag_z = imu.mag_data.z;
       }
 
-      // Add to assembler
-      assembler.add_packet(&laser.packet);
-    }
-    else if (length < 0)
-    {
-      laser.reset(&usart3);
-    }
-    d6::low();
+      system_state.run_state = select_mode();
 
-    run_behavior(system_state.run_state, system_state.time);
+      // Attempt to read from laser data
+      // From scope: this takes 2-8uS, and loop runs about 3.7khz (3/8/2023)
+      d6::high();
+      int8_t length = laser.update(&usart3, system_state.time);
+      if (length > 0)
+      {
+        // Send debugging packets
+        if (system_state.time - last_packet < 1000)
+        {
+          udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), return_port, TABLEBOT_PACKET_LASER_SCAN);
+        }
+
+        // Add to assembler
+        assembler.add_packet(&laser.packet);
+      }
+      else if (length < 0)
+      {
+        laser.reset(&usart3);
+      }
+      d6::low();
+
+      run_behavior(system_state.run_state, system_state.time);
+      continue;
+    }
+
+    if (imu.update(registers.system_time))
+    {
+      registers.accel_x = imu.accel_data.x;
+      registers.accel_y = imu.accel_data.y;
+      registers.accel_z = imu.accel_data.z;
+
+      registers.gyro_x = imu.gyro_data.x;
+      registers.gyro_y = imu.gyro_data.y;
+      registers.gyro_z = imu.gyro_data.z;
+
+      registers.mag_x = imu.mag_data.x;
+      registers.mag_y = imu.mag_data.y;
+      registers.mag_z = imu.mag_data.z;
+    }
+    registers.imu_flags = imu.get_flags();
+
+    if (user_io_laser_active_)
+    {
+      int8_t length = laser.update(&usart3, registers.system_time);
+      if (length > 0)
+      {
+        udp_send_packet((unsigned char *) &laser.packet, sizeof(laser.packet), usart3_port);
+      }
+      else if (length < 0)
+      {
+        laser.reset(&usart3);
+      }
+    }
+    else if (user_io_usart3_active_ && registers.usart3_char != 255)
+    {
+      while (1)
+      {
+        // Attempt to read from usart3 and forward packet
+        int32_t c = usart3.read();
+
+        if (c >= 0)
+          usart3_string[usart3_len + 5] = c;
+        else
+          break;
+
+        usart3_len++;
+
+        if (c == registers.usart3_char)
+        {
+          // Send return string
+          usart3_string[0] = 0xff;
+          usart3_string[1] = 0xff;
+          usart3_string[2] = 253;  // id
+          usart3_string[3] = usart3_len + 2;  // len
+          usart3_string[4] = DEVICE_USART3_DATA;  // we transmit address instead of error
+          uint8_t checksum = 0;
+          for (int i = 2; i < usart3_len + 5; i++)
+            checksum += usart3_string[i];
+          usart3_string[5+usart3_len] = 255 - checksum;
+          udp_send_packet(usart3_string, usart3_len + 6, usart3_port);
+          usart3_len = 0;
+        }
+        else if (usart3_len > 192)
+        {
+          // going to overflow, reset
+          usart3_len = 0;
+        }
+      }
+    }
   }
 }
 
@@ -335,122 +917,199 @@ extern "C"
 
 void SysTick_Handler(void)
 {
-  ++system_state.time;
+  system_state.time = ++registers.system_time;
 
-  // Get system voltage:
-  //   adc is 12 bit (4096 count) spread over 3.3V
-  //   voltage divider is 15k/1k
-  system_state.voltage = (adc1.get_channel1() / 4096.0f) * 3.3f * 16;
-
-  // Get system/servo currents:
-  //   ACS711: vcc/2 = 0A, 55mV/A
-  system_state.current = ((adc1.get_channel3() - 2048.0f) / 4096.0f) * 3.3f / 0.055f;
-  system_state.servo_current = ((adc1.get_channel2() - 2048.0f) / 4096.0f) * 3.3f / 0.055f;
-
-  // Analog channels
-  system_state.cliff_left = adc1.get_channel4();
-  system_state.cliff_center = adc2.get_channel3();
-  system_state.cliff_right = adc2.get_channel4();
-
-  // Motor current sense channels
-  //system_state.motor1_current = adc2.get_channel1();
-  //system_state.motor2_current = adc2.get_channel2();
-
-  // Update motors
-  if (system_state.time % MOTOR_PERIOD == 0)
+  if (tablebot_mode)
   {
-    // Update table with position/velocity
-    system_state.motor1_pos = m1_enc.read();
-    system_state.motor2_pos = m2_enc.read();
-    system_state.motor1_vel = m1_enc.read_speed();
-    system_state.motor2_vel = m2_enc.read_speed();
+    // Get system voltage:
+    //   adc is 12 bit (4096 count) spread over 3.3V
+    //   voltage divider is 15k/1k
+    system_state.voltage = (adc1.get_channel1() / 4096.0f) * 3.3f * 16;
 
-    // Update PID and set motor commands
-    if (system_state.time - system_state.last_motor_command < 100 &&
-        system_state.last_motor_command > 100)  // Avoid lurch on restart
+    // Get system/servo currents:
+    //   ACS711: vcc/2 = 0A, 55mV/A
+    system_state.current = ((adc1.get_channel3() - 2048.0f) / 4096.0f) * 3.3f / 0.055f;
+    system_state.servo_current = ((adc1.get_channel2() - 2048.0f) / 4096.0f) * 3.3f / 0.055f;
+
+    // Analog channels
+    system_state.cliff_left = adc1.get_channel4();
+    system_state.cliff_center = adc2.get_channel3();
+    system_state.cliff_right = adc2.get_channel4();
+
+    // Update motors
+    if (registers.system_time % registers.motor_period == 0)
     {
-      m1.set(m1_pid.update_pid(system_state.motor1_vel));
-      m2.set(m2_pid.update_pid(system_state.motor2_vel));
-    }
-    else
-    {
-      // Motors have timed out
-      m1.disable();
-      m2.disable();
-      m1_pid.reset();
-      m2_pid.reset();
+      // Update table with position/velocity
+      system_state.motor1_pos = m1_enc.read();
+      system_state.motor2_pos = m2_enc.read();
+      system_state.motor1_vel = m1_enc.read_speed();
+      system_state.motor2_vel = m2_enc.read_speed();
+
+      if (system_state.time - system_state.last_motor_command < 100 &&
+          system_state.last_motor_command > 100)  // Avoid lurch on restart
+      {
+        m1.set(m1_pid.update_pid(system_state.motor1_vel));
+        m2.set(m2_pid.update_pid(system_state.motor2_vel));
+      }
+      else
+      {
+        // Motors have timed out
+        m1.disable();
+        m2.disable();
+        m1_pid.reset();
+        m2_pid.reset();
+      }
+
+      // Compute odometry position
+      float left_vel = system_state.motor1_vel / TICK_PER_METER;
+      float right_vel = system_state.motor2_vel / TICK_PER_METER;
+      float d = (left_vel + right_vel) / 2.0f;
+      float dth = (right_vel - left_vel) / TRACK_WIDTH;
+      if (d != 0)
+      {
+        float cos_th, sin_th;
+        arm_sin_cos_f32(system_state.pose_th * 57.2958f, &sin_th, &cos_th);
+        system_state.pose_x += cos_th * d;
+        system_state.pose_y += sin_th * d;
+      }
+      system_state.pose_th = angle_wrap(system_state.pose_th + dth);
     }
 
-    // Compute odometry position
-    float left_vel = system_state.motor1_vel / TICK_PER_METER;
-    float right_vel = system_state.motor2_vel / TICK_PER_METER;
-    float d = (left_vel + right_vel) / 2.0f;
-    float dth = (right_vel - left_vel) / TRACK_WIDTH;
-    if (d != 0)
+    // Control LED
+    if (system_state.run_state == MODE_UNSELECTED)
     {
-      float cos_th, sin_th;
-      arm_sin_cos_f32(system_state.pose_th * 57.2958f, &sin_th, &cos_th);
-      system_state.pose_x += cos_th * d;
-      system_state.pose_y += sin_th * d;
+      // Red LED indicates next selection (if any)
+      int next_mode = get_next_mode();
+      if (next_mode > 0)
+      {
+        // Blink out pattern
+        if (system_state.time % 200 == 0)
+        {
+          if (system_state.time % 1000 < next_mode * 200)
+          {
+            error::high();
+          }
+        }
+        else if (system_state.time % 100 == 0)
+        {
+          error::low();
+        }
+      }
+      else
+      {
+        // Solid RED led
+        error::high();
+      }
     }
-    system_state.pose_th = angle_wrap(system_state.pose_th + dth);
-  }
-
-  // Control LED
-  if (system_state.run_state == MODE_UNSELECTED)
-  {
-    // Red LED indicates next selection (if any)
-    int next_mode = get_next_mode();
-    if (next_mode > 0)
+    else if (system_state.run_state == MODE_DONE)
     {
-      // Blink out pattern
+      // Toggle RED
       if (system_state.time % 200 == 0)
       {
-        if (system_state.time % 1000 < next_mode * 200)
-        {
-          error::high();
-        }
+        error::high();
       }
       else if (system_state.time % 100 == 0)
       {
         error::low();
       }
+
+      // Blue OFF
+      act::low();
     }
     else
     {
-      // Solid RED led
-      error::high();
-    }
-  }
-  else if (system_state.run_state == MODE_DONE)
-  {
-    // Toggle RED
-    if (system_state.time % 200 == 0)
-    {
-      error::high();
-    }
-    else if (system_state.time % 100 == 0)
-    {
+      // Red LED Off
       error::low();
+      // Toggle Blue LED
+      if (system_state.time % 200 == 0)
+        act::high();
+      else if (system_state.time % 100 == 0)
+        act::low();
     }
 
-    // Blue OFF
-    act::low();
+    // Start next conversion of voltage/current
+    adc1.convert();
+    adc2.convert();
+    return;
+  }
+
+  // Get system voltage in 0.1V increment:
+  //   adc is 12 bit (4096 count) spread over 3.3V
+  //   voltage divider is 15k/1k
+  registers.system_voltage = (adc1.get_channel1()/4096.0f) * 3.3f * 16 * 10;
+
+  // Get aux/servo currents in mA:
+  //   ACS711: vcc/2 = 0A, 55mV/A
+  registers.servo_current = ((adc1.get_channel2()-2048.0f)/4096.0f) * 3.3f / 0.055f * 1000;
+  registers.aux_current = ((adc1.get_channel3()-2048.0f)/4096.0f) * 3.3f / 0.055f * 1000;
+
+  // Analog channels
+  registers.a0 = (registers.digital_dir & (1<<0)) ? 0 : adc1.get_channel4();
+  registers.a1 = (registers.digital_dir & (1<<1)) ? 0 : adc2.get_channel3();
+  registers.a2 = (registers.digital_dir & (1<<2)) ? 0 : adc2.get_channel4();
+  
+  // Update motors
+  if (registers.system_time % registers.motor_period == 0)
+  {
+    // Update table with position/velocity
+    registers.motor1_pos = m1_enc.read();
+    registers.motor2_pos = m2_enc.read();
+    registers.motor1_vel = m1_enc.read_speed();
+    registers.motor2_vel = m2_enc.read_speed();
+
+    if (registers.system_time - last_motor_cmd < 250)
+    {
+      // Update PID and set motor commands
+      m1.set(m1_pid.update_pid(registers.motor1_vel));
+      m2.set(m2_pid.update_pid(registers.motor2_vel));
+
+      m1_trace.update(registers.motor1_pos,
+                      registers.motor1_vel,
+                      m1_pid.get_setpoint(),
+                      m1.get());
+      m2_trace.update(registers.motor2_pos,
+                      registers.motor2_vel,
+                      m2_pid.get_setpoint(),
+                      m2.get());
+    }
+    else
+    {
+      // Motor commands have timed out
+      m1.set(0);
+      m2.set(0);
+      m1_pid.reset();
+      m2_pid.reset();
+    }
+  }
+
+  // Update laser, if active
+  if (user_io_laser_active_)
+  {
+    registers.tim12_mode = laser.get_control_pwm();
+  }
+
+  // Toggle LED
+  if (registers.system_time - last_packet < 500)
+  {
+    if (registers.system_time % 200 == 0)
+      act::high();
+    else if (registers.system_time % 100 == 0)
+      act::low();
   }
   else
   {
-    // Red LED Off
-    error::low();
-    // Toggle Blue LED
-    if (system_state.time % 200 == 0)
-      act::high();
-    else if (system_state.time % 100 == 0)
-      act::low();
+    act::low();
   }
 
   // Start next conversion of voltage/current
   adc1.convert();
   adc2.convert();
+}
+
+// Turn around the rs-485 bus
+void USART1_IRQHandler(void)
+{
+  usart1.usartIrqHandler();
 }
 
 // Turn around the ax/mx bus
