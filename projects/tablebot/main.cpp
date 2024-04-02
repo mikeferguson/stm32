@@ -153,40 +153,39 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
   return_port = port;
   last_packet = system_state.time;
 
+  if (p->len == 8 &&
+      data[4] == 'B' &&
+      data[5] == 'O' &&
+      data[6] == 'O' &&
+      data[7] == 'T')
+  {
+    // Disable interrupts before jumping
+    __disable_irq();
+
+    // Disable motor driver
+    m1_pwm::mode(GPIO_INPUT);
+    m2_pwm::mode(GPIO_INPUT);
+    m1_en::mode(GPIO_INPUT);
+    m2_en::mode(GPIO_INPUT);
+
+    // Turn off LED
+    act::low();
+
+    // Jump into bootloader
+    force_bootloader::mode(GPIO_OUTPUT);
+    force_bootloader::low();
+    uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
+    pFunction Jump_To_Application = (pFunction) JumpAddress;
+    __set_MSP(*(__IO uint32_t*)0x08000000);
+    Jump_To_Application();
+  }
+
   if (tablebot_mode)
   {
     // Send packet with just the table, no laser data
     udp_send_packet((unsigned char *) &system_state, sizeof(system_state), return_port);
-
-    if (p->len == 8 &&
-        data[4] == 'B' &&
-        data[5] == 'O' &&
-        data[6] == 'O' &&
-        data[7] == 'T')
-    {
-      // Disable interrupts before jumping
-      __disable_irq();
-
-      // Disable motor driver
-      m1_pwm::mode(GPIO_INPUT);
-      m2_pwm::mode(GPIO_INPUT);
-      m1_en::mode(GPIO_INPUT);
-      m2_en::mode(GPIO_INPUT);
-
-      // Turn off LED
-      act::low();
-
-      // Jump into bootloader
-      force_bootloader::mode(GPIO_OUTPUT);
-      force_bootloader::low();
-      uint32_t JumpAddress = *(__IO uint32_t*) (0x08000000 + 4);
-      pFunction Jump_To_Application = (pFunction) JumpAddress;
-      __set_MSP(*(__IO uint32_t*)0x08000000);
-      Jump_To_Application();
-    }
-
-    // Free buffer
     pbuf_free(p);
+    return;
   }
 
   // Traditional Etherbotix Mode
@@ -696,7 +695,7 @@ int main(void)
 
   // Check state of start button - if held - enable tablebot mode
   d7::mode(GPIO_INPUT);
-  d7::pullup();
+  d7::high();
   if (d7::value() == 0)
   {
     tablebot_mode = true;
@@ -805,17 +804,17 @@ int main(void)
     {
       if (imu.update(system_state.time))
       {
-        system_state.accel_x = imu.accel_data.x;
-        system_state.accel_y = imu.accel_data.y;
-        system_state.accel_z = imu.accel_data.z;
+        system_state.accel_x = -imu.accel_data.x;
+        system_state.accel_y = -imu.accel_data.z;
+        system_state.accel_z = -imu.accel_data.y;
 
-        system_state.gyro_x = imu.gyro_data.x;
-        system_state.gyro_y = imu.gyro_data.y;
-        system_state.gyro_z = imu.gyro_data.z;
+        system_state.gyro_x = -imu.gyro_data.x;
+        system_state.gyro_y = -imu.gyro_data.z;
+        system_state.gyro_z = -imu.gyro_data.y;
 
-        system_state.mag_x = imu.mag_data.x;
-        system_state.mag_y = imu.mag_data.y;
-        system_state.mag_z = imu.mag_data.z;
+        system_state.mag_x = -imu.mag_data.x;
+        system_state.mag_y = -imu.mag_data.z;
+        system_state.mag_z = -imu.mag_data.y;
       }
 
       system_state.run_state = select_mode();
