@@ -84,7 +84,7 @@ int project_points(point_t * points, int max_points, bool project_neck,
 
     // Now handle neck rotation
     float xx = cos_neck * x;
-    float zz = -sin_neck * x + 0.127f;  // Neck is 5" off ground
+    float zz = -sin_neck * x + 0.1778f;  // Neck is 7" off ground
 
     if (xx < max_x && xx > min_x &&
         zz < max_z && zz > min_z &&
