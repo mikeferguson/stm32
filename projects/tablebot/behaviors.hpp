@@ -403,7 +403,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
           if (points_ct > 0)
           {
             // Send those points for debugging
-            udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+            udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, TABLEBOT_PACKET_PROJECTED_POINTS);
           }
           else
           {
@@ -525,7 +525,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         int points_ct = project_points(line_points, MAX_POINTS, true, 0.0f, 3.0f, 0.5f, 0.0f, 0.2f);
 
         // Send those points for debugging
-        udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+        udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, TABLEBOT_PACKET_PROJECTED_POINTS);
 
         // Now process segments
         int segment_ct = extract_segments(line_points, points_ct,
@@ -713,7 +713,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
         int points_ct = project_points(line_points, MAX_POINTS, true, 0.15f, 3.0f, 0.5f, 0.0f, 0.2f);
 
         // Send those points for debugging
-        udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, PACKET_PROJECTED_POINTS);
+        udp_send_packet((unsigned char *) &line_points, points_ct * 12, return_port, TABLEBOT_PACKET_PROJECTED_POINTS);
 
         // Now process segments
         int segment_ct = extract_segments(line_points, points_ct,
@@ -744,7 +744,7 @@ void run_behavior(uint16_t id, uint32_t stamp)
           {
             // Send those points for debugging
             line_segment_t & s = segments[selected_segment];
-            udp_send_packet((unsigned char *) &line_points[s.start_idx], s.points * 12, return_port, PACKET_SEGMENT_POINTS);
+            udp_send_packet((unsigned char *) &line_points[s.start_idx], s.points * 12, return_port, TABLEBOT_PACKET_SEGMENT_POINTS);
 
             // Transform goal to global coordinates
             transform_to_global(&goal_pose, &candidates[0]);
