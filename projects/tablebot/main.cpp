@@ -696,6 +696,7 @@ int main(void)
   // Check state of start button - if held - enable tablebot mode
   d7::mode(GPIO_INPUT);
   d7::high();
+  d7::pullup();
   if (d7::value() == 0)
   {
     tablebot_mode = true;

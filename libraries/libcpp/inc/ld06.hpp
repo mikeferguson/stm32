@@ -178,7 +178,6 @@ public:
           if (crc == packet.crc)
           {
             ++packets_;
-            // Disabled because scan is more stable when PWM is open loop
             last_speed_ = packet.radar_speed;
             if (last_speed_ < MINIMUM_LASER_SPEED)
             {
