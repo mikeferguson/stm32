@@ -10,7 +10,7 @@ The bridge has 3 leds:
  * ERROR - red - similar to the LED on the back of a dynamixel servo, can be
    controlled via register table. Is also illuminated when the robot is booting.
 
-##Ethernet Protocol
+## Ethernet Protocol
 Packets sent over ethernet need the following 4-character magic number
 prepended to the packet: 'SMAL'
 
@@ -22,11 +22,11 @@ appended. For instance:
 Each packet will be handled one at a time, and each will get it's own
 ethernet response packet.
 
-##Extended Device
+## Extended Device
 As with the ArbotiX, there is an extended device at address 253. The register
 table is defined in eth_bridge.hpp.
 
-##Support for Sync Read
+## Support for Sync Read
 This firmware does not yet support the sync_read instruction (0x84).
 
 ## Networking Notes
