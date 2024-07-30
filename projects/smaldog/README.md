@@ -1,8 +1,8 @@
-#Eth-bridge Firmware
+# Eth-bridge Firmware
 Temporary firmware for SMALdog v1.5 based on an eth-bridge board. This firmware
 will eventually be cleaned up for the new SMALdog v2 controller board.
 
-##LED Usage
+## LED Usage
 The bridge has 3 leds:
  * ACT - blue - indicates system activity, blinks at 5hz when packets are
    being properly recieved

@@ -68,21 +68,12 @@
 /* PHY Configuration delay */ 
 #define PHY_CONFIG_DELAY   ((uint32_t)0x00FFFFFF)
 
-/* The PHY status register value change from a PHY to another, so the user have 
-   to update this value depending on the used external PHY */
-//#define PHY_SR   ((uint16_t)16)   /* Value for DP83848 PHY */
-//#define PHY_SR   ((uint16_t)0x1F) /* Value for KS8721CL PHY */
-#define PHY_SR     ((uint16_t)0x1E) /* Value for KS8051CL PHY */
-
-/* The Speed and Duplex mask values change from a PHY to another, so the user
-   have to update this value depending on the used external PHY */
-//#define PHY_SPEED_STATUS          ((uint16_t)0x0002) /* Value for DP83848 PHY */
-//#define PHY_DUPLEX_STATUS         ((uint16_t)0x0004) /* Value for DP83848 PHY */
-//#define PHY_SPEED_STATUS          ((uint16_t)0x0004) /* Value for KS8721CL PHY */
-//#define PHY_DUPLEX_STATUS         ((uint16_t)0x0010) /* Value for KS8721CL PHY */
-#define PHY_SPEED_STATUS            ((uint16_t)0x0002) /* Value for KS8051CL PHY */
-#define PHY_DUPLEX_STATUS           ((uint16_t)0x0004) /* Value for KS8051CL PHY */
-
+/* Address of PHY status register */
+#define PHY_SR ((uint16_t)0x10)
+/* Return non-zero if PHY is running at 100Mbps (note: bit value of 0 is 100Mbps) */
+#define IS_PHY_SPEED_100Mbps(PHY_SR_register_value) ((~PHY_SR_register_value) & 0x02)
+/* Return non-zero if PHY is running in full-duplex mode */ 
+#define IS_PHY_DUPLEX_FULL(PHY_SR_register_value) ((PHY_SR_register_value) & 0x04)
 
    
 /* Exported macro ------------------------------------------------------------*/

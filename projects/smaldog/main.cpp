@@ -98,7 +98,6 @@ int main(void)
   /* setup systick */
   SysTick_Config(SystemCoreClock/1000);
 
-  Ethernet_Init();
   LwIP_Init();
   if (!netapp_init())
     while(1);
@@ -110,12 +109,6 @@ int main(void)
 
   while(1)
   {
-    /* check if any packet received */
-    if (ETH_CheckFrameReceived())
-    { 
-      /* process received ethernet packet */
-      LwIP_Pkt_Handle();
-    }
     LwIP_Periodic_Handle(register_table.system_time);
   }
 }
