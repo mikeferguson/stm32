@@ -332,8 +332,8 @@ void SysTick_Handler(void)
 
   // Get system voltage
   //   adc is 12 bit (4096 count) spread over 3.3V
-  //   voltage divider is 15k/1k
-  dyno.system_voltage = (ADC1->JDR1 / 4096.0f) * 3.3f * 16.0f;
+  //   voltage divider is 20k/1k
+  dyno.system_voltage = (ADC1->JDR1 / 4096.0f) * 3.3f * 21.0f;
   ADC1->CR2 |= ADC_CR2_JSWSTART;
 
   // Encoder update runs at 250hz
