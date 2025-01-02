@@ -10,6 +10,19 @@ Things to keep in mind if adapting to STM32F1, F2, or F3:
  * Much of libcpp has been tested with F1 series. Notably, the gpio.h will not
    work with F2 or F3 processors right now.
 
+# Setup of development environment (24.04)
+
+The toolchain had to be updated for 24.04 since the older gdb links against
+libncurses5:i386, which is no longer available:
+
+```
+cd ~/bin
+wget https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
+tar xf arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
+rm arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
+echo 'export PATH=$PATH:~/bin/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi/bin:$PATH' >> ~/.bashrc
+```
+
 # Setup of development environment (22.04)
 
 I'm using the 2020-q4-major revision from the official GCC ARM launchpad
