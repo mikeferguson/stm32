@@ -59,8 +59,9 @@ DAC121<SPI2_BASE, dut_dac_cs> dac;
 // Encoder is AMT102-V, set to 2048PPR = 8192CPR
 #include "encoder.hpp"
 Encoder<TIM3_BASE> absorber_enc;
-#define ABSORBER_CPR    8192.0f
-#define TO_RADIANS      (2.0f * 3.141592653589793f)
+#define ABSORBER_CPR            8192.0f
+#define TO_RADIANS              (2.0f * 3.141592653589793f)
+#define VELOCITY_FILTER_COEFF   0.3f
 
 #include "copy_float.hpp"
 
@@ -335,14 +336,16 @@ void SysTick_Handler(void)
   dyno.system_voltage = (ADC1->JDR1 / 4096.0f) * 3.3f * 16.0f;
   ADC1->CR2 |= ADC_CR2_JSWSTART;
 
-  // TODO: make the sampling time dynamic based on velocity
   // Encoder update runs at 250hz
   if (dyno.system_time % 100 == 0)
   {
     int32_t pos = absorber_enc.read();
     int32_t vel = absorber_enc.read_speed();
+    // Convert position of encoder (not usually displayed, but useful for debugging)
     dyno.position = static_cast<float>(pos) / ABSORBER_CPR * TO_RADIANS;
-    dyno.velocity = (static_cast<float>(vel) * 250.0f / ABSORBER_CPR) * TO_RADIANS;
+    // Convert velocity and then filter it in to estimate
+    float v = (static_cast<float>(vel) * 25000.0f / 100 / ABSORBER_CPR) * TO_RADIANS;
+    dyno.velocity = (1 - VELOCITY_FILTER_COEFF) * dyno.velocity + VELOCITY_FILTER_COEFF * v;
   }
 
   adc.update();
