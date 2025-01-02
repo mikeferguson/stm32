@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2023, Michael E. Ferguson
+ * Copyright (c) 2012-2025, Michael E. Ferguson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,8 +56,11 @@ ADS8684<SPI1_BASE, adc_cs, adc_reset, spi1_read_dma, spi1_write_dma> adc;
 #include "dac121.hpp"
 DAC121<SPI2_BASE, dut_dac_cs> dac;
 
+// Encoder is AMT102-V, set to 2048PPR = 8192CPR
 #include "encoder.hpp"
 Encoder<TIM3_BASE> absorber_enc;
+#define ABSORBER_CPR    8192.0f
+#define TO_RADIANS      (2.0f * 3.141592653589793f)
 
 #include "copy_float.hpp"
 
@@ -300,7 +303,7 @@ int main(void)
   dac.init();
 
   // Setup systick
-  SysTick_Config(SystemCoreClock/25000);
+  SysTick_Config(SystemCoreClock / 25000);
 
   LwIP_Init();
   if (!udp_interface_init())
@@ -319,6 +322,7 @@ int main(void)
 extern "C"
 {
 
+// Systick runs at 25khz
 void SysTick_Handler(void)
 {
   // Update system time
@@ -328,17 +332,17 @@ void SysTick_Handler(void)
   // Get system voltage
   //   adc is 12 bit (4096 count) spread over 3.3V
   //   voltage divider is 15k/1k
-  dyno.system_voltage = (ADC1->JDR1/4096.0f) * 3.3f * 16.0f;
+  dyno.system_voltage = (ADC1->JDR1 / 4096.0f) * 3.3f * 16.0f;
   ADC1->CR2 |= ADC_CR2_JSWSTART;
 
   // TODO: make the sampling time dynamic based on velocity
+  // Encoder update runs at 250hz
   if (dyno.system_time % 100 == 0)
   {
     int32_t pos = absorber_enc.read();
     int32_t vel = absorber_enc.read_speed();
-    // TODO: calculate position
-    dyno.position = 0.0f;
-    dyno.velocity = (static_cast<float>(vel) * 250.0f / 7200.0f) * 2.0f * 3.141592653589793f;
+    dyno.position = static_cast<float>(pos) / ABSORBER_CPR * TO_RADIANS;
+    dyno.velocity = (static_cast<float>(vel) * 250.0f / ABSORBER_CPR) * TO_RADIANS;
   }
 
   adc.update();
