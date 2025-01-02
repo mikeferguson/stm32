@@ -11,11 +11,11 @@ jobs:
 
     - name: Get ARM toolchain
       run: |
-        wget https://developer.arm.com/-/media/Files/downloads/gnu-rm/10-2020q4/gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2
-        tar xvfj gcc-arm-none-eabi-10-2020-q4-major-x86_64-linux.tar.bz2 -C "$HOME"
+        wget https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz
+        tar xf arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi.tar.xz -C "$HOME"
 
     - name: Setup path
-      run: echo "$HOME/gcc-arm-none-eabi-10-2020-q4-major/bin" >> $GITHUB_PATH
+      run: echo "$HOME/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi/bin" >> $GITHUB_PATH
 
     - name: Build Dyno
       run: cd projects && cd dyno && make
