@@ -57,9 +57,10 @@ ADS8684<SPI1_BASE, adc_cs, adc_reset, spi1_read_dma, spi1_write_dma> adc;
 DAC121<SPI2_BASE, dut_dac_cs> dac;
 
 // Encoder is AMT102-V, set to 2048PPR = 8192CPR
+// Belt reduction is 74:21
 #include "encoder.hpp"
 Encoder<TIM3_BASE> absorber_enc;
-#define ABSORBER_CPR            8192.0f
+#define ABSORBER_CPR            8192.0f * 21.0f / 71.0f
 #define TO_RADIANS              (2.0f * 3.141592653589793f)
 #define VELOCITY_FILTER_COEFF   0.3f
 
