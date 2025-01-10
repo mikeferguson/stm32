@@ -95,13 +95,17 @@ public:
    */
   void setOutput(uint16_t output)
   {
-  	// We only toggle the CS (or SYNC as datasheet calls it) high for a brief
-  	// moment between transfers. This allows us to forget about the SPI call
-  	// completing (and also lowers power draw according to datasheet p.??)
+    // We only toggle the CS (or SYNC as datasheet calls it) high for a brief
+    // moment between transfers. This allows us to forget about the SPI call
+    // completing (and also lowers power draw according to datasheet p.??)
     SPI_TypeDef* SPI = reinterpret_cast<SPI_TypeDef*>(SPIx);
-  	while ((SPI->SR & SPI_I2S_FLAG_RXNE) == RESET);
-  	CS::high();
-  	delay_ns(10);  // Assumes 5V supply
+
+    // Read previous data to avoid overrun error
+    uint16_t garbage = SPI->DR;
+
+    //while ((SPI->SR & SPI_I2S_FLAG_RXNE) == RESET);
+    CS::high();
+    delay_ns(20);  // Assumes 5V supply
 
     // CS to first SCLK edge = 10ns minimum
     CS::low();

@@ -173,7 +173,7 @@ void udp_callback(void *arg, struct udp_pcb *udp, struct pbuf *p,
       {
         // Next 4 bytes are desired analog output as float
         float desired_dut_voltage = copyFloat(data[idx + 2]);
-        dac.setOutput(desired_dut_voltage / 5.0f * 4096);
+        dac.setOutput(desired_dut_voltage / 5.0f * 4095);
         idx += 6;
       }
       else if (data[idx + 1] == 'B')
